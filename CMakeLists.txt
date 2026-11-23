@@ -11,6 +11,9 @@ if(BUILD_TESTING)
   target_include_directories(awe64_realtime_queues_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   target_link_libraries(awe64_realtime_queues_test PRIVATE Threads::Threads)
   add_test(NAME AWE64_RealtimeQueues COMMAND awe64_realtime_queues_test)
+  add_executable(awe64_sf2_compatibility_test tests/Sf2CompatibilityTest.cpp)
+  target_include_directories(awe64_sf2_compatibility_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  add_test(NAME AWE64_Sf2Compatibility COMMAND awe64_sf2_compatibility_test)
 endif()
 
 # The DEV plugin is deliberately not a product release: VST3 activation
