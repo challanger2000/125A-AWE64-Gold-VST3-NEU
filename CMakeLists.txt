@@ -45,12 +45,34 @@ if(AWE64_BUILD_VST3_DEV)
   set(SMTG_CREATE_PLUGIN_LINK OFF CACHE BOOL "" FORCE)
   add_subdirectory("${AWE64_VST3SDK}" "${CMAKE_BINARY_DIR}/vst3sdk")
 
+  # Preserve byte-identical owner GUI in Git. Old SDK VSTGUI 4 lacks
+  # getVisibleClientRect(), so build ONLY an ephemeral compatibility copy.
+  execute_process(
+    COMMAND git hash-object "gui/PresetBrowserView.cpp"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    OUTPUT_VARIABLE AWE64_APPROVED_GUI_BLOB
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT AWE64_APPROVED_GUI_BLOB STREQUAL "922250ed10e864d3fc7eeabf261ff29f5cbe2040")
+    message(FATAL_ERROR "Owner P007Z GUI changed unexpectedly; verify before continuing.")
+  endif()
+  file(READ "${CMAKE_CURRENT_SOURCE_DIR}/gui/PresetBrowserView.cpp" AWE64_GUI_SRC)
+  set(AWE64_OLD_VIEWPORT "browser->getVisibleClientRect().getWidth()")
+  set(AWE64_NEW_VIEWPORT "(browser->getViewSize().getWidth() - ((browser->getActiveScrollbars() & VSTGUI::CScrollView::kVerticalScrollbar) ? browser->getScrollbarWidth() : 0.))")
+  string(FIND "${AWE64_GUI_SRC}" "${AWE64_OLD_VIEWPORT}" AWE64_VIEWPORT_INDEX)
+  if(AWE64_VIEWPORT_INDEX EQUAL -1)
+    message(FATAL_ERROR "Owner GUI viewport compat anchor missing.")
+  endif()
+  string(REPLACE "${AWE64_OLD_VIEWPORT}" "${AWE64_NEW_VIEWPORT}"
+    AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  set(AWE64_GUI_COMPAT_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/PresetBrowserViewSdkCompat.cpp")
+  file(WRITE "${AWE64_GUI_COMPAT_SOURCE}" "${AWE64_GUI_SRC}")
+
   smtg_add_vst3plugin(AWE64GoldDOSBoxDev
     src/DosBoxVst3Shell.hpp
     src/DosBoxVst3Shell.cpp
     src/DosBoxVst3Factory.cpp
     src/RealtimeQueues.hpp
-    gui/PresetBrowserView.h gui/PresetBrowserView.cpp
+    gui/PresetBrowserView.h "${AWE64_GUI_COMPAT_SOURCE}"
     gui/PresetCatalog.h gui/PresetBrowserModel.h gui/IbkBank.h
     "${AWE64_VST3SDK}/public.sdk/source/vst/vstsinglecomponenteffect.cpp"
     "${AWE64_VST3SDK}/public.sdk/source/main/dllmain.cpp")
@@ -75,7 +97,7 @@ if(AWE64_BUILD_VST3_DEV)
       "125A_Knob_Standard_33frames_58px.png"
       "125A_Knob_Master_33frames_134px.png")
     file(APPEND "${AWE64_RESOURCE_RC}"
-      "\"\${AWE64_ASSET}\" PNG DISCARDABLE \"${CMAKE_CURRENT_SOURCE_DIR}/gui/resource/\${AWE64_ASSET}\"\n")
+      "\"${AWE64_ASSET}\" PNG DISCARDABLE \"${CMAKE_CURRENT_SOURCE_DIR}/gui/resource/${AWE64_ASSET}\"\n")
   endforeach()
   target_sources(AWE64GoldDOSBoxDev PRIVATE "${AWE64_RESOURCE_RC}")
 endif()

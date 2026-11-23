@@ -16,7 +16,7 @@
 | Creative-DOS-Treiber | **Integrationsnachweis im neuen Plugin ausstehend** | Originale Creative-DOS-Software ist Ziel, keine rekonstruierte Ersatztreiberlogik |
 | ROM, SYNTHGM.SBK, SF2 | **Private Testdaten in ChatGPT-Dateibibliothek auffindbar** | [TEST-ASSET-LOCATION.md](docs/TEST-ASSET-LOCATION.md); keine öffentlichen Binärdaten |
 | Echtzeit-Audio-/MIDI-Transport | **SPSC-Queue-Quellcode implementiert; Linux- und Windows-C++20-Tests PASS** (FIFO, Overflow, Underrun, getrennte Instanzen, 200.000 übertragene Nachrichten im Zweithread); tatsächliche DOSBox/EMU8000-Klangfunktion NICHT GEPRÜFT | `src/RealtimeQueues.hpp`, `tests/RealtimeQueuesTest.cpp` |
-| Windows-x64-VST3 DEV-Shell | **Quellcode implementiert; Windows-Kompilierung im CI ausstehend. Aktivierung schlägt absichtlich fehl, solange DOSBox-/Creative-Laufzeit nicht integriert ist.** | `src/DosBoxVst3Shell.*` / `src/DosBoxVst3Factory.cpp` |\n| Funktionsfähiges Windows-x64-VST3 | **Noch nicht gebaut** | Kein freigegebener Installer, kein bestandener Hosttest |
+| Windows-x64-VST3 DEV-Shell | **Quellcode implementiert; Erster Windows-Kompilierungsversuch FEHLGESCHLAGEN; SDK-API- und GUI-Header-Abgleich korrigiert, erneute CI-Prüfung ausstehend. Aktivierung schlägt absichtlich fehl, solange DOSBox-/Creative-Laufzeit nicht integriert ist.** | `src/DosBoxVst3Shell.*` / `src/DosBoxVst3Factory.cpp` |\n| Funktionsfähiges Windows-x64-VST3 | **Noch nicht gebaut** | Kein freigegebener Installer, kein bestandener Hosttest |
 | MIDI/Audioklang/Projekt-Recall | **Noch nicht nachgewiesen** | Tests erst nach Runtime-Einbindung |
 | Fender Studio Pro | **Nicht geprüft** | Praxis-Abnahme erst am Ende |
 

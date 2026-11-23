@@ -1,4 +1,6 @@
 #include "DosBoxVst3Shell.hpp"
+#include "PresetBrowserView.h"
+#include "pluginterfaces/base/ustring.h"
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/vsttypes.h"
 #include "pluginterfaces/vst/vstspeaker.h"
