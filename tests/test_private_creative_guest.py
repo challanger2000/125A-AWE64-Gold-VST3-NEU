@@ -37,7 +37,7 @@ class CreativePrivateHarnessTest(unittest.TestCase):
     def test_trace_detects_writes_and_excludes_reads(self):
         with tempfile.TemporaryDirectory() as t:
             trace = Path(t) / "emu.trace"
-            trace.write_text("R 123 620 0001\\n123 620 0001\\n124 A20 0400\\n")
+            trace.write_text("R 123 620 0001\n123 620 0001\n124 A20 0400\n")
             self.assertEqual(module.inspect_trace(trace), 2)
 
 

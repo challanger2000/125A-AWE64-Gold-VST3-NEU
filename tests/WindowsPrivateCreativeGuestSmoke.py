@@ -31,7 +31,7 @@ GM_SF2_SHA256 = "78f8739a25d49e519b3fdc92a7f03d4ddd68588fd0260578a880296e304b7b5
 def digest(path: Path, git_blob: bool = False) -> str:
     h = hashlib.sha1() if git_blob else hashlib.sha256()
     if git_blob:
-        h.update(("blob %d\\0" % path.stat().st_size).encode("ascii"))
+        h.update(("blob %d\0" % path.stat().st_size).encode("ascii"))
     with path.open("rb") as file:
         for chunk in iter(lambda: file.read(256 * 1024), b""):
             h.update(chunk)
@@ -85,7 +85,7 @@ def inspect_trace(trace: Path) -> int:
     # Exclude reads (which begin with 'R ') and require real register writes.
     if not trace.is_file():
         return 0
-    return sum(bool(re.match(r"^\\d+ [0-9A-Fa-f]{3,4} [0-9A-Fa-f]{4}$", line))
+    return sum(bool(re.match(r"^\d+ [0-9A-Fa-f]{3,4} [0-9A-Fa-f]{4}$", line))
                for line in trace.read_text(encoding="utf-8", errors="replace").splitlines())
 
 
@@ -175,8 +175,8 @@ def run_child(bundle: Path, seconds: float):
                     # Repeat after startup because authentic SF2 loading can
                     # consume variable emulated DOS time. Use CC0, not CC32.
                     if elapsed >= 3 and elapsed - last_note >= 1.3:
-                        pending.extend((b"\\xB0\\x00\\x00", b"\\xC0\\x00",
-                                        b"\\x90\\x3C\\x70"))
+                        pending.extend((b"\xB0\x00\x00", b"\xC0\x00",
+                                        b"\x90\x3C\x70"))
                         notes_sent[0] = True
                         last_note = elapsed
                     if peak_after_midi[0] >= 128 and midi_pulled[0] >= 3:
@@ -184,7 +184,7 @@ def run_child(bundle: Path, seconds: float):
                     time.sleep(.05)
             finally:
                 if notes_sent[0]:
-                    pending.append(b"\\x80\\x3C\\x00")
+                    pending.append(b"\x80\x3C\x00")
                 stop()
                 thread.join(timeout=18)
             if thread.is_alive():

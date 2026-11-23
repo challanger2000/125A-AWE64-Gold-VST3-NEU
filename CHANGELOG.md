@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Binäre Testbytes und Trace-Parser im privaten Klang-Gate korrigiert
+
+- Escape-Sequenzen für originale MIDI-Statusbytes, Git-Blob-Hashheader und echten EMU8000-Zeitstempelregulärausdruck in der Windows-Gateprüfung berichtigt; portable synthetische Regressionen verifizieren das Format. Keine Originaldateien in CI.
+- Original-Creative-Klang-PASS weiterhin ausstehend; Plugin bleibt nicht freigegeben.
+
+
 ## 23.11.2026 — Private Original-Creative-AWE-Klang-Abnahme als ausführbare Windows-Gateprüfung
 
 - `WindowsPrivateCreativeGuestSmoke.py` führt den originalen DOSBox-X-AWE32-Kern **aus dem bereits gebauten einzelnen VST3-Bundle** im selben Windows-Prozess wie den isolierten Testhost aus. Es benötigt nach Hash bestätigte Original-Dateien nur in `Contents/Resources/PRIVATE` und verwendet den identischen Gaststart mit Creative `DEMO.EXE /SBK:SYNTHGM.SF2`.
