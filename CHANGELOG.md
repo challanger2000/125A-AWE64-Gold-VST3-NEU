@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — DOSBox-X-main() läuft und kehrt zurück; zusätzlich echten Worker-Shutdown prüfen
+
+- Windows-Actions 45105475614: Original-DOSBox-X-Windows-DLL kompiliert; tatsächlicher In-Process-DOS-Guest-Boot und der DOS-Befehl `exit` **in einem Python-Windows-Prozess PASS**. Dies beweist **nicht** Creative-DOS-AWE-Audio.
+- Smoke-Test meldete nach dem Funktionsrücksprung bisher missverständlich `DLL_UNLOADED`, obwohl `WinDLL` erst beim Verlassen des Funktionsscopes freigegeben wird. Meldung präzisiert auf `CALL_RETURNED`, keine unbelegte DLL-Unload-Behauptung.
+- Zusätzlicher Windows-Prozess-Smoke-Test startet die echte DLL über einen Hintergrundthread (wie später die VST3), fordert über `AWE64_RequestStop` das Ende an und verlangt einen erfolgreichen `join()` nach 18 Sekunden, ohne den DAW-Hauptthread zu blockieren. **Noch kein PASS**, bevor CI das tatsächlich belegt.
+
 ## 23.11.2026 — Race zwischen VST3-Deaktivierung und DOSBox-Start geschlossen
 
 - `AWE64_RequestStop` darf vor dem Start des Emulatorthreads gesetzt werden. Die vorherige `AWE64_StartGuest`-Implementierung hätte die Stop-Anforderung beim Eintritt wieder gelöscht und `std::thread::join()` unbegrenzt blockieren können.

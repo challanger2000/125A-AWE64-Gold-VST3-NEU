@@ -83,6 +83,12 @@ jobs:
           $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll'
           python tests/WindowsDosBoxGuestSmoke.py --parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Original DOSBox-X in-process bootstrap/exit failed" }
+      - name: Verify original DOSBox-X background worker receives stop and joins
+        shell: pwsh
+        run: |
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll'
+          python tests/WindowsDosBoxGuestSmoke.py --stop-parent $dll
+          if ($LASTEXITCODE -ne 0) { throw "Real DOSBox in-process worker shutdown did not complete" }
       - name: Compile VST3 host and stage original internal DOSBox-X runtime DLL
         shell: pwsh
         run: |
