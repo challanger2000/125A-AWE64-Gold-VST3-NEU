@@ -35,6 +35,8 @@
 
 - **DAW-Audioisolierung (neuer Stand, CI noch offen):** interne DOSBox-X-SDL2-Laufzeit über originalen SDL-`dummy`-Treiber statt zusätzlicher Windows-Audiohardware. Der originale DOSBox-Mixer erzeugt weiter PCM, das als einziger Ausgang im VST3 erscheint. Windows-Prozess-Smoke verlangt einen nachweislich laufenden Dummy-SDL-Treiber; ohne diesen Test kein PASS.
 
+- **Neues vollständiges MPU-401-I/O-Gate (noch nicht durchgelaufen):** Eigenes 16-bit-DOS-COM-Testprogramm schaltet die originale DOSBox-X-MPU-401 in UART-Modus, erwartet den originalen 0xFE-ACK, liest Note-On über Hardwareports 331h/330h und schreibt die realen drei MIDI-Bytes per DOS-Dateioperation in MIDI.BIN. Windows-Test speist `90 3C 64` über den echten Host-Callback ein, verifiziert Datei und Verbrauch exakt einmal. Dies beweist bei PASS originalen Host→DOS-MIDI-Pfad, noch nicht Creative-SF2-/EMU8000-Klang.
+
 ## Unveränderliche Versionsregeln
 
 1. **Diese Datei ist die zentrale Versions- und Statusreferenz.** Sie wird im **selben Commit** wie jede technische Änderung an `src/`, `gui/`, dem DOSBox-X-Submodul oder dem VST3-Buildsystem aktualisiert. Ein GitHub-Actions-Check prüft, ob sie bei entsprechenden Änderungen mitgeändert wurde.

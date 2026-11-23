@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Echter MPU-401-Hardwarepfad in 16-bit-DOS-Guest (unabhängiger Integrationstest)
+
+- Eigenes winziges DOS-`MPUPROBE.COM` ohne Creative-Dateien (Assembler in `tests/MakeMpuCom.py`): spricht tatsächliche emulierte MPU-401-UART-Ports 331h/330h an, wartet auf ACK, liest drei MIDI-Bytes und schreibt die gelesenen Bytes mit originalen DOS-INT21-Funktionen in `MIDI.BIN`.
+- `tests/WindowsMpuGuestSmoke.py` startet **die originale echte DOSBox-X-DLL im selben Windows-Prozess** und speist MIDI `90 3C 64` über `AWE64_HostRegisterMidi` ein. PASS nur, wenn der 16-bit-Gast dieselben drei Bytes wirklich in der DOS-Datei ablegt, exakt ein Callback konsumiert wurde und der Emulator kontrolliert zurückkehrt.
+- Verifiziert bei Erfolg die Original-MPU-401-Transportstrecke bis zum DOS-Gast; keine proprietäre Creative-Datei und noch **kein echter EMU8000-/SF2-/AWE-PCM-Klangnachweis**. Teststatus zum Commit offen.
+
 ## 23.11.2026 — Ausschließlich DAW-Audioausgabe: interner SDL-Audiotreiber ohne Hardwareausgang
 
 - `mixer.cpp` im gepinnten **internen** DOSBox-X-Windows-DLL-Build auf SDL2-`dummy`-Audiotreiber umgestellt. Die Original-Mixer-Callback-Synthese bleibt identisch und liefert PCM an den VST3-Ring; die Zusatz-Windows-Audiohardware bleibt geschlossen. Kein globales `SDL_AUDIODRIVER`-Environment im DAW-Prozess.
