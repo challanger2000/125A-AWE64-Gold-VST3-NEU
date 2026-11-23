@@ -219,6 +219,12 @@ int main(int argc,char** argv) {
     std::uint64_t noteOffEventsSent=0;
     std::uint64_t nonzero=0,frames=0;
     float peak=0.;
+    double idleEnergy=0., noteEnergy=0., releaseEnergy=0.;
+    std::uint64_t idleFrames=0,noteFrames=0,releaseFrames=0,activeNoteBlocks=0,nearFullScale=0;
+    constexpr unsigned warmupBlocks=250, idleBlocks=80, heldBlocks=100, tailBlocks=250;
+    constexpr unsigned startNoteBlock=warmupBlocks+idleBlocks;
+    constexpr unsigned stopNoteBlock=startNoteBlock+heldBlocks;
+    constexpr unsigned endOriginalBlock=stopNoteBlock+tailBlocks;
     // Authentic Creative-AWE ROM presets can be quieter than PC-speaker.
     // Keep a measurable threshold above digital noise for owner-only mode.
     const float minimumPeak=originalMode ? 0.002f : 0.01f;
@@ -228,15 +234,13 @@ int main(int argc,char** argv) {
     // Original Creative/SF2LIB initialization may take longer than the
     // validated short public synthetic DOS test. Preserve the latter.
     const unsigned maxBlocks=originalMode ?
-        static_cast<unsigned>(originalSeconds*1000/12) : 600u;
+        std::min(static_cast<unsigned>(originalSeconds*1000/12),endOriginalBlock) : 600u;
     for(unsigned block=0;block<maxBlocks;++block){
-        // First 15 blocks are a silence negative control.
-        // Send both note-on and note-off in private Creative mode so notes
-        // cannot accumulate indefinitely during asynchronous bank loading.
-        const bool sendNote=block>=15 &&
-            (originalMode ? ((block-15u)%80u)==0u : (block%15u)==0u);
-        const bool sendNoteOff=originalMode && block>=15 &&
-            ((block-15u)%80u)==40u;
+        // Synthetic path retains its short silence check. Original path
+        // measures settled idle, one held note and release separately.
+        // Startup transients cannot satisfy the musical note gate.
+        const bool sendNote=originalMode ? block==startNoteBlock : (block>=15 && block%15u==0u);
+        const bool sendNoteOff=originalMode && block==stopNoteBlock;
         midiEvents.setEnabled(sendNote||sendNoteOff,sendNoteOff);
         if(sendNote)++noteEventsSent;
         if(sendNoteOff)++noteOffEventsSent;
@@ -244,17 +248,26 @@ int main(int argc,char** argv) {
         if(processor->process(data)!=S::kResultOk)
             return fail("Actual VST3 process() returned failure");
         called=true;
+        double blockEnergy=0.;
         for(std::size_t i=0;i<l.size();++i) {
             const float v=std::max(std::abs(l[i]),std::abs(r[i]));
             if(!std::isfinite(v)||v>1.01f)
                 return fail("Actual VST3 audio contained non-finite or clipped signal");
-            if(block<15 && v>0.001f)
+            if(!originalMode && block<15 && v>0.001f)
                 return fail("Audio produced BEFORE first VST3 MIDI NoteOn event");
-            peak=std::max(peak,v);
-            if(v>0.0001f)++nonzero;
+            if(originalMode) {
+                const double e=(double(l[i])*l[i]+double(r[i])*r[i])*0.5;
+                blockEnergy+=e;
+                if(block>=warmupBlocks && block<startNoteBlock){idleEnergy+=e;++idleFrames;}
+                else if(block>=startNoteBlock && block<stopNoteBlock){noteEnergy+=e;++noteFrames; if(v>=0.9999f)++nearFullScale;}
+                else if(block>=stopNoteBlock){releaseEnergy+=e;++releaseFrames;}
+            }
+            if(!originalMode || block>=startNoteBlock){peak=std::max(peak,v);if(v>0.0001f)++nonzero;}
         }
+        if(originalMode && block>=startNoteBlock && block<stopNoteBlock &&
+           blockEnergy/l.size()>0.000001)++activeNoteBlocks;
         frames+=l.size();
-        if(peak>minimumPeak&&nonzero>=512 && (!originalMode||noteOffEventsSent>0))break;
+        if(!originalMode && peak>minimumPeak&&nonzero>=512)break;
         std::this_thread::sleep_for(std::chrono::milliseconds(12));
     }
     if(processor->setProcessing(false)!=S::kResultOk)
@@ -269,6 +282,13 @@ int main(int argc,char** argv) {
     FreeLibrary(module);
     if(noteEventsSent<1)return fail("No VST3 NoteOn event injected");
     if(originalMode && noteOffEventsSent<1)return fail("No VST3 NoteOff event injected");
+    if(originalMode){
+        if(!idleFrames||!noteFrames||!releaseFrames)return fail("Missing original note/idle/release measurement window");
+        const double idleRms=std::sqrt(idleEnergy/idleFrames), noteRms=std::sqrt(noteEnergy/noteFrames), releaseRms=std::sqrt(releaseEnergy/releaseFrames);
+        std::cout<<"ORIGINAL_IDLE_RMS="<<idleRms<<"\nORIGINAL_HELD_NOTE_RMS="<<noteRms<<"\nORIGINAL_RELEASE_RMS="<<releaseRms<<"\nORIGINAL_ACTIVE_NOTE_BLOCKS="<<activeNoteBlocks<<"\nORIGINAL_HELD_NEAR_FULL_SCALE_FRAMES="<<nearFullScale<<"\n";
+        if(noteRms<0.001 || noteRms<idleRms*4. || activeNoteBlocks<8)
+            return fail("Original sustained MIDI note did not clearly exceed settled idle audio");
+    }
     if(!called||peak<=minimumPeak||nonzero<512)
         return fail("Real VST3 host process() emitted only silence; peak="+
                     std::to_string(peak)+", nonzero="+std::to_string(nonzero));

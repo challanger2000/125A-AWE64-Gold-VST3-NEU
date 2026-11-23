@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Original-Creative-ROM/SF2 erzeugt erstmals PCM im tatsächlichen Windows-VST3
+
+- **[Windows 45267065002](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45267065002) vollständig SUCCESS**, Original-Archiv-Gate tatsächlich ausgeführt, nicht übersprungen: SHA-verifiziertes AWE-ROM, originale Creative-DEMO/SF2, tatsächliches VST3-PCM: 52.224 Stereo-Frames, 818 nicht-stumm, Peak 0,999969, zwei NoteOn und ein NoteOff gesendet; 12.823 EMU8000-Writes. Separater DLL-Test: 12.902 Writes an sechs Ports, PCM16-Peak 6.539, vier MIDI-Pakete, SDL-Dummy-Isolation und Stop/Join PASS. Positiv-/Negativkontrollen PASS; [Versionsprüfung 45267064799](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45267064799) SUCCESS. Keine privaten Besitzerdateien hochgeladen.
+- **Beweisgrenze:** Der erste VST3-Test belegt Original-PCM, jedoch noch keine saubere musikalische Wiedergabe. Der fast volle Peak und die kurze Messzeit verlangen getrennte Messung nach dem Start. Die neue native Originalprüfung wartet 250 Blöcke auf Initialisierung, misst 80 Blöcke Ruhe, spielt einen einzelnen Ton 100 Blöcke und erfasst 250 Blöcke Release. Sie verlangt mindestens acht aktive Note-Blöcke und einen klaren RMS-Anstieg gegenüber Ruhe; sie protokolliert Near-Full-Scale-Frames ohne den Chip oder die Verstärkung zu verändern. Keine Frühfreigabe aufgrund eines Startimpulses mehr. Synthetisches Gate unverändert.
+- **Neue musikalische Prüfung noch ausstehend**, kein DAW-/Hardwaretreue-Nachweis, keine SF2-Bankwechsel-Abnahme. `0.0.0-dev`, nur `main`, unveränderter originaler EMU8000 und P165.
+
 ## 23.11.2026 — Original-Creative-Archivmaterial im echten Windows-VST3: Forschungsprüfung nach P30
 
 - Nutzerentscheidung: den früheren P30-Prüfweg weiterverwenden, statt die Originalklangprüfung an den Besitzer zu delegieren. P30 hat originales DEMO/SF2-Laden gezeigt, P31 dokumentierte weiterhin stumme bzw. ungültige Notenversuche. Keine Klangfreigabe aus diesen Befunden ableiten.
