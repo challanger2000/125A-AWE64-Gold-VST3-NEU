@@ -9,6 +9,8 @@ on:
       - 'integration/DosBoxHostAdapter.hpp'
       - 'integration/AWE64_DOSBOX_ABI.h'
       - 'tools/patch_creative_demo.py'
+      - 'tools/prepare_private_vst3.py'
+      - 'tools/test_private_vst3.py'
       - 'guest/**'
       - 'CMakeLists.txt'
       - '.github/workflows/audio-bridge-tests.yml'
@@ -29,6 +31,8 @@ jobs:
           submodules: false
       - name: Validate original Creative guest patch without proprietary sources
         run: python -m unittest discover -s tests -p test_guest_patch.py
+      - name: Verify private bundle staging using ONLY generated fake data
+        run: python -m unittest discover -s tools -p test_private_vst3.py -v
       - name: Configure
         run: cmake -S . -B build -DBUILD_TESTING=ON
       - name: Compile

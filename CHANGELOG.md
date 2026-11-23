@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Private Ein-Bundle-Paketierung mit Originaldatei-Integritätsprüfung vorbereitet
+
+- `tools/prepare_private_vst3.py` sichert die geforderte **Ein-VST3-Installation**: originaler Windows-VST3-Host, originale DOSBox-X-AWE32-DLL, unveränderte P165-Frontplatte und die später lokal benötigten Creative-Dateien zusammen in einem einzigen privaten `.vst3`-Bundle.
+- Verwendet ausschließlich lokal vorhandene, bereits legitim bezogene Ownerdateien und kopiert unter das im Git ignorierte `PRIVATE/`. Akzeptiert nur Original-ROM mit geprüftem SHA256/1MiB, Creative `DEMO.EXE` mit dokumentiertem Original-Git-Blob, `SYNTHGM.SF2` mit SHA256/42.726B und die byteidentische P165-Originalfrontplatte. SBK wird ausdrücklich **nicht** mit SF2 verwechselt.
+- Vor dem Kopieren alle Eingaben geprüft; Verweigerung bei Falschdateien, Symlinks, unsicherem Zielort oder bestehendem Output. Keine Originaldateien in Git, GitHub-Runner, CI-Artefakte oder Logs.
+- Neue portable Python-Unit-Tests mit **ausschließlich synthetischen Testbytes** in Linux/Windows-Testlauf eingebunden; vor echtem CI-Ergebnis kein PASS. Ein so gepacktes DEV-Bundle ist **kein** originalklanggeprüftes Plugin und kein Release.
+
 ## 23.11.2026 — Original-DOSBox-X-SDL2, 16-Bit-MIDI-Hardware, Stereo-PCM und vollständiges VST3-Bundle: Windows-PASS
 
 - **GitHub Actions [45109673741](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45109673741) – gesamter integrierter Windows-Lauf SUCCESS.** Originaler gepinnter DOSBox-X-AWE32-Fork als **Windows x64 SDL2-DLL** gebaut, verlinkt und zur Laufzeit innerhalb des Windows-Testprozesses geladen. Originales DOSBox-`main()` führte echte DOS-Kommandos aus und kehrte mit Exitcode 0 zum Host zurück.
