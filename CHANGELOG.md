@@ -1,10 +1,10 @@
 # Änderungsverlauf
 
-## 23.11.2026 — Echte Windows-VST3-Negativkontrolle: PC-Speaker-Ton darf als Creative-only nicht hörbar sein
+## 23.11.2026 — Echte Windows-VST3-Negativkontrolle: POSITIV und NEGATIV bestanden
 
 - Der bestehende echte Windows-VST3-MIDI→DOSBox-X→Mixer→PCM-Positivtest wird um eine **direkt folgende echte Negativkontrolle** ergänzt. Bei unveränderter synthetischer NoteOn-DOS-`DEMO.EXE` und Null-ROM muss der explizite private `AWE64_ORIGINAL_CREATIVE_ONLY=1`-Modus **PC-Speaker und OPL ausschalten** und das reale VST3-`process()` genau **0 nicht-stumme Frames** liefern.
 - Neues `tests/WindowsVst3CreativeOnlyNegative.py` ist ein zeitlich begrenzter echter Windows-VST3-Testhost-Kindprozess. Ein Fehler gilt **nur dann als erwartetes Negativergebnis**, wenn der native Testhost tatsächlich durchgelaufen ist und das ausdrücklich nachgewiesene Null-Audio-Ergebnis meldet. Absturz, Startfehler oder zufällig fehlendes Testprogramm führen ausdrücklich zu FAIL. Kein Original-EMU8000-Klang-PASS daraus ableiten.
-- Ausführung als separate neue Windows-Actions-Stufe nach dem positiven Original-DOSBox-X-Gate; datenfreie Python-Regression verifiziert die private Alternative-Generator-Sperre und die tatsächlich aktivierte Negativkontrolle. **Neue Windows-Gegenprobe noch nicht abgeschlossen**, `0.0.0-dev`, kein Release.
+- **[Windows-Actions 45260688380](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45260688380): SUCCESS.** Echter VST3-Positivtest mit 63.488 Stereo-Frames, 1.011 nicht-stummen, Float32-Peak 0,304871 und 8 NoteOn; unmittelbar danach das gleiche synthetische DOS-Programm im privaten Creative-only-Modus mit **nachweislich exakt 0 nicht-stummen Frames**, erwartetem SILENCE-Fehler und Marker `REAL_VST3_PRIVATE_CREATIVE_ONLY_SILENCES_PC_SPEAKER_PASS`. Vollständige originale DOSBox-DLL-/EMU8000-Register-/MIDI-/Audio-Integrationskette weiter PASS. [Linux/Windows 45260688317](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45260688317) Regressionen SUCCESS; [Version 45260688373](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45260688373) SUCCESS. Die reine Tonquelle bleibt synthetische DOS-PC-Speaker-Hardware; **Original-Creative-SF2-Klang nicht getestet**, `0.0.0-dev`, kein Release.
 
 
 ## 23.11.2026 — Tatsächlichen Original-Creative-VST3-Klangtest gegen PC-Speaker-/OPL-Falschtöne abgesichert
