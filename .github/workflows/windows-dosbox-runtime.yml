@@ -13,6 +13,7 @@ on:
       - 'tests/MakeSpeakerCom.py'
       - 'tests/WindowsSpeakerPcmSmoke.py'
       - 'tests/MakeSyntheticDemoExe.py'
+      - 'tests/MakeMidiTriggeredDemoExe.py'
       - 'tests/WindowsVst3HostPcmSmoke.cpp'
       - 'tests/WindowsRunVst3HostPcmSmoke.py'
       - 'tests/test_synthetic_dos_exe.py'
@@ -164,7 +165,7 @@ jobs:
           Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
           if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
           Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
-      - name: Verify REAL VST3 factory and process audio with PUBLIC DOS speaker MZ (NOT Creative)
+      - name: Verify REAL VST3 MIDI NoteOn -> original DOS MPU-401 -> PC speaker -> VST3 PCM
         shell: pwsh
         timeout-minutes: 2
         run: |

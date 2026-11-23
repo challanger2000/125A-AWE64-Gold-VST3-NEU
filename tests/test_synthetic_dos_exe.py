@@ -13,7 +13,7 @@ class SyntheticDosExeTests(unittest.TestCase):
     def test_true_mz_exe_with_original_pc_speaker_io(self):
         binary = build_test_mz_exe()
         self.assertEqual(binary[:2], b"MZ")
-        self.assertEqual(len(binary), 116)
+        self.assertEqual(len(binary), 202)
         magic, last, pages, reloc, hdrpara, minalloc, maxalloc, ss, sp = (
             struct.unpack_from("<9H", binary, 0))
         self.assertEqual(magic, 0x5a4d)
@@ -28,7 +28,16 @@ class SyntheticDosExeTests(unittest.TestCase):
         self.assertIn(bytes((0xe6, 0x43)), code)
         self.assertIn(bytes((0xe6, 0x61)), code)
         self.assertIn(bytes((0x83, 0xfa, 0x24)), code)
-        self.assertEqual(code[-5:], bytes((0xb8, 0, 0x4c, 0xcd, 0x21)))
+        self.assertIn(bytes((0xb8, 0, 0x4c, 0xcd, 0x21)), code)
+        # The DOS speaker stays OFF until real MIDI has been read on 330h:
+        # UART 3Fh + FE ACK + status90/note60/velocity100, then speaker I/O.
+        self.assertIn(bytes((0xBA, 0x31, 0x03, 0xB0, 0x3F, 0xEE)), code)
+        self.assertIn(bytes((0x3C, 0xFE)), code)
+        self.assertIn(bytes((0x3C, 0x90)), code)
+        self.assertIn(bytes((0x3C, 0x3C)), code)
+        self.assertIn(bytes((0x3C, 0x64)), code)
+        self.assertIn(bytes((0xBA, 0x30, 0x03, 0xEC)), code)
+        self.assertIn(bytes((0xF9, 0x5B, 0xC3)), code)
         self.assertNotIn(b"Creative", binary)
 
     def test_ci_script_does_not_overwrite_powershell_builtin_host_variable(self):

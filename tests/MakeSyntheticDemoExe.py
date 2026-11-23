@@ -1,35 +1,22 @@
 #!/usr/bin/env python3
 """Generate a PUBLIC-DOMAIN-FREE, freshly synthesized DOS MZ executable fixture.
 
-The fixture is NOT Creative DEMO.EXE. It only exercises original emulated
+The fixture is NOT Creative DEMO.EXE. It receives actual VST3 NoteOn over the original MPU-401 and only then
+exercises original emulated
 PC-speaker/PIT registers in DOSBox-X. It is used solely in public CI to
 probe the actual compiled VST3's PCM path. No copyrighted ROM, driver, or
 SoundFont is supplied. Private production VST3 packages must never use it.
 """
 from pathlib import Path
 import struct
-from MakeSpeakerCom import build_probe
+from MakeMidiTriggeredDemoExe import build_midi_triggered_exe
 
 
 def build_test_mz_exe():
-    code = bytearray(build_probe())
-    # Keep fixture sounding for ~2 seconds in real DOS, enough to let the
-    # independently scheduled VST3 host thread request original PCM frames.
-    timer = bytes((0x83, 0xfa, 0x09))
-    if code.count(timer) != 1:
-        raise ValueError("Unexpected PC-speaker timer fixture")
-    code = code.replace(timer, bytes((0x83, 0xfa, 0x24)))
-    header = bytearray(64)
-    length = len(header) + len(code)
-    # MZ EXE with CS:IP=0000:0000, SS:SP=0000:FFFE, no relocations.
-    # The code itself uses real DOS INT 1Ah and the hardware IO ports.
-    words = [
-        0x5A4D, length % 512, (length + 511) // 512,
-        0, 4, 0x1000, 0xFFFF, 0, 0xFFFE,
-        0, 0, 0, 0x1C, 0
-    ]
-    struct.pack_into("<14H", header, 0, *words)
-    return bytes(header + code)
+    # Force a complete VST3-MIDI -> original MPU-401 -> DOS PC-speaker
+    # -> original DOSBox-X mixer -> VST3 process() audio roundtrip.
+    # A note is mandatory: mere MIDI output silence cannot pass this gate.
+    return build_midi_triggered_exe()
 
 
 def stage_fixture(bundle: Path):

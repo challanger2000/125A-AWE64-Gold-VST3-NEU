@@ -36,6 +36,13 @@ Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git
 
 Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
 
+## 23.11.2026 — Geschlossener VST3-MIDI→DOS-MPU→Hardware-Audio→VST3-Test integriert (neue CI noch offen)
+
+- Der vorangegangene Windows-Lauf [45197768158](../../actions/runs/45197768158) hat **echte VST3-Host-Audioausgabe nachgewiesen**, aber nicht den Eingang von MIDI-Events durch denselben VST3-Aufruf. Der neue Test verlangt jetzt beides in **einer einzelnen echten Windows-VST3-Instanz**.
+- **Neuer synthetischer Originalhardware-Gast:** `tests/MakeMidiTriggeredDemoExe.py` assembliert selbst eine 16-Bit-DOS-MZ-Datei. Diese setzt den **originalen emulierten MPU-401** an 331h mittels 3Fh in UART-Modus, verifiziert 0FEh ACK, liest die tatsächlichen Bytes an 330h und aktiviert **erst nach** NoteOn Kanal 0, Ton 60, Velocity 100 die echte PIT-/PC-Speaker-Hardware (Ports 43h/42h/61h) für rund 2 Sekunden. Vorher bleibt der PC-Speaker aus; ~10-Sekunden-BIOS-Tick-Watchdog gegen Hänger. Kein eigener Klangrenderer und keine Creative-Bytes.
+- **Neuer VST3-Host-Test:** `tests/WindowsVst3HostPcmSmoke.cpp` implementiert eine echte Steinberg-`IEventList`, schickt nach anfänglicher stiller Negativkontrolle periodisch **echte NoteOn-Events an `IAudioProcessor::process()`** und verlangt danach nicht-stumme PCM am VST3-Stereoausgang. Ohne funktionierenden VST3-MIDI-zu-EMU401- und DOS-PC-Speaker-zu-VST3-Audio-Rundweg kann der Test nicht bestehen.
+- Das bleibt ein **synthetisches, nicht-proprietäres Original-DOSBox-I/O-Testprogramm**, **kein** Original-Creative-`DEMO.EXE`, kein echtes Wave-ROM oder `SYNTHGM.SF2`. Ein bestandenes MIDI↔Audio-Transport-Gate ist keine Freigabe des Original-EMU8000-Instruments. Stand der neu angestoßenen Windows-Prüfung bis zur vollständigen CI **offen**, `0.0.0-dev`, nur `main`.
+
 ## 23.11.2026 — Erster echter Windows-VST3-Host-`process()`-Klangnachweis: PASS
 
 - **[Windows-Original-DOSBox-X-/VST3-Integrationslauf 45197768158](../../actions/runs/45197768158): vollständig SUCCESS.** Die echte kompilierte `AWE64GoldDOSBoxDev.vst3` wurde über die reale Steinberg-`GetPluginFactory`, `IComponent`, `IAudioProcessor`, `setActive`, `setProcessing` und den wiederholt aufgerufenen originalen `process()`-Callback geladen, gestartet, mit Ton betrieben, deaktiviert und freigegeben.

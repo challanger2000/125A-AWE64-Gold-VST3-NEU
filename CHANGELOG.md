@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Echte MIDI↔Audio-VST3-Rundwegprüfung statt getrennten Ein-/Ausgangs-Smokes
+
+- Nach dem bestätigten echten VST3-`process()`-Audio-PASS in Windows [45197768158](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45197768158) wurde nun ein **gemeinsamer Ende-zu-Ende-Test** eingeführt: MIDI NoteOn vom echten VST3-`IEventList` über `DosBoxVst3Shell::process()`/SPSC-Queue und Original-MPU-401 an ein eigenes 16-Bit-DOS-Programm; erst bei exakter Note 60/Velocity 100 aktiviert dieses die Original-PC-Speaker-Hardware; deren Audio muss durch originalen DOSBox-X-Mixer und VST3-`process()` im Host zurückkehren.
+- `MakeMidiTriggeredDemoExe.py`: vollständiges eigenes DOS-MZ-Assemblerprogramm mit UART-ACK-Verifikation, echter DOS-MPU-330h/331h-Lesung, echter PIT-/Speaker-I/O, BIOS-Tick-Timeout und sicherem DOS-Exit. `MakeSyntheticDemoExe.py` verwendet dieses statt eines unbedingten Starttons. `WindowsVst3HostPcmSmoke.cpp` prüft dazu vor MIDI das Fehlen von Audio und verlangt danach hörbare Float32-Ausgabe.
+- `test_synthetic_dos_exe.py` erweitert auf das 202-Byte-MZ-Programm und dessen tatsächliche Port-/MIDI-Befehle; Windows-Workflow startet das MIDI→PCM-Gate, zunächst **ohne** geschützte Creative-Dateien. Kein Eingriff in Original-EMU8000, Creative-Treiber, P165-GUI oder Quell-DOSBox-X. **Noch kein CI-PASS dieses neuen Rundwegs und noch kein echter Creative-SF2-Klang-PASS;** `0.0.0-dev`.
+
+
 ## 23.11.2026 — Echte VST3-Host-Audioausgabe aus Original-DOSBox: vollständiger Windows-PASS
 
 - **[Windows-Actions 45197768158](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45197768158) SUCCESS.** Reales Windows-`AWE64GoldDOSBoxDev.vst3` über tatsächliche Steinberg-`GetPluginFactory`/`IComponent`/`IAudioProcessor` aktiviert, `process()` bei **44,1 kHz / Float32** ausgeführt und echte nicht-stumme PCM durch das VST3 empfangen. **80.384 Stereo-Frames**, **568 nicht-stumme Frames**, **Peak 0,304871**; Deaktivierung, Beenden und Freigabe ebenfalls PASS.
