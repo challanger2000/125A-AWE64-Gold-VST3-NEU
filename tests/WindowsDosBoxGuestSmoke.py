@@ -57,6 +57,18 @@ def stop_child(dllpath):
         check=lib.AWE64_IsInternalAudioOnly
         check.argtypes=[]
         check.restype=ctypes.c_int
+        # Real original DOSBox-X stereo mixer callback, not a test oscillator.
+        pcm_sig=ctypes.CFUNCTYPE(None,ctypes.c_void_p,
+                                 ctypes.POINTER(ctypes.c_int16),ctypes.c_uint)
+        pcm_frames=[]
+        @pcm_sig
+        def receive_original_pcm(ctx,interleaved,count):
+            if interleaved and count>0:
+                pcm_frames.append(int(count))
+        register_pcm=lib.AWE64_HostRegisterPCM
+        register_pcm.argtypes=[ctypes.c_void_p,pcm_sig]
+        register_pcm.restype=None
+        register_pcm(None,receive_original_pcm)
         args=[b'AWE64DOSBoxRuntime',b'-noconfig',b'-nomenu',b'-noconsole',
               b'-set',b'sblaster sbtype=sb16']
         argv=(ctypes.c_char_p*(len(args)+1))(*args,None)
@@ -66,19 +78,23 @@ def stop_child(dllpath):
         thread=threading.Thread(target=launch,daemon=True)
         thread.start()
         deadline=time.monotonic()+8.0
-        while thread.is_alive() and check()!=1 and time.monotonic()<deadline:
+        while thread.is_alive() and (check()!=1 or not pcm_frames) and time.monotonic()<deadline:
             time.sleep(.05)
         if not thread.is_alive():
             raise SystemExit('DOSBox background worker exited before stop request')
         if check()!=1:
             raise SystemExit('Physical/audio backend not isolated: expected SDL dummy output')
+        if not pcm_frames:
+            raise SystemExit('Original DOSBox-X mixer PCM never reached host callback')
         print('ORIGINAL_DOSBOX_INTERNAL_AUDIO_DRIVER=dummy',flush=True)
+        print('ORIGINAL_DOSBOX_STEREO_PCM_FRAMES='+str(sum(pcm_frames)),flush=True)
         stop()
         thread.join(18)
         if thread.is_alive():
             raise SystemExit('DOSBox background worker did not join after AWE64_RequestStop')
         if result!=[0]:
             raise SystemExit('DOSBox background worker failed: '+repr(result))
+        register_pcm(None,pcm_sig())
     print('ORIGINAL_DOSBOX_WORKER_STOPPED_AND_JOINED',flush=True)
 
 def stop_parent(dllpath):
@@ -88,7 +104,7 @@ def stop_parent(dllpath):
     print('STOP CHILD EXIT:',result.returncode)
     print('STOP STDOUT:',result.stdout[-5000:])
     print('STOP STDERR:',result.stderr[-5000:])
-    if result.returncode or 'ORIGINAL_DOSBOX_WORKER_STOPPED_AND_JOINED' not in result.stdout:
+    if result.returncode or 'ORIGINAL_DOSBOX_WORKER_STOPPED_AND_JOINED' not in result.stdout or 'ORIGINAL_DOSBOX_STEREO_PCM_FRAMES=' not in result.stdout:
         raise SystemExit('Original DOSBox-X thread cancellation failed')
 
 if __name__=='__main__':

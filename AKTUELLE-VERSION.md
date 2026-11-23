@@ -56,6 +56,9 @@ Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32
 
 **GUI-Kompatibilität (build-only):** Alte P165-Win95-/86Box-ROM-/SF2-Popups werden in der CMake-generierten **temporären GUI-Quelldatei** durch korrekte DOSBox-X/Creative-DOS-Hinweise ersetzt. Original P165, Grafiken, Reglerabdunklung und Hash bleiben byteidentisch. Kein falsches Live-SF2-Versprechen. Windows-Regression bei diesem Commit noch ausstehend.
 
+- **Neuer Soundtransport-Gate:** Ein Windows-DOSBox-X-Smoke fordert echte vom originalen Mixer an den Windows-Host gelieferte PCM-Stereo-Frames, bei ausschließlich internem SDL-`dummy`-Treiber. Noch kein PASS; ROM-/Creative-freier Test darf Stille enthalten.
+- **CI-Beschleunigung:** Pro `main`-Branch bleibt nur der jüngste vollständige DOSBox-X-Windows-Build aktiv; die vorherigen werden mittels GitHub-Concurrency abgebrochen.
+
 ## Verbindlicher Workflow für jeden Codex und neuen Chat
 
 1. [AGENTS.md](AGENTS.md), [START-HERE.md](START-HERE.md), diese Datei und [CHANGELOG.md](CHANGELOG.md) lesen; neuestes `main`-HEAD und aktuelle Actions-Prüfläufe nachsehen.

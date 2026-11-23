@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Realen Original-DOSBox-X-PCM-Callback und CI-Build-Isolation prüfen
+
+- Der Windows-Guest-Smoke registriert `AWE64_HostRegisterPCM` über C-ABI als echte Python-Hostfunktion. Er verlangt einen vom originalen DOSBox-X-Stereo-Mixer gelieferten PCM-Block, während der Original-DOSBox-Guest startet und kein zusätzliches Windows-Audiohardwaregerät öffnet. Keine künstliche Klangerzeugung; ohne Creative-ROM darf das PCM-Signal hier noch still sein.
+- `windows-dosbox-runtime.yml`: `concurrency.cancel-in-progress` auf `main` verhindert, dass ältere DOSBox-X-/VST3-Kompilierungen weiterhin gleichzeitig kostspielig laufen, wenn eine neue geprüfte Änderung auf `main` eingecheckt wird.
+- **Keine Behauptung eines Audio-Sound-PASS vor tatsächlichem CI-Ergebnis** und weiterhin keine Original-Creative-DOS-/ROM-Klangabnahme.
+
 ## 23.11.2026 — Original-Creative-MPU401-Initialisierung korrigiert (kritischer 0x3F-ACK)
 
 - Originales gepinntes `src/hardware/mpu401.cpp` direkt überprüft: `MPU401_WriteCommand` ignoriert im **bereits aktiven UART-Modus** jeden Befehl außer 0xFF (Zeile 135). Die ursprüngliche Host-Konfiguration `midi mpu401=uart` verhinderte dadurch den ACK auf 0x3F und konnte `DEMO.EXE` mit `ERROR: MPU401 initialization failed` scheitern lassen.

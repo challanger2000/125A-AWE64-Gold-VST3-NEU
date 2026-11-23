@@ -16,6 +16,10 @@ on:
       - '.github/workflows/windows-dosbox-runtime.yml'
       - '.github/workflows/windows-vst3-dev-shell.yml'
   workflow_dispatch:
+concurrency:
+  group: awe64-dosbox-runtime-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:
