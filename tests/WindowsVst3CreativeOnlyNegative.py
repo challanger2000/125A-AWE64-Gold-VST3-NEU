@@ -24,14 +24,14 @@ def prove_non_creative_silenced(exe: Path, plugin: Path):
     env["AWE64_ORIGINAL_CREATIVE_ONLY"] = "1"
     env["SDL_AUDIODRIVER"] = "dummy"
     result = subprocess.run(
-        [str(native_exe), str(native_plugin), "--original", "15"],
+        [str(native_exe), str(native_plugin), "--negative"],
         env=env, text=True, capture_output=True, timeout=30, check=False)
     # Exit code 1 is required but INSUFFICIENT: a broken VST3/DLL also
     # returns 1. It must specifically have RUN and reached the sound test
     # before rejecting the fake Creative-tone attempt as SILENCE.
     if (result.returncode != 1 or
             "Real VST3 host process() emitted only silence" not in result.stderr or
-            "nonzero=0" not in result.stderr):
+            "peak=0, nonzero=0" not in result.stderr):
         raise RuntimeError(
             "Original-only VST3 sound exclusion NEGATIVE CONTROL FAILED: "
             "return=" + str(result.returncode) +

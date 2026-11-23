@@ -134,14 +134,15 @@ static int fail(const std::string& reason) {
 
 int main(int argc,char** argv) {
     const bool originalMode=(argc==4 && std::strcmp(argv[2],"--original")==0);
+    const bool exclusionMode=(argc==3 && std::strcmp(argv[2],"--negative")==0);
     const int originalSeconds=originalMode ? std::atoi(argv[3]) : 0;
-    if(!(argc==2 || (originalMode && originalSeconds>=15 && originalSeconds<=120)))
-        return fail("usage: WindowsVst3HostPcmSmoke.exe Plugin.vst3 [--original 15..120]");
+    if(!(argc==2 || exclusionMode || (originalMode && originalSeconds>=15 && originalSeconds<=120)))
+        return fail("usage: WindowsVst3HostPcmSmoke.exe Plugin.vst3 [--original 15..120 | --negative]");
     // Private mode runs exclusively on the owner's Windows computer after
     // the launcher verifies the original Creative EXE/SF2/ROM hashes.
     // Refuse a "Creative AWE sound" PASS if the guest could have produced
     // sound through PC speaker, OPL or a real SDL2 output device.
-    if(originalMode) {
+    if(originalMode || exclusionMode) {
         const char* originalOnly=std::getenv("AWE64_ORIGINAL_CREATIVE_ONLY");
         if(!originalOnly || std::strcmp(originalOnly,"1")!=0)
             return fail("Private Creative mode requires AWE64_ORIGINAL_CREATIVE_ONLY=1");
@@ -267,7 +268,7 @@ int main(int argc,char** argv) {
         if(originalMode && block>=startNoteBlock && block<stopNoteBlock &&
            blockEnergy/l.size()>0.000001)++activeNoteBlocks;
         frames+=l.size();
-        if(!originalMode && peak>minimumPeak&&nonzero>=512)break;
+        if(!originalMode && !exclusionMode && peak>minimumPeak&&nonzero>=512)break;
         std::this_thread::sleep_for(std::chrono::milliseconds(12));
     }
     if(processor->setProcessing(false)!=S::kResultOk)
@@ -282,6 +283,13 @@ int main(int argc,char** argv) {
     FreeLibrary(module);
     if(noteEventsSent<1)return fail("No VST3 NoteOn event injected");
     if(originalMode && noteOffEventsSent<1)return fail("No VST3 NoteOff event injected");
+    // The exclusion control uses the SAME repeated MIDI stimulus as the
+    // positive synthetic test, and checks EVERY frame (including startup).
+    // It cannot accidentally pass on a held-note RMS diagnostic.
+    if(exclusionMode){
+        if(peak!=0.f || nonzero!=0)return fail("Negative control produced audio");
+        return fail("Real VST3 host process() emitted only silence; peak=0, nonzero=0");
+    }
     if(originalMode){
         if(!idleFrames||!noteFrames||!releaseFrames)return fail("Missing original note/idle/release measurement window");
         const double idleRms=std::sqrt(idleEnergy/idleFrames), noteRms=std::sqrt(noteEnergy/noteFrames), releaseRms=std::sqrt(releaseEnergy/releaseFrames);

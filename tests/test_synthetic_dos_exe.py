@@ -121,7 +121,11 @@ class SyntheticDosExeTests(unittest.TestCase):
         self.assertIn('env["AWE64_ORIGINAL_CREATIVE_ONLY"] = "1"', anti_spoof)
         self.assertIn('env["SDL_AUDIODRIVER"] = "dummy"', anti_spoof)
         self.assertIn("Real VST3 host process() emitted only silence", anti_spoof)
-        self.assertIn('"nonzero=0"', anti_spoof)
+        self.assertIn('"peak=0, nonzero=0"', anti_spoof)
+        self.assertIn('"--negative"', anti_spoof)
+        self.assertIn("if(exclusionMode){", native)
+        self.assertIn("if(peak!=0.f || nonzero!=0)", native)
+        self.assertIn("!originalMode && !exclusionMode", native)
         self.assertIn("PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED", anti_spoof)
 
     def test_stage_fixture_rejects_existing_owner_data(self):
