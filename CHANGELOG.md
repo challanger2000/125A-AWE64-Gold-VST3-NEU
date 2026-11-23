@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Race zwischen VST3-Deaktivierung und DOSBox-Start geschlossen
+
+- `AWE64_RequestStop` darf vor dem Start des Emulatorthreads gesetzt werden. Die vorherige `AWE64_StartGuest`-Implementierung hätte die Stop-Anforderung beim Eintritt wieder gelöscht und `std::thread::join()` unbegrenzt blockieren können.
+- Der Gaststart löscht deshalb **keine** Stop-Anforderung mehr; jedes VST3-Aktivieren lädt eine neue DOSBox-DLL-Instanz, deren Atomic-Stopflag initial false ist.
+- Separater Quellpatch-Test erzwingt diese Guardrail. **Kein end-to-end Nachweis für plötzlichen DAW-Host-Shutdown.**
+
 ## 23.11.2026 — Originale DOSBox-X-Windows-DLL erstmals wirklich starten (neues CI-Gate)
 
 - `tests/WindowsDosBoxGuestSmoke.py`: Windows-Kindprozess lädt die echte DOSBox-X-DLL im eigenen Prozess, ruft **den originalen DOSBox-X-main()** via `AWE64_StartGuest()` auf, führt nur den öffentlichen DOS-Kommandozeilenbefehl `exit` in einer SB16-VM aus und muss wieder nach Python zurückkehren. Mit 35-s-Timeout gegen dauerhaftes Hängen.

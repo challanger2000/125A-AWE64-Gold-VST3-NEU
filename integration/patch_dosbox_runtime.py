@@ -166,7 +166,9 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
 // Must be invoked on a dedicated host-owned worker, inside the VST3 process.
 extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
     int argc,char** argv) {
-    awe64_guest_stop.store(false,std::memory_order_release);
+    // Never reset a stop request here: the VST3 host can deactivate before
+    // the worker has entered this call. A late reset would cause join() hang.
+    // The DLL is loaded afresh for each activation, so the flag starts false.
     return main(argc,argv);
 }
 #endif

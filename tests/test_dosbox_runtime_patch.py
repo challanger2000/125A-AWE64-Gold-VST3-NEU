@@ -37,6 +37,7 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('AWE64_StartGuest(',r)
         self.assertIn('return main(argc,argv);',r)
         self.assertIn('AWE64_RequestStop',r)
+        self.assertNotIn('awe64_guest_stop.store(false',r)
         self.assertIn('if(awe64_guest_stop.load',r)
     def test_native_win_x64_dll(self):
         cond="'$(Configuration)|$(Platform)'=='Release|x64'"
