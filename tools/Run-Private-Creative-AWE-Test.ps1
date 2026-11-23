@@ -166,16 +166,7 @@ try {
         if (-not (Test-Path -PathType Leaf $externalTrace)) { throw 'External SF2 EMU8000 trace missing.' }
         $externalWrites = 0
         foreach ($line in [System.IO.File]::ReadLines($externalTrace)) {
-            if ($line -match '^\d+ (620|622|A20|A22|E20|E22) [0-9A-Fa-f]{4}
-    & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds
-    if ($LASTEXITCODE -ne 0) { throw 'Private Creative ROM/SF2/DEMO DLL-level PCM gate FAILED.' }
-    # Only announce final PASS after BOTH independent tests and all original
-    # owner SHA-256/Git-blob and EMU8000 trace gates have actually succeeded.
-    Write-Host "PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS; PORT_WRITES=$writes; ORIGINAL_ROM=VERIFIED; MIDI_NOTE_ON_OFF=VERIFIED"
-} finally {
-    Remove-Item -LiteralPath $temporary -Recurse -Force -ErrorAction SilentlyContinue
-}
-) { $externalWrites++ }
+            if ($line -match '^\d+ (620|622|A20|A22|E20|E22) [0-9A-Fa-f]{4}$') { $externalWrites++ }
         }
         if ($externalWrites -lt 16) { throw 'External SF2 original EMU8000 register trace insufficient.' }
         Write-Host "EXTERNAL_REFERENCE_SF2_STATE_AND_ORIGINAL_PCM_PASS; PORT_WRITES=$externalWrites; SOURCE_UNCHANGED"

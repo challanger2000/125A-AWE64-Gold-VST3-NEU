@@ -1,5 +1,9 @@
 # Änderungsverlauf
 
+## 24.11.2026 — SF2-Prüfskript korrigiert
+
+- Windows 45287143543 und Transport 45287143763 brachen vor dem Klangtest wegen eines fehlerhaften PowerShell-Regex-Einfügevorgangs ab. Doppelt eingefügten Skriptabschluss entfernt; Trace-Filter wieder korrekt. Keine Änderung an Plugin, DSP oder Originaltreiber. Externer SF2-Recall-/Klangtest weiterhin offen.
+
 ## 24.11.2026 — Echter VST3-Recall-/SF2-Ladepfad als separates Windows-Gate
 
 - [Windows 45284478927](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478927), [Transport 45284478906](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478906), [Version 45284478902](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478902) SUCCESS auf 17bb039b. Bisheriger GM-Originalpfad bleibt funktionsfähig; dieser Lauf hat noch keine externe Bank geladen.
