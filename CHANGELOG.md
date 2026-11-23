@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Release-Sicherheitsprüfung des Bankwahltests (kein Audio-/Creative-Fix)
+
+- Regression von `assert` auf einen in `Release` aktiven `CHECK`-Abbruch umgestellt. Vorher war die Laufzeitschleife durch `NDEBUG` abgeschaltet, obwohl die Compiletime-Randwertprüfungen funktionierten.
+- Jetzt alle 16 MIDI-Kanäle und jeweils 128 Bank- und Programwerte prüfen (4096 Kombinationen), ohne proprietäre Originaldaten und ohne Änderungen am VST3-Audio-/EMU8000-Code.
+- Linux-/Windows-Release-CI-Ergebnis erst nach tatsächlichem Workflowabschluss deklarieren. Entwicklungskennung unverändert `0.0.0-dev`.
+
+
 ## 23.11.2026 — Creative-DOS-Bankwahl auf den originalen CC0-Pfad korrigiert
 
 - Original `DOS/DEMO/DEMO.C` unabhängig kontrolliert: Die Creative-SF2LIB-Demo setzt beim manuellen Bankwechsel `awe32Controller(15, 0, k)`. Die bisherige VST3-Bankübertragung setzte **CC0 fälschlich immer auf 0** und sendete den gewünschten Wert über CC32; der DOS-Treiber konnte deshalb bei Bankwechseln weiter Bank 0 verwenden.

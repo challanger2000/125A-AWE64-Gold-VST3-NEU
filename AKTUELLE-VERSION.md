@@ -15,6 +15,10 @@ Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder kl
 - **Neue Regression:** `CreativeMidiBankSelectTest.cpp` prüft Bankwerte 0–127, Kanalgrenzen, MIDI-Status, Bank-Controller und Program-Change-Paket. Der tragende C++20-Helper wurde vor dem Commit mit einem isolierten lokalen GCC20-Test übersetzt; die echten Linux-/Windows-CMake-Gates für diesen Quellstand müssen noch laufen.
 - **Keine Klangbehauptung:** Originale Creative-DEMO/ROM/SF2 innerhalb des neuen VST3 sowie korrektes Bank-/Program-Recall sind weiterhin **nicht** end-to-end nachgewiesen; Entwicklungskennung bleibt `0.0.0-dev`.
 
+## Regressionstests – 23.11.2026
+
+Der neue reine MIDI-Bankwahltest prüft 16 Kanäle × 128 Banken und 16 Kanäle × 128 Programme (4096 Eingabekombinationen). Er verwendet bewusst keine C-Standard-`assert`-Makros, da diese in Windows-/Linux-CMake-`Release`-Builds mit `NDEBUG` entfallen. Tests und Versionsnachweis nach Commit erst mit tatsächlich beendeter CI als PASS markieren. Der zuvor bereits ausgeführte Linux-/Windows-CI-Lauf hatte die Konstanten durch `static_assert` geprüft; die 128er Runtime-Schleife war unter `NDEBUG` inaktiv.
+
 ## Festgelegte Architektur
 
 Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32/EMU8000-Quellcode als **intern geladener DLL im VST3-Prozess**, originaler Creative-DOS-SF2LIB/DEMO.EXE als 16-Bit-DOS-Programm im emulierten PC. **Kein** externes DOSBox-Programm, **kein** 86Box-/Windows95-Gast und **kein** nativer Ersatz-SF2-Player.
