@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — SDL2-Gerätediagnose nach tatsächlicher Gerätedefinition platzieren
+
+- Erster echter `Release SDL2|x64`-Build (Actions 45108048294) scheiterte auf der Compilerfehlerstelle `mixer.cpp:86`: das Testexport `AWE64_IsInternalAudioOnly` stand **vor** der Deklaration `SDL2_AudioDevice`.
+- Quellpatch verankert die Diagnosefunktion jetzt explizit **direkt nach der ursprünglichen SDL2_AudioDevice-Deklaration** im originalen `#ifdef C_SDL2`-Block. Keine DSP-/EMU8000-/SoundFont-Änderung; statischer Regressionstest für korrekte Code-Reihenfolge.
+- Erneuter kompletter Windows-SDL2-DLL-/MIDI-/Audio- und VST3-Build muss erst tatsächlich bestehen.
+
 ## 23.11.2026 — Kritischen SDL1/SDL2-Buildfehler korrigiert (Recheck erforderlich)
 
 - Fehlerdiagnose aus Windows-Actions 45107364211: Das bisherige originale `Release|x64`-Projekt baut **SDL1**, nicht SDL2. Dadurch wurden die ursprünglichen Hidden-Window-/SDL2-Dummy-Audio-Integrationen **nicht** wirksam, und die echte Audio-Isolierungsprüfung schlug fehl.

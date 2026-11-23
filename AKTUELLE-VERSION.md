@@ -36,7 +36,7 @@ Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32
 | Bereich | Stand |
 | --- | --- |
 | Original-DOSBox-X-SDL-Fenster unsichtbar | Quellpatch `SDL_WINDOW_HIDDEN`, VST3-Start `-nogui -nomenu`; aktualisierter Windows-Regressionstest ausstehend |
-| Kein zusätzlicher Windows-Audioausgang | Windows-Lauf 45107364211 FAIL: Standard-Release baute SDL1 ohne internes SDL2-Dummy-Audiogerät. Projekt jetzt auf **`Release SDL2|x64`** korrigiert; neuer Windows-Nachweis noch ausstehend |
+| Kein zusätzlicher Windows-Audioausgang | Windows-Lauf 45107364211 FAIL: Standard-Release baute SDL1 ohne internes SDL2-Dummy-Audiogerät. Projekt jetzt auf **`Release SDL2|x64`** korrigiert. Erster SDL2-Kompilierlauf 45108048294 **FAIL** (Statusfunktion wurde vor der SDL2-Gerätevariable deklariert), Reihenfolge im Quellpatch korrigiert; neuer Windows-Nachweis noch ausstehend |
 | Exakte Host-MIDI-Bytes bis zum 16-Bit-DOS-Programm | Eigenes `MPUPROBE.COM` prüft UART-Portstatus/ACK und schreibt empfangene Original-MIDI-Bytes in eine DOS-Datei. **Windows-Hardwaretest ausstehend** |
 | Originale Creative-Standardbank im Gast | `DEMO.EXE /SBK:SYNTHGM.SF2` korrekt nach Original-C-Quellcode; echte private Dateien beim neuen VST3-Start noch nicht nachgewiesen |
 | VST3-Host-Activate/Deactivation | Code vorhanden, aber keine abgeschlossene DAW-/Creative-DOS-Laufzeitabnahme; fehlende private Dateien führen zu bewusstem Aktivierungsfehler |

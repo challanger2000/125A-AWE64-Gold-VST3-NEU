@@ -15,12 +15,13 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('AWE64_HostRegisterIO',r)
         with self.assertRaises(ValueError):patch.patch_emu(r)
     def test_true_pcm_tap(self):
-        s='#define MIXER_SSIZE 4\n    if (mixer.nosound) {\n    }\n}\n\nstd::string mixerinfo() {'
+        s='#define MIXER_SSIZE 4\nSDL_AudioDeviceID SDL2_AudioDevice = 0; /* valid IDs are 2 or higher, 1 for compat, 0 is never a valid ID */\n    if (mixer.nosound) {\n    }\n}\n\nstd::string mixerinfo() {'
         r=patch.patch_mixer(s)
         self.assertIn('reinterpret_cast<const int16_t*>(stream)',r)
         self.assertIn('awe64_pcm_receiver.load',r)
         self.assertIn('SDL_AudioInit("dummy")',r)
         self.assertIn('AWE64_IsInternalAudioOnly',r)
+        self.assertGreater(r.index('AWE64_IsInternalAudioOnly'),r.index('SDL_AudioDeviceID SDL2_AudioDevice = 0'))
         self.assertIn('mixer.nosound=true;',r)
         with self.assertRaises(ValueError):patch.patch_mixer(r)
     def test_real_creative_unchanged_mpu401_input(self):

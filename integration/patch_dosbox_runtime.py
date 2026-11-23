@@ -81,17 +81,15 @@ def patch_mixer(s):
     }
 #endif
 '''+snd)
-    status='extern "C" __declspec(dllexport) int __cdecl AWE64_IsInternalAudioOnly() noexcept {'
-    s=once(s,'#define MIXER_SSIZE 4', '''#define MIXER_SSIZE 4
+    # This export must be defined AFTER SDL2_AudioDevice, not before it:
+    # MSVC previously rejected the inline function at the MIXER_SSIZE define
+    # because the SDL2 device variable is declared several lines later.
+    anchor='SDL_AudioDeviceID SDL2_AudioDevice = 0; /* valid IDs are 2 or higher, 1 for compat, 0 is never a valid ID */'
+    s=once(s,anchor,'''SDL_AudioDeviceID SDL2_AudioDevice = 0; /* valid IDs are 2 or higher, 1 for compat, 0 is never a valid ID */
 #ifdef AWE64_VST3_RUNTIME
-// Windows host can verify the real internal dummy device while DOSBox runs.
 extern "C" __declspec(dllexport) int __cdecl AWE64_IsInternalAudioOnly() noexcept {
-#ifdef C_SDL2
     const char* name=SDL_GetCurrentAudioDriver();
     return name && strcmp(name,"dummy")==0 && SDL2_AudioDevice!=0 ? 1 : 0;
-#else
-    return 0;
-#endif
 }
 #endif''')
     anchor='    }\n}\n\nstd::string mixerinfo() {'
