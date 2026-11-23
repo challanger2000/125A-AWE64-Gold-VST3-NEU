@@ -33,7 +33,7 @@ jobs:
           changed="$(git diff --name-only HEAD^ HEAD)"
           echo "Changed files:"
           printf '%s\n' "$changed"
-          if printf '%s\n' "$changed" | grep -Eq '^(src/|gui/|third_party/|CMakeLists\\.txt$|cmake/|\\.gitmodules$)'; then
+          if printf '%s\n' "$changed" | grep -Eq '^(src/|gui/|third_party/|CMakeLists[.]txt$|cmake/|[.]gitmodules$)'; then
             if ! printf '%s\n' "$changed" | grep -Fxq 'AKTUELLE-VERSION.md'; then
               echo "::error::Technical changes require an AKTUELLE-VERSION.md update in the same commit"
               exit 1
