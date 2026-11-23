@@ -6,6 +6,8 @@ on:
       - 'integration/**'
       - 'tests/test_dosbox_runtime_patch.py'
       - 'tests/DosBoxHostAdapterTest.cpp'
+      - 'tests/WindowsDosBoxGuestSmoke.py'
+      - 'src/**'
       - 'CMakeLists.txt'
       - '.github/workflows/windows-dosbox-runtime.yml'
   workflow_dispatch:
@@ -75,6 +77,12 @@ jobs:
               dll.AWE64_HostRegisterMidi(None,None)
           print('Real Windows DLL loaded and MPU-401 host callback export callable; no DOS guest started')
           '@ | python -
+      - name: Smoke real DOSBox-X main() and clean return within same Windows process
+        shell: pwsh
+        run: |
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll'
+          python tests/WindowsDosBoxGuestSmoke.py --parent $dll
+          if ($LASTEXITCODE -ne 0) { throw "Original DOSBox-X in-process bootstrap/exit failed" }
       - name: Compile VST3 host and stage original internal DOSBox-X runtime DLL
         shell: pwsh
         run: |

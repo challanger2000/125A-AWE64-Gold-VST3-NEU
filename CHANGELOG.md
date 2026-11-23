@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Originale DOSBox-X-Windows-DLL erstmals wirklich starten (neues CI-Gate)
+
+- `tests/WindowsDosBoxGuestSmoke.py`: Windows-Kindprozess lädt die echte DOSBox-X-DLL im eigenen Prozess, ruft **den originalen DOSBox-X-main()** via `AWE64_StartGuest()` auf, führt nur den öffentlichen DOS-Kommandozeilenbefehl `exit` in einer SB16-VM aus und muss wieder nach Python zurückkehren. Mit 35-s-Timeout gegen dauerhaftes Hängen.
+- Der Test startet **keine externe DOSBox-EXE**; Python ist nur der isolierte Windows-Tester, nicht Teil des ausgelieferten VST3. Keine Original-Creative-Dateien und kein AWE-ROM in CI.
+- Nachweisstatus des neuen Gates bis zum tatsächlichen Windows-Actions-Ergebnis **offen**.
+
 ## 23.11.2026 — Windows-VST3-Host-Kompilierung bestanden; originale Creative-SF2LIB-Kommandozeile
 
 - **GitHub Actions 45104901755: PASS.** Der echte Windows-VST3-Host kompiliert mit dem DOSBox-X-Laufzeitloader und dem unveränderten P165-GUI-Quellcode. Dieser Build enthält **noch keinen nachgewiesenen Creative-DOS-Start oder hörbaren Originalklang**.
