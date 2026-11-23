@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Echter VST3-Recall-/SF2-Ladepfad als separates Windows-Gate
+
+- [Windows 45284478927](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478927), [Transport 45284478906](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478906), [Version 45284478902](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478902) SUCCESS auf 17bb039b. Bisheriger GM-Originalpfad bleibt funktionsfähig; dieser Lauf hat noch keine externe Bank geladen.
+- Neuer separater Originaltest: tatsächliches IComponent::setState/getState mit externer UTF-8-SF2-Datei, fehlender Pfad muss fehlschlagen, State bytegenau zurücklesen, danach realer VST3-Notentest mit externer temporärer GM-Referenzkopie über D:\\BANK.SF2. Creative-Bootdiagnose, EMU8000-Trace und unveränderter SHA-256 der Quelle erforderlich. Identische GM-Referenz prüft den Ladeweg, **nicht** RAM-Sample-Klang, andere Banken oder Live-Wechsel. Keine Besitzerdateien hochgeladen. Neuer Testlauf nicht bestätigt.
+- Original-P165-Grafik, Creative-Treiber und EMU8000 bleiben unverändert. `0.0.0-dev`, nur main, kein Release. Keine ungefragten Zwischenberichte; Abnahme erst bei vollständigem Instrument.
+
 ## 23.11.2026 — Externe SF2-Startauswahl und Projektpfad
 
 - [Windows 45281711814](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45281711814), [Transporttests 45281711812](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45281711812), [Version 45281711986](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45281711986): SUCCESS auf d4bf7111; Mapping und Original-GM-Pfad bestanden.

@@ -78,6 +78,9 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
     print(proc.stderr[-5000:], end="", file=sys.stderr)
     expected = ("PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED" if original
                 else "SYNTHETIC_DOS_FIXTURE_REAL_VST3_HOST_PCM_PASS")
+    if original and os.environ.get("AWE64_TEST_EXTERNAL_SF2") and \
+            "REAL_VST3_EXTERNAL_SF2_STATE_ROUNDTRIP_PASS" not in proc.stdout:
+        raise RuntimeError("External SF2 VST3 state roundtrip missing")
     if proc.returncode or expected not in proc.stdout:
         raise RuntimeError("Actual Windows VST3 factory/host process() PCM test FAILED")
     def count(label: str) -> int:

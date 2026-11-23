@@ -143,6 +143,49 @@ try {
     if ($writes -lt 16 -or $ports.Count -lt 2) {
         throw "Insufficient authentic EMU8000 writes: $writes across $($ports.Count) ports"
     }
+    # Test a separately selected reference SF2 through the actual serialized
+    # IComponent state and the production external-bank DOS mount path.
+    # Never change the owner's source, default bank or the first trace.
+    $external = Join-Path $temporary 'external reference.sf2'
+    Copy-Item -LiteralPath $sf2 -Destination $external -ErrorAction Stop
+    $externalHash = (Get-FileHash -Algorithm SHA256 $external).Hash
+    $externalBoot = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
+    $externalTrace = Join-Path $temporary 'external_creative_vst3_emu8000.trace'
+    $previousExternal = [Environment]::GetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', 'Process')
+    try {
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', $external, 'Process')
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $externalTrace, 'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', 'dummy', 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', '1', 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $externalBoot, 'Process')
+        & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
+        if ($LASTEXITCODE -ne 0) { throw 'External reference SF2 real VST3 gate FAILED.' }
+        if ((Get-FileHash -Algorithm SHA256 $external).Hash -ne $externalHash) {
+            throw 'External source was unexpectedly modified.'
+        }
+        if (-not (Test-Path -PathType Leaf $externalTrace)) { throw 'External SF2 EMU8000 trace missing.' }
+        $externalWrites = 0
+        foreach ($line in [System.IO.File]::ReadLines($externalTrace)) {
+            if ($line -match '^\d+ (620|622|A20|A22|E20|E22) [0-9A-Fa-f]{4}
+    & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds
+    if ($LASTEXITCODE -ne 0) { throw 'Private Creative ROM/SF2/DEMO DLL-level PCM gate FAILED.' }
+    # Only announce final PASS after BOTH independent tests and all original
+    # owner SHA-256/Git-blob and EMU8000 trace gates have actually succeeded.
+    Write-Host "PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS; PORT_WRITES=$writes; ORIGINAL_ROM=VERIFIED; MIDI_NOTE_ON_OFF=VERIFIED"
+} finally {
+    Remove-Item -LiteralPath $temporary -Recurse -Force -ErrorAction SilentlyContinue
+}
+) { $externalWrites++ }
+        }
+        if ($externalWrites -lt 16) { throw 'External SF2 original EMU8000 register trace insufficient.' }
+        Write-Host "EXTERNAL_REFERENCE_SF2_STATE_AND_ORIGINAL_PCM_PASS; PORT_WRITES=$externalWrites; SOURCE_UNCHANGED"
+    } finally {
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', $previousExternal, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $previousBootLog, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', $previousOriginal, 'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
+    }
     # Independent secondary original-Creative test in an isolated DLL child.
     & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds
     if ($LASTEXITCODE -ne 0) { throw 'Private Creative ROM/SF2/DEMO DLL-level PCM gate FAILED.' }

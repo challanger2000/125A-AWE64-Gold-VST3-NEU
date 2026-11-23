@@ -14,6 +14,8 @@
 #include "pluginterfaces/base/ipluginbase.h"
 #include "pluginterfaces/base/funknown.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
+#include "public.sdk/source/common/memorystream.h"
+#include <vector>
 #include "pluginterfaces/vst/ivsteditcontroller.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstevents.h"
@@ -184,6 +186,33 @@ int main(int argc,char** argv) {
     MinimalHostApplication host;
     if(component->initialize(&host)!=S::kResultOk)
         return fail("VST3 initialize() failed");
+    if(originalMode) {
+        if(const char* path=std::getenv("AWE64_TEST_EXTERNAL_SF2")) {
+            const std::string source(path);
+            if(source.empty()||source.size()>32768)return fail("External test path invalid");
+            auto makeState=[](const std::string& selected) {
+                const auto n=static_cast<std::uint32_t>(selected.size());
+                std::vector<std::uint8_t> bytes{'D','B','X','D',2,0,0,0x10,0x27,0x5a,0xa5,
+                    std::uint8_t(n),std::uint8_t(n>>8),std::uint8_t(n>>16),std::uint8_t(n>>24)};
+                bytes.insert(bytes.end(),selected.begin(),selected.end());
+                return bytes;
+            };
+            auto invalid=makeState(source+".does-not-exist");
+            S::MemoryStream missing(invalid.data(),invalid.size());
+            if(component->setState(&missing)==S::kResultOk)
+                return fail("External SF2 recall accepted nonexistent path");
+            auto bytes=makeState(source);
+            S::MemoryStream incoming(bytes.data(),bytes.size());
+            if(component->setState(&incoming)!=S::kResultOk)
+                return fail("External SF2 recall failed on real IComponent");
+            S::MemoryStream outgoing;
+            if(component->getState(&outgoing)!=S::kResultOk||
+               outgoing.getSize()!=static_cast<S::TSize>(bytes.size())||
+               std::memcmp(outgoing.getData(),bytes.data(),bytes.size())!=0)
+                return fail("External SF2 real IComponent state did not roundtrip");
+            std::cout<<"REAL_VST3_EXTERNAL_SF2_STATE_ROUNDTRIP_PASS\n";
+        }
+    }
     V::IMidiMapping* mapping=nullptr;
     if(component->queryInterface(V::IMidiMapping::iid,reinterpret_cast<void**>(&mapping))!=S::kResultOk||!mapping)
         return fail("Actual VST3 IMidiMapping missing");

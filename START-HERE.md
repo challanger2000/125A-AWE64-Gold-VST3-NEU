@@ -5,6 +5,12 @@
 **Chronologischer Änderungsverlauf:** [CHANGELOG.md](CHANGELOG.md).  
 **Private ROM-/Creative-/SF2-Fundorte:** [docs/TEST-ASSET-LOCATION.md](docs/TEST-ASSET-LOCATION.md).
 
+## 24.11.2026 — Echter VST3-Recall-/SF2-Ladepfad als separates Windows-Gate
+
+- [Windows 45284478927](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478927), [Transport 45284478906](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478906), [Version 45284478902](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478902) SUCCESS auf 17bb039b. Bisheriger GM-Originalpfad bleibt funktionsfähig; dieser Lauf hat noch keine externe Bank geladen.
+- Neuer separater Originaltest: tatsächliches IComponent::setState/getState mit externer UTF-8-SF2-Datei, fehlender Pfad muss fehlschlagen, State bytegenau zurücklesen, danach realer VST3-Notentest mit externer temporärer GM-Referenzkopie über D:\\BANK.SF2. Creative-Bootdiagnose, EMU8000-Trace und unveränderter SHA-256 der Quelle erforderlich. Identische GM-Referenz prüft den Ladeweg, **nicht** RAM-Sample-Klang, andere Banken oder Live-Wechsel. Keine Besitzerdateien hochgeladen. Neuer Testlauf nicht bestätigt.
+- Original-P165-Grafik, Creative-Treiber und EMU8000 bleiben unverändert. `0.0.0-dev`, nur main, kein Release. Keine ungefragten Zwischenberichte; Abnahme erst bei vollständigem Instrument.
+
 ## 23.11.2026 — Negativkontrolle vom musikalischen Originaltest getrennt
 
 - [Windows 45275384157](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45275384157) FAIL ausschließlich in der synthetischen Negativkontrolle: gemessene Ruhe-, Note- und Release-RMS sämtlich exakt null. Die neue musikalische Prüfung meldete jedoch einen anderen erwarteten Fehlertext; deshalb wurde der eigentliche Original-Archivtest nicht mehr erreicht. Windows-Build und synthetischer Positivtest (783 nicht-stumme Frames) PASS; [Linux/Windows 45275384197](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45275384197) und [Version 45275384621](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45275384621) SUCCESS.
