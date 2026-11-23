@@ -126,7 +126,7 @@ public:
             queues_=std::make_unique<rt::RealtimeQueues>();
             adapter_=std::make_unique<DosBoxHostAdapter>(*queues_);
             argvStorage_={
-                "AWE64DOSBoxRuntime", "-noconfig", "-silent",
+                "AWE64DOSBoxRuntime", "-noconfig", "-silent", "-nogui", "-nomenu",
                 "-set", "sblaster sbtype=sbawe",
                 "-set", "sblaster awe32ram=28672",
                 "-set", "sblaster awe32rom="+utf8(rom),

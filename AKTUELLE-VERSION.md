@@ -31,6 +31,8 @@
 - **Neue bevorzugte MIDI-Anbindung:** hostseitige DAW-MIDI-Nachrichten in das originale emulierte MPU-401-UART-Gerät (0x330/0x331), welches das unveränderte Creative-DOS-DEMO.EXE bereits liest und an die originalen Creative-SF2LIB-Funktionen weitergibt. Quellcode implementiert, zugehöriger Windows-DLL-Kompilierungs-/UART-Integrationstest noch ausstehend.
 - **Neu:** Export `AWE64_RequestStop()` implementiert, der das bestehende DOSBox-X-Shutdown-Signal über den emulierten Eventloop auslöst. Start/Stop-Race geschlossen: der Gaststart löscht keine bereits vor dem Workerstart eingegangene Stop-Anforderung. Windows-Gaststopp noch nicht end-to-end abgenommen. **Nicht implementiert/abgenommen:** echte DOS-Gastlaufzeit im VST3, ROM/SBK/SF2-Klang, Host-Rate-Konvertierung, zuverlässiger Shutdown, Mehrfachinstanzisolierung, DAW-Recall und Studio-Pro-Praxistest.
 
+- **Headless host (Quellstand):** originale SDL-Emulationsfenster der internen DOSBox-X-DLL mit `SDL_WINDOW_HIDDEN` angelegt, Startargumente `-nogui -nomenu` ergänzt. Nur originale VST3-P165-Bedienoberfläche sichtbar. Windows-Gast-Regression bei diesem Commit noch ausstehend.
+
 ## Unveränderliche Versionsregeln
 
 1. **Diese Datei ist die zentrale Versions- und Statusreferenz.** Sie wird im **selben Commit** wie jede technische Änderung an `src/`, `gui/`, dem DOSBox-X-Submodul oder dem VST3-Buildsystem aktualisiert. Ein GitHub-Actions-Check prüft, ob sie bei entsprechenden Änderungen mitgeändert wurde.

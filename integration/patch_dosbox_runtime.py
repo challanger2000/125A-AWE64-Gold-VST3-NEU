@@ -157,6 +157,12 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
 }
 #endif
 '''
+    # The only visible UI is the approved P165 VST3 editor. Do not display
+    # an additional DOSBox-X emulation window inside the DAW.
+    # This is ONLY applied to the private runtime DLL working copy.
+    visible_flag='| SDL_WINDOW_SHOWN | (SDL2_resize_enable ? SDL_WINDOW_RESIZABLE : 0)'
+    s=once(s,visible_flag,
+           '| SDL_WINDOW_HIDDEN | (SDL2_resize_enable ? SDL_WINDOW_RESIZABLE : 0)')
     s=once(s,event,injected+'\n'+event+'''
 #ifdef AWE64_VST3_RUNTIME
     if(awe64_guest_stop.load(std::memory_order_acquire))throw(0);

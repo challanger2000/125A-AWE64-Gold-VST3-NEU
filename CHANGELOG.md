@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Eigenes DOSBox-Fenster im DAW-Plugin unterdrücken
+
+- Korrigierter tatsächlicher Original-SDL2-Codepfad: im Build der internen DOSBox-X-AWE32-DLL wird `SDL_WINDOW_SHOWN` durch `SDL_WINDOW_HIDDEN` ersetzt. Das einzige sichtbare Bedienfeld bleibt die erhaltene originale P165-VST3-GUI.
+- Zusätzlich originale DOSBox-Argumente `-nogui` und `-nomenu`. Kein globaler SDL-Videotreiber-Environment-Hack in Fender Studio Pro.
+- Source-Patch-Einzigkeitskontrolle und Tests aktualisiert. **Noch kein bestätigter Studio-Pro-Praxistest, keine Freigabe.**
+
 ## 23.11.2026 — Erste tatsächlich zusammengebaute interne DOSBox-X-VST3-Struktur nachgewiesen
 
 - **GitHub Actions 45105475614 erfolgreich (Commit ccdbe3ac)**: originales gepinntes DOSBox-X-AWE32 als Windows-x64-DLL gebaut, alle Exporte geprüft und DLL in einem Windows-Prozess real geladen. Originales DOSBox-X-`main()` ausgeführt, DOS-`exit` erfolgreich mit Rückkehrcode 0 beendet.
