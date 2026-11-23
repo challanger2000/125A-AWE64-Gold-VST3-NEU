@@ -36,6 +36,14 @@ Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git
 
 Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
 
+## Originalhardware erstmals nachweislich aktiv – Windows-PASS 23.11.2026
+
+- **[Windows-Integrationslauf 45186047184](../../actions/runs/45186047184): vollständig SUCCESS.** Original-DOSBox-X-AWE32-SDL2-DLL, echter DOSBox-Start, interne SDL2-Isolation, kontrollierter Gaststopp, originaler MPU-401-MIDI-Nachweis und vollständiger Windows-VST3-Bundle-Build mit unveränderter P165-Oberfläche erfolgreich.
+- **9.688 reale EMU8000-Hardware-Registerschreibzugriffe** in der Original-DOSBox-X-Kernemulation durch deren unverändertes DOS-`AWEUTIL /S` im neuen Hardware-Smoketest nachgewiesen (`ORIGINAL_AWE32_HARDWARE_WRITE_GATE_PASS`). Die Hardware wurde mit einem **synthetisch mit Nullen gefüllten 1-MiB-ROM** gestartet; keine geschützten ROM-/Creative-/SF2-Dateien in öffentlicher CI.
+- **Ursache und Korrektur:** Im unveränderten Upstream setzt `control->opt_silent` den Sound Blaster auf `SBT_NONE`. Die Entfernung von `-silent` aus der echten VST3-Startliste und beiden AWE-Testern hat die reale Hardwareinitialisierung ermöglicht.
+- **[Linux- und Windows-Transport-/Negativregressionen 45186047103](../../actions/runs/45186047103): SUCCESS**; `-silent` kann nicht unbemerkt in die Produkt- oder AWE-Test-Startlisten zurückkehren. [Versionskonsistenz 45186047049](../../actions/runs/45186047049): SUCCESS.
+- **Weiter offen:** Originale Creative `DEMO.EXE` + echte `awe32.raw` + `SYNTHGM.SF2` innerhalb des VST3 **nicht end-to-end auf echten hörbaren Klang geprüft**. Keine SF2-Preset-/GUI-/State-/44,1–96-kHz-/Mehrfachinstanzen-Freigabe; `0.0.0-dev`.
+
 ## Blockierender Fehler im AWE64-DOSBox-VST3-Start behoben – 23.11.2026
 
 - **Fehler anhand unveränderten Upstreams belegt:** `sblaster.cpp` im gepinnten `turican0/dosbox-x-AWE32` setzt mit `if (control->opt_silent) type = SBT_NONE;` die gesamte Sound-Blaster-Karte außer Betrieb. Das produktive VST3 und beide Original-AWE-Testharnesses verwendeten jedoch fälschlich **`-silent`**.

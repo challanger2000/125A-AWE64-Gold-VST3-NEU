@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 23.11.2026 — 9.688 echte EMU8000-Registerwrites / Windows-VST3-Bundle PASS
+
+- Vollständiger [Windows-Actions-Lauf 45186047184](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45186047184) **SUCCESS**: originaler DOSBox-X-AWE32-Chip als in-process-SDL2-DLL, echter DOS-Gast, Hardwarestart per `AWEUTIL /S`, **9.688 originale EMU8000-Registerschreibzugriffe**, originale MPU-401-UART-Bytes, clean shutdown und Windows-VST3-Host samt Original-P165-GUI in einem Bundle gebaut.
+- Nach Entfernen des Sound-Blaster-tötenden DOSBox-X-Parameters `-silent` **echter Hardware-Register-PASS statt vorherigem fehlenden Trace**. Das CI-ROM war nur ein nicht-proprietärer 1-MiB-Nullen-Dummy und lieferte **keinen Creative-Klang**. Private ROM-/Creative-/.SF2-Dateien sind nicht hochgeladen worden.
+- [Linux + Windows-Release-Regression 45186047103](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45186047103) SUCCESS; [Version 45186047049](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45186047049) SUCCESS.
+- **Weiter NO-GO:** Private Creative-`DEMO.EXE`-`SYNTHGM.SF2`-ROM-Einbindung und hörbare Original-PCM im VST3 noch nicht belegt. Keine Veröffentlichung, `0.0.0-dev`.
+
+
 ## 23.11.2026 — Kritischen `-silent`-Klangkiller aus Original-DOSBox-Start entfernt
 
 - **Grundursache:** Gepinnter originaler DOSBox-X-Quellcode `src/hardware/sblaster.cpp` erzwingt bei `control->opt_silent` die Emulation `SBT_NONE`. Dadurch verhinderten sowohl VST3-Produktstart als auch beide Original-EMU8000-Prüfpfade aktiv die Sound-Blaster-/AWE32-Hardware.

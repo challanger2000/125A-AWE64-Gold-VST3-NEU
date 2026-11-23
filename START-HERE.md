@@ -11,6 +11,12 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **Submodul:** `third_party/dosbox-x-AWE32` auf `f3a95b9f19a7f9863295e6481f271cf04733c635` gepinnt. **Einziger Branch:** `main`.
 
+## Neue echte Hardware-Abnahme (23.11.2026)
+
+- **[Windows-Prüflauf 45186047184](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45186047184) vollständig erfolgreich:** Original-DOSBox-X startet jetzt die echte AWE32/EMU8000-Hardware; 9.688 tatsächliche EMU8000-Portschreibvorgänge durch DOSBox-`AWEUTIL /S` nachgewiesen. Originaler MPU-401, separater SDL2-Dummy-Audioweg, kontrollierter Stop und Windows-VST3-Bundle-Build ebenfalls PASS. In öffentlicher CI nur synthetisches Nullen-ROM, kein Original-Creative-Klang.
+- **Kritischer Fix:** `-silent` war im echten VST3-Start aktiv und hatte nachweislich den originalen Sound-Blaster-/AWE32-Kern deaktiviert (`SBT_NONE`). Entfernt; `-nogui -nomenu` bleiben. Linux- und Windows-Negativregressionen bestanden.
+- **Noch offen:** Tatsächlich hörbares `DEMO.EXE /SBK:SYNTHGM.SF2` mit privatem authentischen `awe32.raw` in **demselben VST3**. Kein freigegebenes Instrument; `0.0.0-dev`.
+
 ## Tatsächlich gebaut
 
 - Der **Original-DOSBox-X-AWE32-Quellcode** ist als interne Windows-x64-DLL gebaut. Ein originaler DOSBox-DOS-Befehl wurde im Windows-Testprozess ausgeführt und der Emulator verließ den Prozess nicht.
