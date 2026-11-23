@@ -15,7 +15,7 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 - Der **Original-DOSBox-X-AWE32-Quellcode** ist als interne Windows-x64-DLL gebaut. Ein originaler DOSBox-DOS-Befehl wurde im Windows-Testprozess ausgeführt und der Emulator verließ den Prozess nicht.
 - Die **ursprüngliche P165-GUI**, der Windows-VST3-Host und die originale DOSBox-X-DLL wurden bereits zusammen in einem einzigen VST3-Bundle kompiliert.
-- Original-MPU401-MIDI-Anbindung, PCM-Bridge, verstecktes DOSBox-SDL-Fenster und internes audiofreies SDL-Backend sind implementiert; aktuelle Windows-Integrations- und I/O-Tests sind **getrennt** zu bewerten und stehen in der Versionsübersicht.
+- Original-MPU401-MIDI-Anbindung, PCM-Bridge, verstecktes DOSBox-SDL-Fenster und internes audiofreies SDL-Backend sind implementiert; Windows-Integrations- und I/O-Tests wurden tatsächlich bestanden ([vollständige Windows-Integration 45175109078](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45175109078)); **der echte Creative-DOS-/ROM-/SF2-Klangtest ist weiterhin offen**.
 - **Noch KEIN fertiges Instrument:** Creative-DOS-Programm mit den echten privaten Originaldaten innerhalb des VST3, echter AWE-Sound, State/Host/Studio-Pro-Abnahme stehen weiterhin aus.
 
 ## Fortsetzung – ausschließlich dieser Pfad

@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Original-DOSBox-X-Windows-Integration und synthetische Privattest-Regressionen: CI bestätigt
+
+- [Windows-Integration 45175109078](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45175109078) **SUCCESS**: unveränderter AWE32-Kern als in-process-SDL2-DLL, MPU-401 bis in DOS-COM-Programm, echtes Mixer-PCM, Stop/Join und VST3-Bundle-Build auf Windows 2022 bestanden.
+- [Transport- und Privat-Klangtest-Harness 45177530826](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45177530826) **SUCCESS auf Linux und Windows**: synthetische Unit-Tests auch für Original-MIDI-Bytes und Hash-/EMU-Trace-Gates. **Keine** originale Creative-DOS-Software, ROMs oder SF2 in öffentlicher CI.
+- `AKTUELLE-VERSION.md` von historischen, inzwischen überholten „Windows-Nachweis ausstehend“-Formulierungen bereinigt. Keine Änderung am Original-P165-GUI oder Synthesizer-Code, keine klangliche Freigabe. Original-Creative-DEMO im neuen VST3 und echter Ton bleiben weiterhin ausstehend.
+
+
 ## 23.11.2026 — Private Creative-Prüfung mit öffentlichen, datenfreien Regressionen verbunden
 
 - Linux-/Windows-`audio-bridge-tests.yml` führt den privaten Creative-Klangtest **nicht** aus, sondern prüft mit Fake-Dateien SHA/Git-Blob-Verifikation, Original-DOSBox-Konfiguration, MPU-MIDI-Bytes und trace-write-Erkennung. Kein Original-ROM, Creative-Binary oder privates Audio in CI.
