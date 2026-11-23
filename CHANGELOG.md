@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — SDL_STATIC_LIB-Originalquellpatch gegen Doppelanwendung absichern
+
+- CI 45109467871, Linux-/Quellcheck **FAIL**: Die Funktion `patch_sdl2_static()` ließ sich ein zweites Mal auf dieselbe SDL.c anwenden, weil der ursprüngliche `#if`-Anchor trotz eingefügtem Define weiterhin vorhanden war.
+- Eindeutigen Guard gegen vorhandenes `#define SDL_STATIC_LIB 1` ergänzt, der wiederholtes Patchen verweigert und damit die eigentliche Ursache der Fehlermeldung beseitigt. C++-Quellstand und Original-EMU8000 bleiben unangetastet.
+- Erneuter originärer SDL2-Windows-Build weiterhin erforderlich. Auch dieser Bug war ein Source-Patcher-Unit-Test, keine Behauptung von AWE-Audio.
+
 ## 23.11.2026 — Doppelte SDL2-DLL-Einstiegsfunktion aus statischer Originallibrary entfernen
 
 - Windows-`Release SDL2|x64` Run **45108821043** zeigt wichtige Verbesserung: Die zuvor ca. 280 fehlenden CRT-Symbole wurden durch explizite `libvcruntime/libucrt/libcmt`-Abhängigkeiten beseitigt. Verbleibende **eine** Link-Sperre: `sdl2.lib(SDL.obj)` definiert selbst `_DllMainCRTStartup`, obwohl SDL2 im Originalprojekt als **StaticLibrary** gelinkt wird und das übergeordnete DOSBox-VST3 bereits den echten CRT-DLL-Startpunkt besitzt.

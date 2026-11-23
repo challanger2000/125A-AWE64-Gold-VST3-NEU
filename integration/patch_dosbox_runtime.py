@@ -207,6 +207,8 @@ def patch_sdl2_static(s):
     # _DllMainCRTStartup when SDL_STATIC_LIB is undefined, which clashes
     # with the embedded DLL's proper CRT startup. Disable only SDL's
     # duplicate entrypoint in this CI working copy; SDL callback/DSP stay.
+    if '#define SDL_STATIC_LIB 1' in s:
+        raise ValueError('SDL2 static CRT entry already patched')
     anchor='#if (!defined(HAVE_LIBC) || defined(__WATCOMC__)) && !defined(SDL_STATIC_LIB)'
     if s.count(anchor)!=1:
         raise ValueError('SDL2 startup anchor missing/duplicated')
