@@ -6,6 +6,8 @@ on:
       - 'src/RealtimeQueues.hpp'
       - 'src/Sf2CreativeDosCompatibility.hpp'
       - 'tests/**'
+      - 'tools/patch_creative_demo.py'
+      - 'guest/**'
       - 'CMakeLists.txt'
       - '.github/workflows/audio-bridge-tests.yml'
   workflow_dispatch:
@@ -23,6 +25,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: false
+      - name: Validate original Creative guest patch without proprietary sources
+        run: python -m unittest discover -s tests -p test_guest_patch.py
       - name: Configure
         run: cmake -S . -B build -DBUILD_TESTING=ON
       - name: Compile
