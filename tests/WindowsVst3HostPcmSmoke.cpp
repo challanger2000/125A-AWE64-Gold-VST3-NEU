@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -68,6 +69,7 @@ class MidiNoteHostEvents final : public V::IEventList {
     std::atomic<S::uint32> refs_{1};
     V::Event note_{};
     bool enabled_{false};
+    bool noteOff_{false};
 public:
     MidiNoteHostEvents() {
         note_.busIndex=0;
@@ -80,7 +82,27 @@ public:
         note_.noteOn.length=0;
         note_.noteOn.noteId=-1;
     }
-    void setEnabled(bool enabled) noexcept {enabled_=enabled;}
+    void setEnabled(bool enabled,bool noteOff=false) noexcept {
+        enabled_=enabled;
+        noteOff_=noteOff;
+        if(!enabled)return;
+        // Actual VST3 NoteOn/NoteOff union payload; no private MIDI hook.
+        note_.type=noteOff_ ? V::Event::kNoteOffEvent : V::Event::kNoteOnEvent;
+        if(noteOff_) {
+            note_.noteOff.channel=0;
+            note_.noteOff.pitch=60;
+            note_.noteOff.velocity=0.f;
+            note_.noteOff.noteId=-1;
+            note_.noteOff.tuning=0.f;
+        }else{
+            note_.noteOn.channel=0;
+            note_.noteOn.pitch=60;
+            note_.noteOn.velocity=100.f/127.f;
+            note_.noteOn.tuning=0.f;
+            note_.noteOn.length=0;
+            note_.noteOn.noteId=-1;
+        }
+    }
     S::tresult PLUGIN_API queryInterface(const S::TUID iid,void** obj) override {
         if(!obj)return S::kInvalidArgument;
         *obj=nullptr;
@@ -111,7 +133,13 @@ static int fail(const std::string& reason) {
 }
 
 int main(int argc,char** argv) {
-    if(argc!=2)return fail("usage: WindowsVst3HostPcmSmoke.exe Plugin.vst3");
+    const bool originalMode=(argc==4 && std::strcmp(argv[2],"--original")==0);
+    const int originalSeconds=originalMode ? std::atoi(argv[3]) : 0;
+    if(!(argc==2 || (originalMode && originalSeconds>=15 && originalSeconds<=120)))
+        return fail("usage: WindowsVst3HostPcmSmoke.exe Plugin.vst3 [--original 15..120]");
+    // Private mode runs exclusively on the owner's Windows computer after
+    // the launcher verifies the original Creative EXE/SF2/ROM hashes.
+
     std::string filename=argv[1];
     HMODULE module=LoadLibraryExA(filename.c_str(),nullptr,
                                   LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|
@@ -178,17 +206,30 @@ int main(int argc,char** argv) {
     MidiNoteHostEvents midiEvents{};
     data.inputEvents=&midiEvents; // REAL Steinberg VST3 note event bus
     std::uint64_t noteEventsSent=0;
+    std::uint64_t noteOffEventsSent=0;
     std::uint64_t nonzero=0,frames=0;
     float peak=0.;
+    // Authentic Creative-AWE ROM presets can be quieter than PC-speaker.
+    // Keep a measurable threshold above digital noise for owner-only mode.
+    const float minimumPeak=originalMode ? 0.002f : 0.01f;
     bool called=false;
     // Real wall-time pacing, approximately matching 44100 Hz. The guest
     // runs on the VST3-owned DOSBox worker thread, NOT inside process().
-    for(unsigned block=0;block<600;++block){
-        // First allow 15 silent blocks. Only then send actual VST3 NoteOn
-        // events (periodically, to cover asynchronous DOS initialization).
-        const bool sendNote=block>=15 && (block%15u)==0u;
-        midiEvents.setEnabled(sendNote);
+    // Original Creative/SF2LIB initialization may take longer than the
+    // validated short public synthetic DOS test. Preserve the latter.
+    const unsigned maxBlocks=originalMode ?
+        static_cast<unsigned>(originalSeconds*1000/12) : 600u;
+    for(unsigned block=0;block<maxBlocks;++block){
+        // First 15 blocks are a silence negative control.
+        // Send both note-on and note-off in private Creative mode so notes
+        // cannot accumulate indefinitely during asynchronous bank loading.
+        const bool sendNote=block>=15 &&
+            (originalMode ? ((block-15u)%80u)==0u : (block%15u)==0u);
+        const bool sendNoteOff=originalMode && block>=15 &&
+            ((block-15u)%80u)==40u;
+        midiEvents.setEnabled(sendNote||sendNoteOff,sendNoteOff);
         if(sendNote)++noteEventsSent;
+        if(sendNoteOff)++noteOffEventsSent;
         l.fill(0.f);r.fill(0.f);
         if(processor->process(data)!=S::kResultOk)
             return fail("Actual VST3 process() returned failure");
@@ -203,7 +244,7 @@ int main(int argc,char** argv) {
             if(v>0.0001f)++nonzero;
         }
         frames+=l.size();
-        if(peak>0.01f&&nonzero>=512)break;
+        if(peak>minimumPeak&&nonzero>=512 && (!originalMode||noteOffEventsSent>0))break;
         std::this_thread::sleep_for(std::chrono::milliseconds(12));
     }
     if(processor->setProcessing(false)!=S::kResultOk)
@@ -217,14 +258,22 @@ int main(int argc,char** argv) {
     factory->release();
     FreeLibrary(module);
     if(noteEventsSent<1)return fail("No VST3 NoteOn event injected");
-    if(!called||peak<=0.01f||nonzero<512)
+    if(originalMode && noteOffEventsSent<1)return fail("No VST3 NoteOff event injected");
+    if(!called||peak<=minimumPeak||nonzero<512)
         return fail("Real VST3 host process() emitted only silence; peak="+
                     std::to_string(peak)+", nonzero="+std::to_string(nonzero));
-    std::cout<<"SYNTHETIC_DOS_FIXTURE_REAL_VST3_HOST_PCM_PASS\n"
-             <<"VST3_HOST_FRAMES="<<frames<<"\n"
+    // Owner-only final PASS also requires original EMU8000 port writes
+    // and SHA-verified Creative files; PCM by itself is NOT final proof.
+    if(originalMode)
+        std::cout<<"PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED\n";
+    else
+        std::cout<<"SYNTHETIC_DOS_FIXTURE_REAL_VST3_HOST_PCM_PASS\n";
+    std::cout<<"VST3_HOST_FRAMES="<<frames<<"\n"
              <<"VST3_HOST_NONZERO_FRAMES="<<nonzero<<"\n"
              <<"VST3_HOST_PEAK_FLOAT="<<peak<<"\n"
              <<"VST3_HOST_NOTE_ON_EVENTS_SENT="<<noteEventsSent<<"\n"
-             <<"ORIGINAL_CREATIVE_EMU8000_KLANG_BEWIESEN=NEIN\n";
+             <<"VST3_HOST_NOTE_OFF_EVENTS_SENT="<<noteOffEventsSent<<"\n";
+    if(!originalMode)
+        std::cout<<"ORIGINAL_CREATIVE_EMU8000_KLANG_BEWIESEN=NEIN\n";
     return 0;
 }

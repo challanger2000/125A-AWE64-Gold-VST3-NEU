@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Private Original-Creative-Klangprüfung durch echten VST3-Host integriert
+
+- Separater **`--original 15..120`-Modus** in `WindowsVst3HostPcmSmoke.cpp`: authentisches Owner-ROM, echte Creative-`DEMO.EXE` und `SYNTHGM.SF2` im **tatsächlich ausgeführten VST3** statt des öffentlichen synthetischen PC-Speaker-Gasts. VST3-`IEventList` sendet C4 Note-On/Note-Off über originale DOSBox-X-MPU-401 an unveränderte Creative-DOS-SF2LIB; reale VST3-`process()`-Audioausgabe mit Stille-Negativkontrolle und niedrigerem Original-Preset-Mindestpeak `0,002`.
+- Private PowerShell-Abnahme führt nun zuerst den echten VST3-Host-Prozess isoliert mit Timeout aus und verlangt echte nicht-stumme PCM, danach tatsächliche Original-EMU8000-Registerwrites an mindestens zwei Original-I/O-Ports. Anschließend unabhängig der bestehende originale DOSBox-X-DLL-/Creative-Klangtest. Das private Originalmaterial wird per festen SHA-/Git-Blob-Hashes validiert und **niemals überschrieben oder in GitHub Actions hochgeladen**.
+- Plattformsichere **datenfreie** Regression sichert `--original`-Modus, NoteOff, privaten Trace-/Hash-Nachweis und die strikte Nichtnutzung des Originalmodus in öffentlicher CI. Original-P165-GUI, Original-DOSBox-X-AWE-Kern und Produktklangcode bleiben unangetastet. **Noch kein privater Klang-PASS**; erst echte Windows-Ausführung zählt. `0.0.0-dev`, Release-NO-GO.
+
+
 ## 23.11.2026 — Workflow-Name nach bestandener echter VST3-Integration präzisiert
 
 - Der nachweislich bestandene Original-DOSBox-X-/VST3-`process()`-Test [45201802002](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45201802002) wird nicht länger unter dem widersprüchlichen Workflow-Titel `NO VST3 PLAYBACK` angezeigt. Neuer Titel `DOSBox-X original + VST3 MIDI/PCM end-to-end (synthetic DOS)` benennt den **wirklich** geprüften bi-direktionalen MIDI-/PCM-Pfad und zugleich dessen synthetischen DOS-PC-Speaker-Gast.

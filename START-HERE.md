@@ -11,6 +11,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **Submodul:** `third_party/dosbox-x-AWE32` auf `f3a95b9f19a7f9863295e6481f271cf04733c635` gepinnt. **Einziger Branch:** `main`.
 
+## Privater Original-Creative-VST3-Klangtest jetzt ausführbar vorbereitet (noch kein PASS)
+
+Der reale VST3-Host besitzt jetzt einen separaten privaten `--original`-Modus für das **echte** Creative-`DEMO.EXE`, authentische `SYNTHGM.SF2` und `awe32.raw`. Der Besitzer-Windows-Launcher `tools/Run-Private-Creative-AWE-Test.ps1` fordert SHA-verifizierte Originaldaten, echten MIDI-NoteOn/NoteOff, originale EMU8000-Registerwrites und hörbare Stereo-PCM-Frames **aus dem tatsächlichen VST3**. Öffentliche CI bleibt vollständig datenfrei. **Dieser Original-Creative-Test wurde noch nicht durchgeführt und ist NICHT abgenommen.** Alle vorherigen synthetischen VST3-Transporttests bleiben davon getrennt.
+
 ## Neuester integrierter Windows-MIDI-und-PCM-VST3-PASS (23.11.2026)
 
 **[Windows-Actions 45201802002](../../actions/runs/45201802002): vollständiger Erfolg.** Im echten VST3-Instrument laufen jetzt **7 MIDI-NoteOn-Events durch Steinberg-`IEventList` → Original-DOSBox-X-MPU401 (331h/330h) → synthetisches 16-Bit-DOS-PC-Speaker-Programm → originalen DOSBox-X-Mixer → echten VST3-`process()`-Stereoausgang**. Gemessen **59.904 Float32-Stereoframes, 982 nicht-stumm, Spitzenpegel 0,304871**, Stille vor NoteOn geprüft. Linux-/Windows-Regressionen ebenfalls bestanden. **Der Original-Creative-DOS-SF2/ROM-Klang ist damit weiterhin NICHT nachgewiesen**, erfordert getrennten privaten Test. Kein Release, Entwicklungskennung `0.0.0-dev`. Verbindlich: [AKTUELLE-VERSION.md](AKTUELLE-VERSION.md).

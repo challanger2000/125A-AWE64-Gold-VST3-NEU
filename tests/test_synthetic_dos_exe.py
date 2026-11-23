@@ -52,6 +52,31 @@ class SyntheticDosExeTests(unittest.TestCase):
         self.assertIn("actions/cache/restore@v4", workflow)
         self.assertIn("actions/cache/save@v4", workflow)
 
+    def test_private_original_creative_mode_never_runs_in_public_ci(self):
+        root = Path(__file__).resolve().parents[1]
+        native = (root / "tests" / "WindowsVst3HostPcmSmoke.cpp").read_text(
+            encoding="utf-8")
+        launcher = (root / "tests" / "WindowsRunVst3HostPcmSmoke.py").read_text(
+            encoding="utf-8")
+        private = (root / "tools" / "Run-Private-Creative-AWE-Test.ps1").read_text(
+            encoding="utf-8")
+        public = (root / ".github" / "workflows" /
+                  "windows-dosbox-runtime.yml").read_text(encoding="utf-8")
+        self.assertIn("PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED", native)
+        self.assertIn("VST3_HOST_NOTE_OFF_EVENTS_SENT", native)
+        self.assertIn("originalSeconds", native)
+        self.assertIn("minimumPeak=originalMode ? 0.002f : 0.01f", native)
+        self.assertIn('command.extend(["--original", str(seconds)])', launcher)
+        self.assertIn("PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS", private)
+        self.assertIn("--original --seconds $Seconds", private)
+        self.assertIn("expectedDemoBlob", private)
+        self.assertIn("expectedSf2", private)
+        self.assertIn("expectedRom", private)
+        self.assertIn("ORIGINAL_CREATIVE_EMU8000_KLANG_BEWIESEN=NEIN", native)
+        # Only SHA-verified private owner script is allowed to run this mode.
+        self.assertNotIn("--original --seconds", public)
+        self.assertNotIn("Run-Private-Creative-AWE-Test.ps1 -Bundle", public)
+
     def test_stage_fixture_rejects_existing_owner_data(self):
         with tempfile.TemporaryDirectory() as work:
             bundle = Path(work) / "AWE64GoldDOSBoxDev.vst3"

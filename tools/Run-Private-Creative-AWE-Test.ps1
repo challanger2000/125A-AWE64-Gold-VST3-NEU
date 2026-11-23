@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$Bundle,
     [Parameter(Mandatory=$true)][string]$Rom,
+    [string]$HostExe = '',
     [int]$Seconds = 45
 )
 $ErrorActionPreference = 'Stop'
@@ -69,8 +70,44 @@ try {
         }
     }
     Write-Host 'PRIVATE_ORIGINAL_SHA_VALIDATION_PASS; NO_OWNER_BYTES_UPLOADED'
+    # SHA-verified original ROM/EXE/SF2 must actually sound through the
+    # Steinberg VST3 process() interface, not merely an internal DLL hook.
+    $hostTestExe = if ($HostExe) { (Resolve-Path $HostExe).Path } else {
+        Join-Path $root 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe'
+    }
+    if (-not (Test-Path -PathType Leaf $hostTestExe)) {
+        throw 'VST3 test binary absent. Build awe64_vst3_host_pcm_smoke locally or use -HostExe.'
+    }
+    $pluginBinary = Join-Path $native 'AWE64GoldDOSBoxDev.vst3'
+    $traceFile = Join-Path $temporary 'original_creative_vst3_emu8000.trace'
+    $previousTrace = [Environment]::GetEnvironmentVariable('EMU8K_TRACE', 'Process')
+    try {
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $traceFile, 'Process')
+        & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Real VST3 process() did not produce MIDI-triggered Creative PCM.'
+        }
+    } finally {
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
+    }
+    if (-not (Test-Path -PathType Leaf $traceFile)) {
+        throw 'No original EMU8000 register trace during actual VST3 host playback.'
+    }
+    $writes = 0
+    $ports = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($line in [System.IO.File]::ReadLines($traceFile)) {
+        if ($line -match '^\d+ (620|622|A20|A22|E20|E22) [0-9A-Fa-f]{4}$') {
+            $writes++
+            $null = $ports.Add($Matches[1])
+        }
+    }
+    if ($writes -lt 16 -or $ports.Count -lt 2) {
+        throw "Insufficient authentic EMU8000 writes: $writes across $($ports.Count) ports"
+    }
+    Write-Host "PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS; PORT_WRITES=$writes; ORIGINAL_ROM=VERIFIED; MIDI_NOTE_ON_OFF=VERIFIED"
+    # Independent secondary original-Creative test in an isolated DLL child.
     & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds
-    if ($LASTEXITCODE -ne 0) { throw 'Private Creative ROM/SF2/DEMO PCM gate FAILED.' }
+    if ($LASTEXITCODE -ne 0) { throw 'Private Creative ROM/SF2/DEMO DLL-level PCM gate FAILED.' }
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -56,3 +56,13 @@ pwsh -File tools/Run-Private-Creative-AWE-Test.ps1 -Bundle "build-vst3/VST3/Rele
 ```
 
 Das Skript benötigt den eigenen ROM-Dateipfad und ein bereits gebautes VST3-Bundle, klont das öffentliche Original-Creative-Entwicklerarchiv nur **auf den lokalen Windows-PC**, validiert `DEMO.EXE` über den Git-Blob und `SYNTHGM.SF2`/ROM über die dokumentierten SHA-256-Hashes, verweigert das Überschreiben anderer privater Dateien und führt die vollständig echte `WindowsPrivateCreativeGuestSmoke.py`-Prüfung aus. Weder GitHub Actions noch das öffentliche Repository enthalten proprietäre Originaldateien. Das ist kein behaupteter Nachweis eines erfolgreichen privaten Windows-Laufs.
+
+## Neues privates echtes VST3-/Creative-DOS-Sound-Gate (23.11.2026)
+
+Der PowerShell-Launcher `tools/Run-Private-Creative-AWE-Test.ps1` prüft **nicht mehr nur die originale DOSBox-DLL**, sondern auch den **wirklichen Windows-VST3-`IAudioProcessor::process()`-Klangpfad** mit authentischer Creative-`DEMO.EXE`, `SYNTHGM.SF2` und dem Besitzer-ROM. Der native Testhost `awe64_vst3_host_pcm_smoke.exe` muss im selben lokalen Windows-Build vorhanden sein; optional `-HostExe <Pfad>` verwenden. Er liefert NoteOn/NoteOff über die echte Steinberg-`IEventList`. Erst bei nachgewiesener echter VST3-PCM-Ausgabe **und** EMU8000-Originalregisterwrites plus authentischen Asset-Hashes ist die private Testabnahme positiv.
+
+```powershell
+powershell -File tools/Run-Private-Creative-AWE-Test.ps1 -Bundle "build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3" -Rom "C:\Private\awe32.raw" -Seconds 60
+```
+
+Kein Originalbestandteil wird durch diese Skripte ins öffentliche GitHub eingecheckt oder per Actions ausgeführt. Die private Windows-Ausführung **steht noch aus**; das Vorhandensein der Prüfschnittstelle bedeutet **keinen** Klang-PASS.
