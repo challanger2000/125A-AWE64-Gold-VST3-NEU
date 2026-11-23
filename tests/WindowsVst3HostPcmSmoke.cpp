@@ -141,6 +141,9 @@ int main(int argc,char** argv) {
     const double ramHz=ramHzEnv?std::atof(ramHzEnv):0.;
     if(ramHzEnv&&ramHz!=441.&&ramHz!=735.)return fail("Invalid RAM fixture frequency");
     const unsigned fixtureProgram=ramHz==735.?17u:0u;
+    const char* hostRateEnv=std::getenv("AWE64_TEST_HOST_RATE");
+    const double hostRate=hostRateEnv?std::atof(hostRateEnv):44100.;
+    if(hostRate!=44100.&&hostRate!=48000.)return fail("Unsupported native test host rate");
     const bool originalMode=(argc==4 && std::strcmp(argv[2],"--original")==0);
     const bool exclusionMode=(argc==3 && std::strcmp(argv[2],"--negative")==0);
     const int originalSeconds=originalMode ? std::atoi(argv[3]) : 0;
@@ -245,7 +248,7 @@ int main(int argc,char** argv) {
     V::ProcessSetup setup{};
     setup.processMode=V::kRealtime;
     setup.symbolicSampleSize=V::kSample32;
-    setup.sampleRate=44100.;
+    setup.sampleRate=hostRate;
     setup.maxSamplesPerBlock=512;
     if(processor->canProcessSampleSize(V::kSample32)!=S::kResultTrue ||
        processor->setupProcessing(setup)!=S::kResultOk)
@@ -279,10 +282,11 @@ int main(int argc,char** argv) {
     double expectedTonePower=0., otherTonePower=0.;
     std::uint64_t toneBlocks=0;
     std::uint64_t idleFrames=0,noteFrames=0,releaseFrames=0,activeNoteBlocks=0,nearFullScale=0;
-    constexpr unsigned warmupBlocks=800, idleBlocks=80, heldBlocks=100, tailBlocks=250;
-    constexpr unsigned startNoteBlock=warmupBlocks+idleBlocks;
-    constexpr unsigned stopNoteBlock=startNoteBlock+heldBlocks;
-    constexpr unsigned endOriginalBlock=stopNoteBlock+tailBlocks;
+    const auto scaleBlocks=[hostRate](unsigned n){return static_cast<unsigned>(std::ceil(n*hostRate/44100.));};
+    const unsigned warmupBlocks=scaleBlocks(800), idleBlocks=scaleBlocks(80), heldBlocks=scaleBlocks(100), tailBlocks=scaleBlocks(250);
+    const unsigned startNoteBlock=warmupBlocks+idleBlocks;
+    const unsigned stopNoteBlock=startNoteBlock+heldBlocks;
+    const unsigned endOriginalBlock=stopNoteBlock+tailBlocks;
     // Authentic Creative-AWE ROM presets can be quieter than PC-speaker.
     // Keep a measurable threshold above digital noise for owner-only mode.
     const float minimumPeak=originalMode ? 0.002f : 0.01f;
@@ -292,17 +296,17 @@ int main(int argc,char** argv) {
     // Original Creative/SF2LIB initialization may take longer than the
     // validated short public synthetic DOS test. Preserve the latter.
     const unsigned maxBlocks=originalMode ?
-        std::min(static_cast<unsigned>(originalSeconds*1000/12),endOriginalBlock) : 600u;
+        std::min(static_cast<unsigned>(originalSeconds*hostRate/512.),endOriginalBlock) : 600u;
     if(!externalState.empty()){
         // Allow the initial original Creative guest to settle before
         // exercising stop/join/unload/restart inside the same component.
         std::cout<<"ACTIVE_EXTERNAL_PRE_SWITCH_START\n";
         const auto begin=std::chrono::steady_clock::now();
-        for(unsigned i=0;i<800;++i){
+        for(unsigned i=0;i<warmupBlocks;++i){
             midiEvents.setEnabled(false);
             if(processor->process(data)!=S::kResultOk)return fail("Pre-switch original runtime failed");
             std::this_thread::sleep_until(begin+std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                std::chrono::duration<double>((i+1)*512.0/44100.0)));
+                std::chrono::duration<double>((i+1)*512.0/hostRate)));
         }
         std::cout<<"ACTIVE_EXTERNAL_RESTART_ENTER\n";
         S::MemoryStream switched(externalState.data(),externalState.size());
@@ -337,8 +341,8 @@ int main(int argc,char** argv) {
             if(measureTone) {
                 constexpr double pi=3.14159265358979323846;
                 const double x=0.5*(l[i]+r[i]);
-                const double a=2.*pi*ramHz*i/44100.;
-                const double b=2.*pi*(ramHz==735.?441.:735.)*i/44100.;
+                const double a=2.*pi*ramHz*i/hostRate;
+                const double b=2.*pi*(ramHz==735.?441.:735.)*i/hostRate;
                 er+=x*std::cos(a);ei+=x*std::sin(a);
                 orr+=x*std::cos(b);oi+=x*std::sin(b);
             }
@@ -362,7 +366,7 @@ int main(int argc,char** argv) {
         if(!originalMode && !exclusionMode && peak>minimumPeak&&nonzero>=512)break;
         if(originalMode) {
             const auto due=measurementStart+std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                std::chrono::duration<double>((block+1)*512.0/44100.0));
+                std::chrono::duration<double>((block+1)*512.0/hostRate));
             std::this_thread::sleep_until(due);
         } else std::this_thread::sleep_for(std::chrono::milliseconds(12));
     }
@@ -409,6 +413,7 @@ int main(int argc,char** argv) {
         std::cout<<"PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED\n";
     else
         std::cout<<"SYNTHETIC_DOS_FIXTURE_REAL_VST3_HOST_PCM_PASS\n";
+    std::cout<<"VST3_HOST_RATE="<<hostRate<<"\n";
     std::cout<<"VST3_HOST_FRAMES="<<frames<<"\n"
              <<"VST3_HOST_NONZERO_FRAMES="<<nonzero<<"\n"
              <<"VST3_HOST_PEAK_FLOAT="<<peak<<"\n"

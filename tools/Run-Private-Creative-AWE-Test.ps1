@@ -184,10 +184,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'RAM fixture creation failed.' }
     $ramHash = (Get-FileHash -Algorithm SHA256 $ramFixture).Hash
     $previousRamHz = [Environment]::GetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ','Process')
+    $previousHostRate = [Environment]::GetEnvironmentVariable('AWE64_TEST_HOST_RATE','Process')
     try {
-        foreach ($hz in @('441','735')) {
+        foreach ($case in @('441:44100','735:44100','735:48000')) {
+            $hz,$rate = $case.Split(':')
+            [Environment]::SetEnvironmentVariable('AWE64_TEST_HOST_RATE', $rate, 'Process')
             $ramBoot = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
-            $ramTrace = Join-Path $temporary ("ram_" + $hz + ".trace")
+            $ramTrace = Join-Path $temporary ("ram_" + $hz + "_" + $rate + ".trace")
             [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', $ramFixture, 'Process')
             [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ', $hz, 'Process')
             [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $ramTrace, 'Process')
@@ -198,10 +201,11 @@ try {
             if ($LASTEXITCODE -ne 0) { throw ("RAM sample spectral gate failed: " + $hz) }
             if (-not (Test-Path -PathType Leaf $ramTrace)) { throw 'RAM sample EMU8000 trace absent.' }
             if ((Get-FileHash -Algorithm SHA256 $ramFixture).Hash -ne $ramHash) { throw 'RAM fixture modified.' }
-            Write-Host "RAM_SAMPLE_PROGRAM_SPECTRAL_PASS; HZ=$hz; SOURCE_UNCHANGED"
+            Write-Host "RAM_SAMPLE_PROGRAM_SPECTRAL_PASS; HZ=$hz; HOST_RATE=$rate; SOURCE_UNCHANGED"
         }
     } finally {
         [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ', $previousRamHz, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_HOST_RATE', $previousHostRate, 'Process')
         [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', $previousExternal, 'Process')
         [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $previousBootLog, 'Process')
         [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', $previousOriginal, 'Process')

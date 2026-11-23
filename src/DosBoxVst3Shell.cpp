@@ -168,6 +168,7 @@ bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected) {
         guestStatus_.store(1,std::memory_order_release);
         initialProgramSent_=false;
         absoluteSamplePosition_=0;
+        rateConverter_.reset();
         return true;
     } catch (...) {
         stopRuntimeLocked();
@@ -189,10 +190,14 @@ tresult PLUGIN_API DosBoxVst3Shell::canProcessSampleSize(int32 size) {
     return size==kSample32?kResultTrue:kResultFalse;
 }
 tresult PLUGIN_API DosBoxVst3Shell::setProcessing(TBool) {return kResultOk;}
+uint32 PLUGIN_API DosBoxVst3Shell::getLatencySamples() {
+    // Converter delay only; asynchronous guest/transport latency still
+    // needs end-to-end measurement. No claim of sample-accurate rendering.
+    return rateConverter_.latencySamples();
+}
 tresult PLUGIN_API DosBoxVst3Shell::setupProcessing(ProcessSetup& setup) {
-    // Do not play distorted/pitched audio at a mismatched host sample rate.
-    // 48000/96000 Hz are NOT falsely advertised until true resampling exists.
-    if(std::abs(setup.sampleRate-44100.0)>0.5)return kResultFalse;
+    std::lock_guard<std::mutex> lifecycle(runtimeMutex_);
+    if(!rateConverter_.configure(setup.sampleRate))return kResultFalse;
     return SingleComponentEffect::setupProcessing(setup);
 }
 tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
@@ -300,9 +305,12 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         auto* left=data.outputs[0].channelBuffers32[0];
         auto* right=data.outputs[0].channelBuffers32[1];
         if(left&&right){
-            // Initial version: the original DOSBox mixer runs at 44100 Hz.
-            // setupProcessing rejects other rates until verified resampling.
-            engine.readAudio(left,right,static_cast<std::size_t>(data.numSamples));
+            // Preserve native mixer samples at 44.1 kHz. For higher host
+            // rates convert the original final PCM, not the chip clock.
+            if(rateConverter_.bypass())engine.readAudio(left,right,static_cast<std::size_t>(data.numSamples));
+            else rateConverter_.render(left,right,static_cast<std::size_t>(data.numSamples),[&engine]() noexcept {
+                rt::StereoFrame f{};engine.readAudio(&f.left,&f.right,1);return f;
+            });
             const float gain=master_.load(std::memory_order_acquire);
             for(int32 i=0;i<data.numSamples;i++){
                 left[i]*=gain;right[i]*=gain;

@@ -7,6 +7,7 @@
 #include "PresetCatalog.h"
 #include "DosBoxRuntimeHost.hpp"
 #include "RealtimeQueues.hpp"
+#include "HostRateConverter.hpp"
 #include <memory>
 #include <atomic>
 #include <cstdint>
@@ -29,6 +30,7 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::atomic<std::uint8_t> program_{0};
     std::atomic<std::uint8_t> bank_{0};
     std::atomic<float> master_{1.f};
+    rt::HostRateConverter rateConverter_{};
     // Lifecycle changes on the host/editor thread. The audio callback uses
     // try_lock, never waits for the emulator or a disk operation.
     std::mutex runtimeMutex_;
@@ -58,6 +60,7 @@ public:
     Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown*) override;
     Steinberg::tresult PLUGIN_API setActive(Steinberg::TBool) override;
     Steinberg::tresult PLUGIN_API canProcessSampleSize(Steinberg::int32) override;
+    Steinberg::uint32 PLUGIN_API getLatencySamples() override;
     Steinberg::tresult PLUGIN_API setupProcessing(Steinberg::Vst::ProcessSetup&) override;
     Steinberg::tresult PLUGIN_API setProcessing(Steinberg::TBool) override;
     Steinberg::tresult PLUGIN_API process(Steinberg::Vst::ProcessData&) override;
