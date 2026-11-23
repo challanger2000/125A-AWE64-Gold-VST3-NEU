@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Private Original-Creative-AWE-Klang-Abnahme als ausführbare Windows-Gateprüfung
+
+- `WindowsPrivateCreativeGuestSmoke.py` führt den originalen DOSBox-X-AWE32-Kern **aus dem bereits gebauten einzelnen VST3-Bundle** im selben Windows-Prozess wie den isolierten Testhost aus. Es benötigt nach Hash bestätigte Original-Dateien nur in `Contents/Resources/PRIVATE` und verwendet den identischen Gaststart mit Creative `DEMO.EXE /SBK:SYNTHGM.SF2`.
+- **Realitäts-Gates:** Original-MPU-401-CC0/Program/NoteOn, ursprünglicher PCM-Stereo-Callback mit messbarem Note-On-Peak, echte Original-EMU8000-Portschreibtraces, ausschließlicher SDL2-Dummy-Ausgang und erfolgreicher Stop/Join. Keine generierten Audiosignale und keine freien ROM-Dummies im Klangtest.
+- Absturz-/Timeout-Isolation via privatem Windows-Unterprozess. Öffentliche Linux/Windows-CI prüft ausschließlich Syntax und synthetische Konfiguration/Fake-Daten ohne originale Creative-Dateien. **Privater Klangtest aktuell noch nicht tatsächlich bestanden**, kein VST3-DAW-Test, keine Releasefreigabe.
+
+
 ## 23.11.2026 — Release-Sicherheitsprüfung des Bankwahltests (kein Audio-/Creative-Fix)
 
 - Regression von `assert` auf einen in `Release` aktiven `CHECK`-Abbruch umgestellt. Vorher war die Laufzeitschleife durch `NDEBUG` abgeschaltet, obwohl die Compiletime-Randwertprüfungen funktionierten.

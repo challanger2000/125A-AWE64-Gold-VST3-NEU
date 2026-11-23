@@ -19,6 +19,12 @@ Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder kl
 
 Der neue reine MIDI-Bankwahltest prüft 16 Kanäle × 128 Banken und 16 Kanäle × 128 Programme (4096 Eingabekombinationen). Er verwendet bewusst keine C-Standard-`assert`-Makros, da diese in Windows-/Linux-CMake-`Release`-Builds mit `NDEBUG` entfallen. Tests und Versionsnachweis nach Commit erst mit tatsächlich beendeter CI als PASS markieren. Der zuvor bereits ausgeführte Linux-/Windows-CI-Lauf hatte die Konstanten durch `static_assert` geprüft; die 128er Runtime-Schleife war unter `NDEBUG` inaktiv.
 
+## Original-Creative-Klang-Gate – private Windows-Prüfung vorbereitet
+
+- `tests/WindowsPrivateCreativeGuestSmoke.py` führt ausschließlich in einem **privaten Windows-Testprozess** die tatsächlich im VST3-Bundle liegende originale DOSBox-X-DLL aus. Es prüft exakt die Originaldateien per SHA-/Git-Blob, startet `DEMO.EXE /SBK:SYNTHGM.SF2`, sendet CC0/Programm/Note über den echten MPU-401, misst Original-Mixer-PCM und verlangt EMU8000-Portschreibspuren, SDL2-Dummy-Isolation und kontrolliertes Beenden.
+- Der Test erzeugt **keinen** Ton und keine Ersatz-EMU8000-Engine. Trace/PCM/Originaldateien bleiben privat; Child-Prozess mit hartem Timeout schützt gegen Hänger. Öffentliche CI führt **nur synthetische Quell-/Harness-Regressionstests** aus.
+- **Wichtig:** Der private Originalklang-Gate-Test wurde hier mangels lokal ausgeführter Windows-AWE-Laufzeit **noch nicht erfolgreich ausgeführt**. Sein Vorhandensein ist weder echter Klang-PASS noch ein VST3-Host- oder Fender-Studio-Pro-Test. Erst die entsprechenden echten Befunde können eine Freigabe rechtfertigen.
+
 ## Festgelegte Architektur
 
 Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32/EMU8000-Quellcode als **intern geladener DLL im VST3-Prozess**, originaler Creative-DOS-SF2LIB/DEMO.EXE als 16-Bit-DOS-Programm im emulierten PC. **Kein** externes DOSBox-Programm, **kein** 86Box-/Windows95-Gast und **kein** nativer Ersatz-SF2-Player.

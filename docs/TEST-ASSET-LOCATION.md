@@ -36,3 +36,13 @@ Die Bibliothek enthält teils zusätzlich gleichnamige Kopien mit `(1)`, `(2)` o
 - Das aktuelle VST3 benötigt `DEMO.EXE` und `SYNTHGM.SF2` als **privates** Laufzeitmaterial neben dem ROM in `Contents/Resources/PRIVATE`. Die Dateien werden nicht ins öffentliche GitHub oder GitHub-Actions aufgenommen.
 - Die originale SF2LIB-Demo erkennt Bankaufrufe an **`/SBK:`**, unabhängig von der falsch ausgegebenen `/SF2:`-Hilfemeldung. `SYNTHGM.SBK` ist nicht automatisch `SYNTHGM.SF2`.
 - **Kein bestätigter VST3-Test dieser Originaldateien im neuen DOSBox-X-VST3**; sobald private Einbindung verfügbar ist, zuerst tatsächlichen DOS/Originalsound nachweisen.
+
+## Windows-Originalklang-Gate
+
+Nach privater Paketierung mit `tools/prepare_private_vst3.py` kann die tatsächliche originale DOSBox-X-DLL innerhalb des **unveröffentlichten** VST3-Bundles geprüft werden:
+
+```powershell
+python tests/WindowsPrivateCreativeGuestSmoke.py --bundle PRIVATE/AWE64GoldDOSBoxDev.vst3
+```
+
+Die Prüfung braucht neben dem bereits vorhandenen `awe32.raw` ausdrücklich die originale `DOS/DEMO/DEMO.EXE` (Git-Blob `e10b8705c6a46444a998c4f6aa74a1cda2081506`) und `SYNTHGM.SF2` (SHA-256 `78f8739a25d49e519b3fdc92a7f03d4ddd68588fd0260578a880296e304b7b5f`). Beide stammen aus dem in dieser Datei dokumentierten Creative-ADIP-Originalfundort. Nur nach Originalprüfung privat bereitstellen. Dies ist ein **DLL-Gast-Klangtest**, noch keine automatische VST3-Host-/Studio-Pro-Abnahme. Bei einer Fehlprüfung keine Nachweise erfinden.
