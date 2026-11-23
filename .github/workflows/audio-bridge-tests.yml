@@ -6,6 +6,8 @@ on:
       - 'src/RealtimeQueues.hpp'
       - 'src/Sf2CreativeDosCompatibility.hpp'
       - 'tests/**'
+      - 'integration/DosBoxHostAdapter.hpp'
+      - 'integration/AWE64_DOSBOX_ABI.h'
       - 'tools/patch_creative_demo.py'
       - 'guest/**'
       - 'CMakeLists.txt'

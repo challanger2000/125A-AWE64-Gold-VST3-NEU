@@ -1,0 +1,63 @@
+name: DOSBox-X original hardware in-process DLL (NO VST3 PLAYBACK)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'integration/**'
+      - 'tests/test_dosbox_runtime_patch.py'
+      - 'tests/DosBoxHostAdapterTest.cpp'
+      - 'CMakeLists.txt'
+      - '.github/workflows/windows-dosbox-runtime.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  patch-actual-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Verify upstream commit and apply real source patch
+        run: |
+          test "$(git -C third_party/dosbox-x-AWE32 rev-parse HEAD)" = "f3a95b9f19a7f9863295e6481f271cf04733c635"
+          python -m unittest discover -s tests -p test_dosbox_runtime_patch.py -v
+          python integration/patch_dosbox_runtime.py third_party/dosbox-x-AWE32
+          grep -q 'AweHostRead.Install(0xBEE0u' third_party/dosbox-x-AWE32/src/hardware/emu8000.cpp
+          grep -q 'AWE64_HostRegisterPCM' third_party/dosbox-x-AWE32/src/hardware/mixer.cpp
+  compile-original-dosbox-dll:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: microsoft/setup-msbuild@v2
+      - name: Confirm original DOSBox-X SHA
+        shell: pwsh
+        run: |
+          $sha=(git -C third_party/dosbox-x-AWE32 rev-parse HEAD).Trim()
+          if ($sha -ne 'f3a95b9f19a7f9863295e6481f271cf04733c635') { throw "Unexpected upstream SHA $sha" }
+      - name: Patch only GitHub runner working tree
+        shell: pwsh
+        run: |
+          python integration/patch_dosbox_runtime.py third_party/dosbox-x-AWE32
+          if ($LASTEXITCODE -ne 0) { throw "Source patch failed" }
+      - name: Build in-process x64 DOSBox-X-AWE32 DLL
+        shell: pwsh
+        working-directory: third_party/dosbox-x-AWE32
+        run: |
+          msbuild vs/dosbox-x.sln -t:dosbox-x:Rebuild -p:Configuration=Release -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m:4
+          if ($LASTEXITCODE -ne 0) { throw "DOSBox runtime DLL compilation failed" }
+          if (-not (Test-Path 'bin/x64/Release/AWE64DOSBoxRuntime.dll')) { throw "Runtime DLL not found" }
+      - name: Assert real DLL exports exist
+        shell: pwsh
+        run: |
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll'
+          $tool=Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022' -Filter dumpbin.exe -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match 'Hostx64\\x64' } | Select-Object -First 1
+          if (-not $tool) { throw 'dumpbin.exe not found' }
+          $exports=(& $tool.FullName /exports $dll | Out-String)
+          foreach ($symbol in @('AWE64_StartGuest','AWE64_HostRegisterIO','AWE64_HostRegisterPCM')) {
+            if (-not $exports.Contains($symbol)) { throw "Missing native runtime export $symbol" }
+          }
+          Write-Host 'Compiled original DOSBox-X-AWE32 DLL; no Creative DOS guest boot or PCM proved'
+      # Source-only test; no public runtime binaries or private ROM/SF2 uploaded.
