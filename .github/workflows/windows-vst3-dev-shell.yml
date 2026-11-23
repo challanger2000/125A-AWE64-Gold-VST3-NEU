@@ -1,0 +1,36 @@
+name: Windows VST3 developer shell compilation (NO AUDIO ENGINE)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-vst3-shell:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Acquire pinned Steinberg SDK 3.7.12
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch v3.7.12_build_20 --recurse-submodules --shallow-submodules https://github.com/steinbergmedia/vst3sdk.git "$env:RUNNER_TEMP\vst3sdk"
+          if ($LASTEXITCODE -ne 0) { throw "VST3 SDK clone failed" }
+      - name: Configure VST3
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DAWE64_BUILD_VST3_DEV=ON -DAWE64_VST3SDK="$env:RUNNER_TEMP\vst3sdk" -DBUILD_TESTING=ON
+          if ($LASTEXITCODE -ne 0) { throw "VST3 CMake configure failed" }
+      - name: Build VST3 developer shell
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --target AWE64GoldDOSBoxDev --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw "VST3 developer shell compilation failed" }
+      - name: Assert no engine falsely promoted to a product
+        shell: pwsh
+        run: |
+          $source = Get-Content src/DosBoxVst3Shell.cpp -Raw
+          if (-not $source.Contains('if(state)') -or -not $source.Contains('return kResultFalse;')) { throw "Missing fail-closed activation" }
+          if (-not (Get-Content AKTUELLE-VERSION.md -Raw).Contains('Noch nicht gebaut')) { throw "Documentation must not claim a finished VST3" }
+      # Deliberately no public artifact: this dev module is not a functioning instrument.
