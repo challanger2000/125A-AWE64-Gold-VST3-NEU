@@ -11,6 +11,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **Submodul:** `third_party/dosbox-x-AWE32` auf `f3a95b9f19a7f9863295e6481f271cf04733c635` gepinnt. **Einziger Branch:** `main`.
 
+## Neuester integrierter Windows-MIDI-und-PCM-VST3-PASS (23.11.2026)
+
+**[Windows-Actions 45201802002](../../actions/runs/45201802002): vollständiger Erfolg.** Im echten VST3-Instrument laufen jetzt **7 MIDI-NoteOn-Events durch Steinberg-`IEventList` → Original-DOSBox-X-MPU401 (331h/330h) → synthetisches 16-Bit-DOS-PC-Speaker-Programm → originalen DOSBox-X-Mixer → echten VST3-`process()`-Stereoausgang**. Gemessen **59.904 Float32-Stereoframes, 982 nicht-stumm, Spitzenpegel 0,304871**, Stille vor NoteOn geprüft. Linux-/Windows-Regressionen ebenfalls bestanden. **Der Original-Creative-DOS-SF2/ROM-Klang ist damit weiterhin NICHT nachgewiesen**, erfordert getrennten privaten Test. Kein Release, Entwicklungskennung `0.0.0-dev`. Verbindlich: [AKTUELLE-VERSION.md](AKTUELLE-VERSION.md).
+
 ## Aktueller erster VST3-`process()`-PCM-End-to-End-PASS (23.11.2026)
 
 **[Windows 45197768158](../../actions/runs/45197768158): SUCCESS.** Der echte Windows-x64-VST3-Host hat das gebaute Plugin über die Steinberg-Factory aktiviert und seinen Audio-Callback ausgeführt: **80.384 Float32-Stereoframes, 568 nicht-stumme Frames, Peak 0,304871**. Quelle war die emulierte **DOS-PC-Speaker-Hardware**, nicht der EMU8000. Originale ROM-, `DEMO.EXE`- und `SYNTHGM.SF2`-Dateien sind hier **bewusst nicht vorhanden**; ein vollständiges Creative-AWE64-Instrument ist noch nicht freigegeben. `0.0.0-dev`, `main`, Original-P165-GUI unverändert. Weitere Details in [AKTUELLE-VERSION.md](AKTUELLE-VERSION.md).

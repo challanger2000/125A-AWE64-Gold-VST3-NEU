@@ -1,10 +1,11 @@
 # Änderungsverlauf
 
-## 23.11.2026 — Echte MIDI↔Audio-VST3-Rundwegprüfung statt getrennten Ein-/Ausgangs-Smokes
+## 23.11.2026 — Echte bidirektionale VST3-MIDI↔Original-DOSBox-I/O-PCM-Abnahme: Windows-PASS
 
-- Nach dem bestätigten echten VST3-`process()`-Audio-PASS in Windows [45197768158](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45197768158) wurde nun ein **gemeinsamer Ende-zu-Ende-Test** eingeführt: MIDI NoteOn vom echten VST3-`IEventList` über `DosBoxVst3Shell::process()`/SPSC-Queue und Original-MPU-401 an ein eigenes 16-Bit-DOS-Programm; erst bei exakter Note 60/Velocity 100 aktiviert dieses die Original-PC-Speaker-Hardware; deren Audio muss durch originalen DOSBox-X-Mixer und VST3-`process()` im Host zurückkehren.
-- `MakeMidiTriggeredDemoExe.py`: vollständiges eigenes DOS-MZ-Assemblerprogramm mit UART-ACK-Verifikation, echter DOS-MPU-330h/331h-Lesung, echter PIT-/Speaker-I/O, BIOS-Tick-Timeout und sicherem DOS-Exit. `MakeSyntheticDemoExe.py` verwendet dieses statt eines unbedingten Starttons. `WindowsVst3HostPcmSmoke.cpp` prüft dazu vor MIDI das Fehlen von Audio und verlangt danach hörbare Float32-Ausgabe.
-- `test_synthetic_dos_exe.py` erweitert auf das 202-Byte-MZ-Programm und dessen tatsächliche Port-/MIDI-Befehle; Windows-Workflow startet das MIDI→PCM-Gate, zunächst **ohne** geschützte Creative-Dateien. Kein Eingriff in Original-EMU8000, Creative-Treiber, P165-GUI oder Quell-DOSBox-X. **Noch kein CI-PASS dieses neuen Rundwegs und noch kein echter Creative-SF2-Klang-PASS;** `0.0.0-dev`.
+- **[Windows-Integrationslauf 45201802002](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45201802002) vollständig SUCCESS**: echtes Windows-VST3 über `GetPluginFactory`/`IAudioProcessor::process()` mit `IEventList` betrieben, **7 Steinberg-VST3-NoteOn-Events** durch den Original-DOSBox-X-MPU401-UART (Port 330h/331h mit 3Fh/FEh) an ein eigenständiges DOS-MZ-Programm. Diese schaltet nur bei passender Note die original emulierte PIT-/PC-Speaker-Hardware frei; vorher fordert der Host Stille.
+- Im selben Pluginprozess nachweislich **59.904 Stereo-Float32-Frames**, davon **982 nicht-stumme**, Peak **0,304871** am wirklichen VST3-Ausgang; originale Mixer-PCM, STOP, Release, kein NaN/Clip **PASS**. Ebenso Original-EMU8000-Registertest (**9.688 reale Writes**) und originale MPU-/Mixer-/Windows-x64-DLL-Tests **PASS**.
+- [Linux-/Windows-Datenfrei-Release-Prüfung 45201802160](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45201802160) **SUCCESS**, [Changelog-Konsistenz 45201801967](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45201801967) **SUCCESS**. Original-P165-GUI und DOSBox-X-Chipkern bleiben unangetastet, weiterhin nur `main`.
+- Originale Creative-DOS-`DEMO.EXE`, echtes Besitzer-`awe32.raw` und `SYNTHGM.SF2` waren aus Privacy-/Lizenzgründen **nicht** in der öffentlichen CI. Der bisherige MIDI-gesteuerte PC-Speaker-Ton ist **kein** AWE64-GM-SoundFont-Nachweis. Kein Fender-Studio-Pro-Test und kein Produkt-Release; `0.0.0-dev`.
 
 
 ## 23.11.2026 — Echte VST3-Host-Audioausgabe aus Original-DOSBox: vollständiger Windows-PASS
