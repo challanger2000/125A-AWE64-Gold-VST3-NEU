@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Kritischen SDL1/SDL2-Buildfehler korrigiert (Recheck erforderlich)
+
+- Fehlerdiagnose aus Windows-Actions 45107364211: Das bisherige originale `Release|x64`-Projekt baut **SDL1**, nicht SDL2. Dadurch wurden die ursprünglichen Hidden-Window-/SDL2-Dummy-Audio-Integrationen **nicht** wirksam, und die echte Audio-Isolierungsprüfung schlug fehl.
+- Der Original-DOSBox-X-Fork besitzt eine separate `Release SDL2|x64`-Konfiguration. Diese wird jetzt für den internen Emulator zwingend gepatcht, mit `C_SDL2` kontrolliert und vom Windows-CI ausgeführt; die bisherige SDL1-Konfiguration bleibt im Original-Submodul unangetastet.
+- Geänderter tatsächlicher DLL-Pfad: `bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll`. Windows-Exports, der echte DOS-Guest, Host-MIDI-Probe, Mixer-Dummy und das VST3-Bundle werden **neu** geprüft, bevor ein PASS erklärt wird.
+
 ## 23.11.2026 — Verbindlichen Quell-/Prüfstand für Codex und spätere Chats konsolidiert
 
 - `AKTUELLE-VERSION.md` komplett neu strukturiert: **gebaut/real getestet**, **nur implementiert** und **NO-GO bis Original-AWE-Sound** strikt getrennt. Exakte gepinnte Versionen, Referenz-CI-Läufe und private Datenfundorte stehen an einer Stelle.

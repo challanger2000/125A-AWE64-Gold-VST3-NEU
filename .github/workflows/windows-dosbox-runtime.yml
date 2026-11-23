@@ -54,15 +54,17 @@ jobs:
         shell: pwsh
         working-directory: third_party/dosbox-x-AWE32
         run: |
-          msbuild vs/dosbox-x.sln -t:dosbox-x:Rebuild -p:Configuration=Release -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m:4
+          msbuild vs/dosbox-x.sln -t:dosbox-x:Rebuild '-p:Configuration=Release SDL2' -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m:4
           if ($LASTEXITCODE -ne 0) { throw "DOSBox runtime DLL compilation failed" }
-          if (-not (Test-Path 'bin/x64/Release/AWE64DOSBoxRuntime.dll')) { throw "Runtime DLL not found" }
+          if (-not (Test-Path 'bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll')) { throw "Runtime DLL not found" }
       - name: Assert real DLL exports exist
         shell: pwsh
         run: |
-          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll'
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           $tool=Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022' -Filter dumpbin.exe -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match 'Hostx64\\x64' } | Select-Object -First 1
           if (-not $tool) { throw 'dumpbin.exe not found' }
+          # Actual internal-DLL codepath must use the SDL2 project variant
+          if (-not (Test-Path $dll)) { throw "Original SDL2-DLL is absent" }
           $exports=(& $tool.FullName /exports $dll | Out-String)
           foreach ($symbol in @('AWE64_StartGuest','AWE64_HostRegisterIO','AWE64_HostRegisterPCM')) {
             if (-not $exports.Contains($symbol)) { throw "Missing native runtime export $symbol" }
@@ -73,7 +75,7 @@ jobs:
         run: |
           @'
           import ctypes,os,pathlib
-          path=pathlib.Path('third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll').resolve()
+          path=pathlib.Path('third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll').resolve()
           with os.add_dll_directory(str(path.parent)):
               dll=ctypes.WinDLL(str(path))
               names=('AWE64_StartGuest','AWE64_HostRegisterIO','AWE64_HostRegisterPCM','AWE64_HostRegisterMidi','AWE64_RequestStop','AWE64_IsInternalAudioOnly')
@@ -86,19 +88,19 @@ jobs:
       - name: Smoke real DOSBox-X main() and clean return within same Windows process
         shell: pwsh
         run: |
-          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll'
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           python tests/WindowsDosBoxGuestSmoke.py --parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Original DOSBox-X in-process bootstrap/exit failed" }
       - name: Verify original DOSBox-X background worker receives stop and joins
         shell: pwsh
         run: |
-          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll'
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           python tests/WindowsDosBoxGuestSmoke.py --stop-parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Real DOSBox in-process worker shutdown did not complete" }
       - name: Prove actual 16-bit guest MPU401 UART receives host MIDI through original DOSBox-X
         shell: pwsh
         run: |
-          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll'
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           python tests/WindowsMpuGuestSmoke.py --parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Original MPU401 guest hardware path failed" }
       - name: Compile VST3 host and stage original internal DOSBox-X runtime DLL
@@ -111,7 +113,7 @@ jobs:
           cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev --parallel 2
           if ($LASTEXITCODE -ne 0) { throw "VST3 Windows build failed" }
           $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win'
-          $native='third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll'
+          $native='third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           if (-not (Test-Path $native)) { throw "Original DOSBox DLL not built" }
           if (-not (Test-Path (Join-Path $bundle 'AWE64GoldDOSBoxDev.vst3'))) { throw "VST3 host binary missing" }
           Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')

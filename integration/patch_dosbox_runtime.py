@@ -204,7 +204,7 @@ extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
 #endif
 '''
 def patch_project(s):
-    cond="'$(Configuration)|$(Platform)'=='Release|x64'"
+    cond="'$(Configuration)|$(Platform)'=='Release SDL2|x64'"
     pre='  <PropertyGroup Condition="'+cond+'" Label="Configuration">\n'
     s=once(s,pre+'    <ConfigurationType>Application</ConfigurationType>',
            pre+'    <ConfigurationType>DynamicLibrary</ConfigurationType>')
@@ -219,6 +219,9 @@ def patch_project(s):
                        lambda m:m.group(0).replace('<PreprocessorDefinitions>',
                         '<PreprocessorDefinitions>AWE64_VST3_RUNTIME;'),group,count=1)
     if count!=1: raise ValueError('Compiler macro block missing')
+    # Classic Release|x64 builds SDL1: no hidden window and no SDL2
+    # dummy audio. The internal VST3 runtime MUST use Release SDL2|x64.
+    if 'C_SDL2' not in group:raise ValueError('SDL2 build configuration missing')
     return left+marker+group+'  </ItemDefinitionGroup>'+tail
 
 PATCHES={
