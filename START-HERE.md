@@ -13,7 +13,7 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 ## Neue private Creative-Startdiagnose: Originalfehler statt bloßer Stille
 
-Im **nur lokalen Original-Creative-Klangtest** werden die tatsächlichen DOS-Fehler von Creative-`DEMO.EXE` (AWE32-Detect, Initialisierung, MPU401, SF2-Load) jetzt in einer **pro Lauf eigenen privaten DOS-8.3-Logdatei** abgefangen. Die originale EXE und der EMU8000-Kern bleiben unverändert; die öffentlichen synthetischen VST3-Tests führen weiterhin den unveränderten DOS-Testgast aus. Eine kleine datenfreie Linux-/Windows-Regression testet Fehler-/Zeitablauf. **Bis zu echten CI-Ergebnissen nicht als bestanden bezeichnen; der erste Original-Creative-Sound bleibt weiterhin OFFEN.**
+Im **nur lokalen Original-Creative-Klangtest** werden die tatsächlichen DOS-Fehler von Creative-`DEMO.EXE` (AWE32-Detect, Initialisierung, MPU401, SF2-Load) jetzt in einer **pro Lauf eigenen privaten DOS-8.3-Logdatei** abgefangen. Die originale EXE und der EMU8000-Kern bleiben unverändert; die öffentlichen synthetischen VST3-Tests führen weiterhin den unveränderten DOS-Testgast aus. Eine kleine datenfreie Linux-/Windows-Regression testet Fehler-/Zeitablauf. **[Linux und Windows 45263904252](../../actions/runs/45263904252) PASS** für diese datenfreien Kinderprozess-/Logfehlerfälle; **[echter Windows-VST3-Build plus synthetischer MIDI/PCM-Positiv-/Negativtest 45263904174](../../actions/runs/45263904174) PASS** (921 nicht-stumme Stereo-Frames positiv, 0 im Creative-only-Negativtest). **Der Original-Creative-ROM/SF2-Sound selbst bleibt weiterhin OFFEN.**
 
 ## Neue echte Windows-VST3-Klang-Negativkontrolle (Stand 23.11.2026)
 
