@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 23.11.2026 — Vorbereitete Windows-Testpaketierung ohne private Originaldaten
+
+- Der bestehende Windows-Integrationsworkflow bereitet das tatsächlich kompilierte VST3, den nativen Steinberg-Testhost, die beiden privaten Python-Prüfer und den lokalen PowerShell-Launcher **vor** dem Einbringen synthetischer DOS-Testdateien in einem separaten Verzeichnis vor. Ein expliziter Dateicheck verweigert ROM/SF2/SBK/DEMO.EXE/PRIVATE-Inhalte. Der CMD-Starter verwendet den lokalen Besitzer-ROM und den vorgebauten Testhost, ohne erneuten C++-Build.
+- Ein GitHub-Actions-Download wird **nur bei einem privaten Repository** und nach erfolgreichen bestehenden Windows-Gates bereitgestellt. Das aktuelle Repository ist öffentlich; kein öffentlicher Binärdownload, keine Veröffentlichung proprietärer Bestandteile und kein Release. Windows-CI für die neue Paketierung noch nicht bestätigt.
+- Der authentische Original-Creative-Klangtest bleibt offen. `0.0.0-dev`, nur `main`, P165 und originaler EMU8000 unverändert.
+
 ## 23.11.2026 — Private Original-Creative-DOS-Startdiagnose: Linux-/Windows- und VST3-Tests bestanden
 
 - **Technische Lücke geschlossen:** Die unveränderte originale Creative-`DOS/DEMO/DEMO.EXE` meldet im DOS-Quellcode ausdrücklich `ERROR: SB AWE32 not detected`, `ERROR: SB AWE32 initialization failed`, `ERROR: MPU401 initialization failed`, `ERROR: Cannot load SoundFont file` oder `ERROR: Invalid SoundFont file`. Im bisherigen unsichtbaren DOS-VST3-Gast erschienen diese echten Fehler im privaten Klangtest nur als stiller Output/Timeout, also ohne bekannte Ursache.

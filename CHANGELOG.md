@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Vorbereitete Windows-Testpaketierung ohne private Originaldaten
+
+- Der bestehende Windows-Integrationsworkflow bereitet das tatsächlich kompilierte VST3, den nativen Steinberg-Testhost, die beiden privaten Python-Prüfer und den lokalen PowerShell-Launcher **vor** dem Einbringen synthetischer DOS-Testdateien in einem separaten Verzeichnis vor. Ein expliziter Dateicheck verweigert ROM/SF2/SBK/DEMO.EXE/PRIVATE-Inhalte. Der CMD-Starter verwendet den lokalen Besitzer-ROM und den vorgebauten Testhost, ohne erneuten C++-Build.
+- Ein GitHub-Actions-Download wird **nur bei einem privaten Repository** und nach erfolgreichen bestehenden Windows-Gates bereitgestellt. Das aktuelle Repository ist öffentlich; kein öffentlicher Binärdownload, keine Veröffentlichung proprietärer Bestandteile und kein Release. Windows-CI für die neue Paketierung noch nicht bestätigt.
+- Der authentische Original-Creative-Klangtest bleibt offen. `0.0.0-dev`, nur `main`, P165 und originaler EMU8000 unverändert.
+
 ## 23.11.2026 — Original-Creative-DOS-Fehlerursachen werden im privaten echten VST3 sichtbar
 
 - Original-Programmquelle `DOS/DEMO/DEMO.C` erneut kontrolliert: Hardware-Detect, Chip-Init, MPU-401-Init und SF2-Request/-Preset-Fehler erzeugen ursprüngliche DOS-`ERROR:`-Meldungen. Für private Windows-Testläufe bisher unsichtbar.
