@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'src/RealtimeQueues.hpp'
+      - 'src/CreativeMidiBankSelect.hpp'
       - 'src/Sf2CreativeDosCompatibility.hpp'
       - 'tests/**'
       - 'integration/DosBoxHostAdapter.hpp'

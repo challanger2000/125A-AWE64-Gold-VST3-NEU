@@ -21,6 +21,9 @@ if(BUILD_TESTING)
   target_include_directories(awe64_creative_dos_dispatch_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/guest")
   set_target_properties(awe64_creative_dos_dispatch_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON)
   add_test(NAME AWE64_CreativeDosDispatch COMMAND awe64_creative_dos_dispatch_test)
+  add_executable(awe64_creative_midi_bank_select_test tests/CreativeMidiBankSelectTest.cpp)
+  target_include_directories(awe64_creative_midi_bank_select_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  add_test(NAME AWE64_CreativeMidiBankSelect COMMAND awe64_creative_midi_bank_select_test)
   add_executable(awe64_dosbox_host_adapter_test tests/DosBoxHostAdapterTest.cpp)
   target_include_directories(awe64_dosbox_host_adapter_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/integration")
   add_test(NAME AWE64_DosBoxHostAdapter COMMAND awe64_dosbox_host_adapter_test)
@@ -111,6 +114,7 @@ if(AWE64_BUILD_VST3_DEV)
     src/DosBoxVst3Shell.cpp
     src/DosBoxVst3Factory.cpp
     src/RealtimeQueues.hpp
+    src/CreativeMidiBankSelect.hpp
     src/DosBoxRuntimeHost.hpp
     integration/DosBoxHostAdapter.hpp
     integration/AWE64_DOSBOX_ABI.h

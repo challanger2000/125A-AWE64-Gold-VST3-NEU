@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Creative-DOS-Bankwahl auf den originalen CC0-Pfad korrigiert
+
+- Original `DOS/DEMO/DEMO.C` unabhängig kontrolliert: Die Creative-SF2LIB-Demo setzt beim manuellen Bankwechsel `awe32Controller(15, 0, k)`. Die bisherige VST3-Bankübertragung setzte **CC0 fälschlich immer auf 0** und sendete den gewünschten Wert über CC32; der DOS-Treiber konnte deshalb bei Bankwechseln weiter Bank 0 verwenden.
+- VST3 sendet jetzt den gewünschten Bankwert direkt in **CC0** und danach die Program-Change-Nachricht. Keine Änderung an der originalen DOSBox-X-EMU8000-Engine, Creative-DOS-Demo oder originalen P165-GUI.
+- `src/CreativeMidiBankSelect.hpp` und unabhängiger C++20-Regressionstest hinzugefügt, Linux-/Windows-CMake-Testworkflow für Änderungen am Header aktiviert. Isolierter lokaler GCC20-Helper-Test PASS; echte CI-/VST3-Integration **bis zum GitHub-Actions-Ergebnis offen**.
+- Kein neuer Branch, keine proprietären Binärdaten und keine Freigabe. `0.0.0-dev` bleibt unverändert.
+
+
 ## 23.11.2026 — Private Test-Bundle-Paketierung Linux/Windows geprüft
 
 - **GitHub Actions [45110560473](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45110560473): SUCCESS** – originale Windows- und Linux-Transporttests einschließlich der neuen privaten VST3-Paketierungsregression mit ausschließlich erzeugten **Fake-Originaldateien** durchgelaufen. Keine echten Creative-ROMs, Original-`DEMO.EXE`, SoundFonts oder herunterladbaren Lizenzdateien im GitHub-Runner.

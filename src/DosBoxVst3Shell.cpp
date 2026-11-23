@@ -1,4 +1,5 @@
 #include "DosBoxVst3Shell.hpp"
+#include "CreativeMidiBankSelect.hpp"
 #include "PresetBrowserView.h"
 #include "pluginterfaces/base/ustring.h"
 #include "pluginterfaces/base/ibstream.h"
@@ -123,14 +124,15 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     const auto bank=bank_.load(std::memory_order_acquire);
     const auto program=program_.load(std::memory_order_acquire);
     if(!initialProgramSent_||lastBank_!=bank||lastProgram_!=program) {
-        // Bank select MSB/LSB and ProgramChange reach ORIGINAL Creative DOS
-        // SF2LIB via the real MPU-401 I/O controller, not direct EMU writes.
+        // The original Creative DOS demo uses CC0 (BANK MSB), not CC32
+        // (BANK LSB), to select an AWE SF2 bank. Keep MIDI routed through
+        // the original MPU-401, never synthesize or write EMU registers here.
         bool accepted=true;
-        if(!initialProgramSent_||lastBank_!=bank){
-            accepted=engine.sendMidi({absoluteSamplePosition_,0xB0,0,0,3})&&accepted;
-            accepted=engine.sendMidi({absoluteSamplePosition_,0xB0,32,bank,3})&&accepted;
-        }
-        accepted=engine.sendMidi({absoluteSamplePosition_,0xC0,program,0,2})&&accepted;
+        if(!initialProgramSent_||lastBank_!=bank)
+            accepted=engine.sendMidi(
+                rt::makeCreativeBankSelect(absoluteSamplePosition_,bank))&&accepted;
+        accepted=engine.sendMidi(
+            rt::makeCreativeProgramChange(absoluteSamplePosition_,program))&&accepted;
         if(accepted) {
             initialProgramSent_=true;lastBank_=bank;lastProgram_=program;
         }

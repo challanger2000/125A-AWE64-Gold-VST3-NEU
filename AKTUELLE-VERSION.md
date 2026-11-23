@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## Korrektur vom 23.11.2026 – Creative-DOS-Bankwahl (neuer Quellstand)
+
+- **Implementiert:** Der VST3-Host sendet Bankwahl jetzt als MIDI **CC 0 (Bank Select MSB) mit dem echten Bankwert** an die unveränderte Creative-DOS-Runtime, statt bisher stets CC 0=0 und CC 32=Bank. Quelle: originales Creative `DOS/DEMO/DEMO.C`, dessen Tastatursteuerung Bankwahl ausdrücklich mit `awe32Controller(15, 0, k)` ausführt.
+- **Neue Regression:** `CreativeMidiBankSelectTest.cpp` prüft Bankwerte 0–127, Kanalgrenzen, MIDI-Status, Bank-Controller und Program-Change-Paket. Der tragende C++20-Helper wurde vor dem Commit mit einem isolierten lokalen GCC20-Test übersetzt; die echten Linux-/Windows-CMake-Gates für diesen Quellstand müssen noch laufen.
+- **Keine Klangbehauptung:** Originale Creative-DEMO/ROM/SF2 innerhalb des neuen VST3 sowie korrektes Bank-/Program-Recall sind weiterhin **nicht** end-to-end nachgewiesen; Entwicklungskennung bleibt `0.0.0-dev`.
+
 ## Festgelegte Architektur
 
 Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32/EMU8000-Quellcode als **intern geladener DLL im VST3-Prozess**, originaler Creative-DOS-SF2LIB/DEMO.EXE als 16-Bit-DOS-Programm im emulierten PC. **Kein** externes DOSBox-Programm, **kein** 86Box-/Windows95-Gast und **kein** nativer Ersatz-SF2-Player.
