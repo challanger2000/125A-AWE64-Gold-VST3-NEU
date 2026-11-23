@@ -104,10 +104,12 @@ try {
     if ($writes -lt 16 -or $ports.Count -lt 2) {
         throw "Insufficient authentic EMU8000 writes: $writes across $($ports.Count) ports"
     }
-    Write-Host "PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS; PORT_WRITES=$writes; ORIGINAL_ROM=VERIFIED; MIDI_NOTE_ON_OFF=VERIFIED"
     # Independent secondary original-Creative test in an isolated DLL child.
     & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds
     if ($LASTEXITCODE -ne 0) { throw 'Private Creative ROM/SF2/DEMO DLL-level PCM gate FAILED.' }
+    # Only announce final PASS after BOTH independent tests and all original
+    # owner SHA-256/Git-blob and EMU8000 trace gates have actually succeeded.
+    Write-Host "PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS; PORT_WRITES=$writes; ORIGINAL_ROM=VERIFIED; MIDI_NOTE_ON_OFF=VERIFIED"
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force -ErrorAction SilentlyContinue
 }

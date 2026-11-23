@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Windows-VST3-Build und neuer privater Original-Creative-Testmodus: CI bestanden
+
+- **[45205416871](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45205416871): Windows-Original-DOSBox-X-DLL und tatsächliche Steinberg-VST3-Audio-Host-EXE mit neuem owner-only `--original`-Modus **erfolgreich kompiliert**. Öffentlicher synthetischer NoteOn→MPU401→DOS-Hardware→Original-Mixer→VST3-PCM-Test weiterhin PASS (60.928 Float32-Stereoframes, 979 nicht-stumme, Peak 0,304871, 7 NoteOn). Original-EMU8000-`AWEUTIL`, MPU und Windows-CI-Stop ebenfalls PASS.
+- **[45205416646](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45205416646)**: Linux/Windows-Datenfrei-Regressionen PASS inklusive Verhinderung von Originaldatei-Nutzung in öffentlicher CI; [45205416611](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45205416611) Versionsprüfung PASS.
+- Privaten PS-Prüfablauf präzisiert: `PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS` wird **erst nach sämtlichen drei Bedingungen** (originale hashes, tatsächliches VST3-PCM mit EMU8000-Portwrites und unabhängiger Original-Creative-DOSBox-DLL-Klangprüfung) ausgegeben. Kein Status vor Abschluss vorzeitig als erfolgreich markieren.
+- **Nicht verwechselt werden:** Öffentlicher PC-Speaker-Ton im echten VST3 ist noch nicht der Original-Creative-SF2-Klang. Private Besitzer-ROM-/Creative-DOS-Original-Klangabnahme auf Windows steht aus, `0.0.0-dev` und NO-GO für Release.
+
+
 ## 23.11.2026 — Private Original-Creative-Klangprüfung durch echten VST3-Host integriert
 
 - Separater **`--original 15..120`-Modus** in `WindowsVst3HostPcmSmoke.cpp`: authentisches Owner-ROM, echte Creative-`DEMO.EXE` und `SYNTHGM.SF2` im **tatsächlich ausgeführten VST3** statt des öffentlichen synthetischen PC-Speaker-Gasts. VST3-`IEventList` sendet C4 Note-On/Note-Off über originale DOSBox-X-MPU-401 an unveränderte Creative-DOS-SF2LIB; reale VST3-`process()`-Audioausgabe mit Stille-Negativkontrolle und niedrigerem Original-Preset-Mindestpeak `0,002`.

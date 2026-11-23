@@ -11,6 +11,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **Submodul:** `third_party/dosbox-x-AWE32` auf `f3a95b9f19a7f9863295e6481f271cf04733c635` gepinnt. **Einziger Branch:** `main`.
 
+## Aktuell neu bestätigter Windows-Release-Build (23.11.2026)
+
+**[Windows 45205416871](../../actions/runs/45205416871) SUCCESS:** Neu erweiterter Windows-VST3-Testhost mit privatem Creative-`--original`-Modus tatsächlich kompiliert, weiterhin echter synthetischer MIDI-zu-PCM-VST3-Rundweg bestanden (979 nicht-stumme Stereo-Frames, 7 NoteOn). [Linux/Windows 45205416646](../../actions/runs/45205416646) PASS. **Original-ROM/Creative-`DEMO.EXE`/echte `SYNTHGM.SF2` wurden dabei nicht ausgeführt.** Privater Originalklang weiterhin nicht abgenommen; `0.0.0-dev`.
+
 ## Privater Original-Creative-VST3-Klangtest jetzt ausführbar vorbereitet (noch kein PASS)
 
 Der reale VST3-Host besitzt jetzt einen separaten privaten `--original`-Modus für das **echte** Creative-`DEMO.EXE`, authentische `SYNTHGM.SF2` und `awe32.raw`. Der Besitzer-Windows-Launcher `tools/Run-Private-Creative-AWE-Test.ps1` fordert SHA-verifizierte Originaldaten, echten MIDI-NoteOn/NoteOff, originale EMU8000-Registerwrites und hörbare Stereo-PCM-Frames **aus dem tatsächlichen VST3**. Öffentliche CI bleibt vollständig datenfrei. **Dieser Original-Creative-Test wurde noch nicht durchgeführt und ist NICHT abgenommen.** Alle vorherigen synthetischen VST3-Transporttests bleiben davon getrennt.
