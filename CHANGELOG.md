@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Falsche Win95-/86Box-Dialoge im alten P165-GUI-Build korrigiert
+
+- Die alte P165-GUI verwendet beim ROM/SF2-Klick noch den Win95-/86Box-P007-Wortlaut, der zur festgelegten **DOSBox-X + Creative-DOS**-Architektur falsch ist.
+- Ausschließlich der CMake-generierte temporäre GUI-Quellcode erhält korrigierte Dialogtexte. Original-GUI, Frontplattenbild und 73-%-Reglerhintergründe werden **byteidentisch erhalten**.
+- ROM-Text nennt den privaten WAV-ROM-Pfad; SF2-Text behauptet **nicht**, dass der noch fehlende Live-SF2-Wechsel funktioniert. Kein Layout- oder Engine-Umbau.
+- Erst der echte Windows-VST3-CMake-Lauf entscheidet über PASS/FAIL.
+
 ## 23.11.2026 — SDL2-Gerätediagnose nach tatsächlicher Gerätedefinition platzieren
 
 - Erster echter `Release SDL2|x64`-Build (Actions 45108048294) scheiterte auf der Compilerfehlerstelle `mixer.cpp:86`: das Testexport `AWE64_IsInternalAudioOnly` stand **vor** der Deklaration `SDL2_AudioDevice`.

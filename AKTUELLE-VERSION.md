@@ -54,6 +54,8 @@ Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32
 
 [docs/TEST-ASSET-LOCATION.md](docs/TEST-ASSET-LOCATION.md) nennt exakte Dateinamen, private ChatGPT-Bibliothek, Original-Creative-ADIP-Quellfundort und Prüfsummen. **Nie** ROM, private SoundFonts, Creative-DOS-Binaries in öffentliches GitHub, Actions-Artefakte oder Logs einchecken; vorher private Bibliothek durchsuchen, statt erneuten Upload zu verlangen.
 
+**GUI-Kompatibilität (build-only):** Alte P165-Win95-/86Box-ROM-/SF2-Popups werden in der CMake-generierten **temporären GUI-Quelldatei** durch korrekte DOSBox-X/Creative-DOS-Hinweise ersetzt. Original P165, Grafiken, Reglerabdunklung und Hash bleiben byteidentisch. Kein falsches Live-SF2-Versprechen. Windows-Regression bei diesem Commit noch ausstehend.
+
 ## Verbindlicher Workflow für jeden Codex und neuen Chat
 
 1. [AGENTS.md](AGENTS.md), [START-HERE.md](START-HERE.md), diese Datei und [CHANGELOG.md](CHANGELOG.md) lesen; neuestes `main`-HEAD und aktuelle Actions-Prüfläufe nachsehen.

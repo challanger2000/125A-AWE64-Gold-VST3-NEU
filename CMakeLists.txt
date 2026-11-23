@@ -81,6 +81,28 @@ if(AWE64_BUILD_VST3_DEV)
   endif()
   string(REPLACE "${AWE64_OLD_VIEWPORT}" "${AWE64_NEW_VIEWPORT}"
     AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  # Original P165 GUI source stays byte-identical in Git. Fix only legacy
+  # P007 Win95/86Box messages in the compiler's temporary compatibility copy.
+  string(FIND "\${AWE64_GUI_SRC}" "Creative-Windows-95-SoundFont-Laden" AWE64_OLD_W95)
+  string(FIND "\${AWE64_GUI_SRC}" "automatisch durch 86Box" AWE64_OLD_86BOX)
+  if(AWE64_OLD_W95 EQUAL -1 OR AWE64_OLD_86BOX EQUAL -1)
+    message(FATAL_ERROR "Original P165 Win95/86Box dialog anchors not found")
+  endif()
+  string(REPLACE [=[L"Das originale Creative-Windows-95-SoundFont-Laden ist in der "]=]
+      [=[L"Das SF2-Laden ist in dieser DOSBox-X-Version derzeit "]=]
+      AWE64_GUI_SRC "\${AWE64_GUI_SRC}")
+  string(REPLACE [=[L"P007-Gaststeuerung noch nicht angebunden. Die Auswahl wird "]=]
+      [=[L"nicht an die originale Creative-DOS-Laufzeit angebunden. Es wird "]=]
+      AWE64_GUI_SRC "\${AWE64_GUI_SRC}")
+  string(REPLACE [=[L"Das originale AWE-ROM liegt bereits im privaten VST3 und wird "]=]
+      [=[L"Das AWE-Wave-ROM muss im privaten VST3-Ordner liegen. "]=]
+      AWE64_GUI_SRC "\${AWE64_GUI_SRC}")
+  string(REPLACE [=[L"automatisch durch 86Box verwendet. Ein Austausch des ROMs "]=]
+      [=[L"Es wird beim DOSBox-X-Start geladen. Ein ROM-Wechsel "]=]
+      AWE64_GUI_SRC "\${AWE64_GUI_SRC}")
+  string(REPLACE [=[L"im laufenden Windows-95-Gast ist noch nicht implementiert."=]
+      [=[L"waehrend des DOS-Gastbetriebs ist noch nicht implementiert."=]
+      AWE64_GUI_SRC "\${AWE64_GUI_SRC}")
   set(AWE64_GUI_COMPAT_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/PresetBrowserViewSdkCompat.cpp")
   file(WRITE "${AWE64_GUI_COMPAT_SOURCE}" "${AWE64_GUI_SRC}")
 
