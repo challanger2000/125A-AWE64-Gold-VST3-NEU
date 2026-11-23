@@ -113,6 +113,16 @@ class SyntheticDosExeTests(unittest.TestCase):
         self.assertIn("$previousSdl", private)
         # GitHub public CI still uses only synthetic DOS-PC-speaker audio.
         self.assertNotIn("AWE64_ORIGINAL_CREATIVE_ONLY", public)
+        # Actual Windows original-EMU8K DEV bundle must also run a STRICT
+        # negative integration test on the public generated fake MZ guest.
+        self.assertIn("WindowsVst3CreativeOnlyNegative.py", public)
+        anti_spoof = (root / "tests" / "WindowsVst3CreativeOnlyNegative.py").read_text(
+            encoding="utf-8")
+        self.assertIn('env["AWE64_ORIGINAL_CREATIVE_ONLY"] = "1"', anti_spoof)
+        self.assertIn('env["SDL_AUDIODRIVER"] = "dummy"', anti_spoof)
+        self.assertIn("Real VST3 host process() emitted only silence", anti_spoof)
+        self.assertIn('"nonzero=0"', anti_spoof)
+        self.assertIn("PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED", anti_spoof)
 
     def test_stage_fixture_rejects_existing_owner_data(self):
         with tempfile.TemporaryDirectory() as work:

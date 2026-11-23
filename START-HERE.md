@@ -11,6 +11,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **Submodul:** `third_party/dosbox-x-AWE32` auf `f3a95b9f19a7f9863295e6481f271cf04733c635` gepinnt. **Einziger Branch:** `main`.
 
+## Neue echte Windows-VST3-Klang-Negativkontrolle (Stand 23.11.2026)
+
+Zur positiven synthetischen MIDI-zu-PCM-Prüfung gibt es jetzt eine **echte Windows-VST3-Negativkontrolle**: Das identische öffentliche DOS-Testprogramm darf im privaten Creative-only-Modus **keinen hörbaren PC-Speaker- oder OPL-Ton** mehr erzeugen. Der native Steinberg-Host muss `nonzero=0` am echten VST3-PCM-Ausgang bestätigen; andere Fehler zählen nicht als Erfolg. Code und Workflow eingereicht, **der neue Windows-Integrationstest muss noch PASS melden**. Original-Creative-ROM-/SF2-Klang steht weiter aus, `0.0.0-dev`.
+
 ## Neue Original-Creative-VST3-Klangprüfung: Alternativtonquellen im Test deaktiviert
 
 Im **privaten** Original-Creative-VST3-Hosttest werden jetzt auch im tatsächlichen VST3-Gast PC-Speaker und OPL abgeschaltet (`AWE64_ORIGINAL_CREATIVE_ONLY=1`); der Testhost verlangt außerdem `SDL_AUDIODRIVER=dummy`. Öffentliche MIDI-/Audio-Synthetic-Gates bleiben unverändert. Quelländerung und neue Regression sind implementiert, **neuer CI-Lauf noch zu bestätigen**; echter Besitzer-Creative-ROM/SF2-Klangtest weiterhin nicht ausgeführt. `0.0.0-dev`, nur `main`.

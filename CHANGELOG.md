@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Echte Windows-VST3-Negativkontrolle: PC-Speaker-Ton darf als Creative-only nicht hörbar sein
+
+- Der bestehende echte Windows-VST3-MIDI→DOSBox-X→Mixer→PCM-Positivtest wird um eine **direkt folgende echte Negativkontrolle** ergänzt. Bei unveränderter synthetischer NoteOn-DOS-`DEMO.EXE` und Null-ROM muss der explizite private `AWE64_ORIGINAL_CREATIVE_ONLY=1`-Modus **PC-Speaker und OPL ausschalten** und das reale VST3-`process()` genau **0 nicht-stumme Frames** liefern.
+- Neues `tests/WindowsVst3CreativeOnlyNegative.py` ist ein zeitlich begrenzter echter Windows-VST3-Testhost-Kindprozess. Ein Fehler gilt **nur dann als erwartetes Negativergebnis**, wenn der native Testhost tatsächlich durchgelaufen ist und das ausdrücklich nachgewiesene Null-Audio-Ergebnis meldet. Absturz, Startfehler oder zufällig fehlendes Testprogramm führen ausdrücklich zu FAIL. Kein Original-EMU8000-Klang-PASS daraus ableiten.
+- Ausführung als separate neue Windows-Actions-Stufe nach dem positiven Original-DOSBox-X-Gate; datenfreie Python-Regression verifiziert die private Alternative-Generator-Sperre und die tatsächlich aktivierte Negativkontrolle. **Neue Windows-Gegenprobe noch nicht abgeschlossen**, `0.0.0-dev`, kein Release.
+
+
 ## 23.11.2026 — Tatsächlichen Original-Creative-VST3-Klangtest gegen PC-Speaker-/OPL-Falschtöne abgesichert
 
 - **Bisherige Lücke beseitigt:** PC-Speaker und OPL waren nur beim separaten ursprünglichen DOSBox-DLL-Soundcheck stumm; der `--original`-VST3-Hostcheck konnte alternative DOSBox-Klangquellen noch nicht ausschließen. Im VST3-DOSBox-Boot werden jetzt **nur im privaten `AWE64_ORIGINAL_CREATIVE_ONLY=1`-Abnahmemodus** beide deaktiviert; öffentlicher MIDI→PC-Speaker→VST3-Test und normaler Produktstart bleiben im Klangpfad unverändert.

@@ -16,6 +16,7 @@ on:
       - 'tests/MakeMidiTriggeredDemoExe.py'
       - 'tests/WindowsVst3HostPcmSmoke.cpp'
       - 'tests/WindowsRunVst3HostPcmSmoke.py'
+      - 'tests/WindowsVst3CreativeOnlyNegative.py'
       - 'tests/test_synthetic_dos_exe.py'
       - 'tests/test_speaker_probe.py'
       - 'tests/test_awe_hardware_probe.py'
@@ -176,4 +177,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Safe synthetic test DOS EXE staging failed' }
           python tests/WindowsRunVst3HostPcmSmoke.py --exe $hostTestExe --plugin $plugin
           if ($LASTEXITCODE -ne 0) { throw 'VST3 process() failed to deliver original mixer audio' }
+      - name: NEGATIVE CONTROL real VST3 must silence PC-speaker+OPL in private-Creative-only mode
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3'
+          $plugin=Join-Path $bundle 'Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3'
+          $hostTestExe='build-vst3/Release/awe64_vst3_host_pcm_smoke.exe'
+          # This must run on exactly the SYNTHETIC ROM and DOS MZ fixture
+          # from the previous POSITIVE control, NOT authentic Creative files.
+          # Real Windows VST3 must respond with silence and no fake PASS.
+          python tests/WindowsVst3CreativeOnlyNegative.py --exe $hostTestExe --plugin $plugin
+          if ($LASTEXITCODE -ne 0) { throw 'Private-only original-Creative anti-spoof negative control FAILED' }
       # No public release artifact or private ROM/SF2/Creative bytes uploaded. DOSBox DLL cache is source-only-generated.
