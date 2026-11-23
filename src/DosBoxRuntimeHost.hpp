@@ -134,7 +134,7 @@ public:
                 "-set", "mixer rate=44100",
                 "-c", "mount c \""+utf8(privateDir)+"\"",
                 "-c", "c:",
-                "-c", "DEMO.EXE /SF2:SYNTHGM.SF2",
+                "-c", "DEMO.EXE /SBK:SYNTHGM.SF2",
             };
             // Two output destinations: original MPU-401 guest input and
             // original DOSBox audio mixer. Do NOT register BEE0 MIDI consumer.

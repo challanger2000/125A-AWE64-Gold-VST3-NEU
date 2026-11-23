@@ -238,7 +238,7 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
         originalMidiCatalog_,unusedFmCatalog_,std::string{},
         [this](){
             const int s=guestStatus_.load(std::memory_order_acquire);
-            return s==2 ? std::string("DOSBOX-X: ORIGINALER CREATIVE-DOS-GAST AKTIV") :
+            return s==2 ? std::string("DOSBOX-X: EMULATOR AKTIV, CREATIVE-STATUS UNGEPRUEFT") :
                    s==1 ? std::string("DOSBOX-X: ORIGINALER CREATIVE-DOS-GAST STARTET") :
                    s==-1 ? std::string("DOSBOX-X: ORIGINAL-DATEIEN ODER DLL FEHLEN") :
                    s==-2 ? std::string("DOSBOX-X: GAST IST BEENDET") :
@@ -246,7 +246,7 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
         },
         [this](){
             const int s=guestStatus_.load(std::memory_order_acquire);
-            return s==2 ? std::string("ORIGINAL DOSBOX-X / CREATIVE SF2LIB LAEUFT") :
+            return s==2 ? std::string("ORIGINAL DOSBOX-X AKTIV | CREATIVE NICHT VERIFIZIERT") :
                    s==1 ? std::string("ORIGINAL DOSBOX-X STARTET") :
                            std::string("AWE64 GOLD | KEIN AUDIO-GAST");
         },

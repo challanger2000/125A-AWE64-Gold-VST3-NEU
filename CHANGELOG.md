@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Windows-VST3-Host-Kompilierung bestanden; originale Creative-SF2LIB-Kommandozeile
+
+- **GitHub Actions 45104901755: PASS.** Der echte Windows-VST3-Host kompiliert mit dem DOSBox-X-Laufzeitloader und dem unveränderten P165-GUI-Quellcode. Dieser Build enthält **noch keinen nachgewiesenen Creative-DOS-Start oder hörbaren Originalklang**.
+- Nach erneuter Prüfung des originalen `DOS/DEMO/DEMO.C` verlangt Creative SF2LIB entgegen dem im Demo gedruckten `/SF2:` tatsächlich **`/SBK:`**. Guest-AUTOEXEC-Start korrigiert auf `DEMO.EXE /SBK:SYNTHGM.SF2`.
+- `DEMO.C` fragt tatsächlich MPU-401-Port `0x331` ab und leitet Bytes aus `0x330` an originale `ProcessMidi/SendMidi/awe32...`-Funktionen weiter; keine eigenen Creative-Treiber nötig.
+- Host-GUI meldet das Vorhandensein des originalen DOSBox-X-Emulator-Workers, **nicht** voreilig einen erfolgreich gestarteten Creative-DOS-Gast; dieser echte Nachweis steht weiter aus.
+- Creative-Original-Referenzbank `DOS/DEMO/SYNTHGM.SF2` (42.726 Byte) ist die für den SF2LIB-Gast passende ROM-GM-Bank; die bisherige `SYNTHGM.SBK` (34.832 Byte) ist ein anderes, nicht austauschbares SBK-Format.
+
 ## 23.11.2026 — Windows-VST3-Event-Header und MIDI-Zeitstempel korrigiert
 
 - Run 45104591680: echte Windows-VST3-Integration an nicht vollständig inkludierten VST3-SDK-Interfaces IEventList/IParameterChanges gescheitert. Vollständige VST3-Event- und ParamChanges-Header ergänzt.

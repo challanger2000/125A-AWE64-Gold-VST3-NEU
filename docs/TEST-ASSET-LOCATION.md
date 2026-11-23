@@ -7,7 +7,8 @@ Diese Dateien liegen in der **privaten ChatGPT-Dateibibliothek des Projektinhabe
 | Zweck | Exakter Bibliotheksdateiname | Erwartete Dateigröße |
 | --- | --- | ---: |
 | Original-AWE-Wave-ROM | `awe32.raw` | 1.048.576 Bytes |
-| Originale Creative-Standardbank | `SYNTHGM.SBK` | 34.832 Bytes |
+| Originale Creative-SBK-Standardbank (anderes Format) | `SYNTHGM.SBK` | 34.832 Bytes |
+| Originale Creative-SF2LIB-GM-Referenzbank | `SYNTHGM.SF2` aus `DOS/DEMO/SYNTHGM.SF2` des originalen Creative ADIP 3.01; **privater Runtime-Pfad noch nicht bereitgestellt** | 42.726 Bytes |
 | Haupttestbank | `Synth 512 Bank.sf2` | 555.754 Bytes |
 | Zusätzliche Testbank | `Vintage Dreams Bank.sf2` | 315.982 Bytes |
 | Zusätzliche Testbank | `Digital Bliss.sf2` | 1.722.362 Bytes |
@@ -27,3 +28,11 @@ Die Bibliothek enthält teils zusätzlich gleichnamige Kopien mit `(1)`, `(2)` o
 5. Bei späteren Aufgaben **nicht erneut um Upload bitten**, bevor die Bibliothek geprüft wurde. Falls eine Datei tatsächlich nicht mehr zugreifbar ist, die Einschränkung genau nennen.
 
 **Original-Creative-DOS-Treiber und DOS-SF2LIB**: deren tatsächlichen Fundort und Prüfsumme getrennt dokumentieren, sobald die konkret verwendete Originalbinärdatei gesichtet wurde. Vorher keinesfalls behaupten, sie liege in GitHub oder im Testordner.
+
+## Originale Creative-DOS-Executable und ROM-FM-Bank (Prüfort)
+
+- Im Original-Creative-Archiv `qb40/sound-blaster-awe32` befinden sich `DOS/DEMO/DEMO.EXE` und `DOS/DEMO/SYNTHGM.SF2`; frühere private P30-Tests haben den tatsächlichen Original-Lauf dieser Kombination mit dem Besitzer-ROM nachgewiesen.
+- **Original-`DEMO.EXE` SHA/Git-Blob:** `e10b8705c6a46444a998c4f6aa74a1cda2081506` (P30-Protokoll); **`SYNTHGM.SF2` SHA-256:** `78f8739a25d49e519b3fdc92a7f03d4ddd68588fd0260578a880296e304b7b5f` (damaliger Originaldaten-Audit).
+- Das aktuelle VST3 benötigt `DEMO.EXE` und `SYNTHGM.SF2` als **privates** Laufzeitmaterial neben dem ROM in `Contents/Resources/PRIVATE`. Die Dateien werden nicht ins öffentliche GitHub oder GitHub-Actions aufgenommen.
+- Die originale SF2LIB-Demo erkennt Bankaufrufe an **`/SBK:`**, unabhängig von der falsch ausgegebenen `/SF2:`-Hilfemeldung. `SYNTHGM.SBK` ist nicht automatisch `SYNTHGM.SF2`.
+- **Kein bestätigter VST3-Test dieser Originaldateien im neuen DOSBox-X-VST3**; sobald private Einbindung verfügbar ist, zuerst tatsächlichen DOS/Originalsound nachweisen.
