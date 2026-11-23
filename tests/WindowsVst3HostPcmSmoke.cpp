@@ -14,6 +14,7 @@
 #include "pluginterfaces/base/ipluginbase.h"
 #include "pluginterfaces/base/funknown.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
+#include "pluginterfaces/vst/ivsteditcontroller.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstevents.h"
 #include "pluginterfaces/vst/ivsthostapplication.h"
@@ -183,6 +184,18 @@ int main(int argc,char** argv) {
     MinimalHostApplication host;
     if(component->initialize(&host)!=S::kResultOk)
         return fail("VST3 initialize() failed");
+    V::IMidiMapping* mapping=nullptr;
+    if(component->queryInterface(V::IMidiMapping::iid,reinterpret_cast<void**>(&mapping))!=S::kResultOk||!mapping)
+        return fail("Actual VST3 IMidiMapping missing");
+    V::ParamID sustain0=0,sustain15=0,bend=0;
+    if(mapping->getMidiControllerAssignment(0,0,64,sustain0)!=S::kResultTrue ||
+       mapping->getMidiControllerAssignment(0,15,64,sustain15)!=S::kResultTrue ||
+       mapping->getMidiControllerAssignment(0,0,129,bend)!=S::kResultTrue ||
+       sustain0==sustain15||sustain0==bend||
+       mapping->getMidiControllerAssignment(1,0,64,bend)==S::kResultTrue)
+        return fail("Actual VST3 controller assignment failed");
+    mapping->release();
+    std::cout<<"REAL_VST3_MIDI_MAPPING_PASS\n";
     if(component->getBusCount(V::kAudio,V::kOutput)!=1)
         return fail("Expected exactly one real stereo output bus");
     if(component->activateBus(V::kAudio,V::kOutput,0,true)!=S::kResultOk)

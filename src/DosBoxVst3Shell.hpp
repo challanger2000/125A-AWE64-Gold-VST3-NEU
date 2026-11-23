@@ -13,7 +13,8 @@
 
 namespace awe64 {
 class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
-                              public VSTGUI::VST3EditorDelegate {
+                              public VSTGUI::VST3EditorDelegate,
+                              public Steinberg::Vst::IMidiMapping {
     AWE125::PresetCatalog originalMidiCatalog_{};
     AWE125::PresetCatalog unusedFmCatalog_{};
     // The worker owns all true original DOSBox-X guest audio/MIDI queues.
@@ -31,6 +32,12 @@ public:
     static Steinberg::FUnknown* createInstance(void*) {
         return static_cast<Steinberg::Vst::IAudioProcessor*>(new DosBoxVst3Shell());
     }
+    Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID iid,void** obj) override;
+    Steinberg::uint32 PLUGIN_API addRef() override {return SingleComponentEffect::addRef();}
+    Steinberg::uint32 PLUGIN_API release() override {return SingleComponentEffect::release();}
+    Steinberg::tresult PLUGIN_API getMidiControllerAssignment(
+        Steinberg::int32 busIndex,Steinberg::int16 channel,
+        Steinberg::Vst::CtrlNumber number,Steinberg::Vst::ParamID& id) override;
     Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown*) override;
     Steinberg::tresult PLUGIN_API setActive(Steinberg::TBool) override;
     Steinberg::tresult PLUGIN_API canProcessSampleSize(Steinberg::int32) override;

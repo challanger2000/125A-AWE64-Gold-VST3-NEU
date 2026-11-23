@@ -1,5 +1,6 @@
 #include "DosBoxVst3Shell.hpp"
 #include "CreativeMidiBankSelect.hpp"
+#include "CreativeMidiControllers.hpp"
 #include "PresetBrowserView.h"
 #include "pluginterfaces/base/ustring.h"
 #include "pluginterfaces/base/ibstream.h"
@@ -29,10 +30,26 @@ constexpr std::array<std::uint8_t,4> kSignature{{'D','B','X','D'}};
 constexpr std::size_t kStateLength = 11;
 } // namespace
 
+tresult PLUGIN_API DosBoxVst3Shell::queryInterface(const TUID iid,void** obj) {
+    if(!obj)return kInvalidArgument;
+    if(FUnknownPrivate::iidEqual(iid,IMidiMapping::iid)) {
+        *obj=static_cast<IMidiMapping*>(this);addRef();return kResultOk;
+    }
+    return SingleComponentEffect::queryInterface(iid,obj);
+}
+tresult PLUGIN_API DosBoxVst3Shell::getMidiControllerAssignment(
+    int32 bus,int16 channel,CtrlNumber number,ParamID& id) {
+    if(bus!=0||channel<0||channel>=16)return kResultFalse;
+    const int slot=rt::midiControllerIndex(static_cast<unsigned>(number));
+    if(slot<0)return kResultFalse;
+    id=rt::midiControllerBase+static_cast<unsigned>(slot)*rt::midiControllerStride+
+        static_cast<unsigned>(channel);
+    return kResultTrue;
+}
 tresult PLUGIN_API DosBoxVst3Shell::initialize(FUnknown* context) {
     if(SingleComponentEffect::initialize(context)!=kResultOk)return kResultFalse;
     addEventInput(STR16("Creative MIDI (16 channels)"),16);
-    addAudioOutput(STR16("AWE64 Stereo (not yet connected)"),SpeakerArr::kStereo);
+    addAudioOutput(STR16("AWE64 Stereo"),SpeakerArr::kStereo);
     parameters.addParameter(new RangeParameter(STR16("MIDI Program"),kProgram,nullptr,0.,127.,0.,127));
     parameters.addParameter(new RangeParameter(STR16("MIDI Bank"),kBank,nullptr,0.,127.,0.,127));
     parameters.addParameter(new RangeParameter(STR16("Master Volume"),kMaster,STR16("%"),0.,100.,100.));
@@ -44,6 +61,20 @@ tresult PLUGIN_API DosBoxVst3Shell::initialize(FUnknown* context) {
     }
     parameters.addParameter(new RangeParameter(STR16("Reverb Type"),1200u,nullptr,0.,7.,2.,7));
     parameters.addParameter(new RangeParameter(STR16("Chorus Type"),1201u,nullptr,0.,7.,3.,7));
+    // Host MIDI CC routing via the standard IMidiMapping interface.
+    // Defaults are metadata only; never send CCs at boot that would alter
+    // the original Creative bank's initial controller state.
+    for(unsigned i=0;i<rt::midiControllerSpecs.size();++i) {
+        const auto& spec=rt::midiControllerSpecs[i];
+        for(unsigned ch=0;ch<16;++ch) {
+            String128 label{};
+            const auto title=std::string(spec.name)+" CH "+std::to_string(ch+1);
+            UString(label,128).fromAscii(title.c_str());
+            parameters.addParameter(new RangeParameter(label,
+                rt::midiControllerBase+i*rt::midiControllerStride+ch,
+                nullptr,0.,1.,spec.initial,0,ParameterInfo::kCanAutomate|ParameterInfo::kIsHidden));
+        }
+    }
     originalMidiCatalog_.SetOriginalCreativeMidiNumbers();
     return kResultOk;
 }
@@ -103,6 +134,18 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         for(int32 i=0;i<data.inputParameterChanges->getParameterCount();++i) {
             auto* q=data.inputParameterChanges->getParameterData(i);
             if(!q || q->getPointCount()<1)continue;
+            if(q->getParameterId()>=rt::midiControllerBase) {
+                // Preserve every mapped controller change in this block.
+                for(int32 n=0;n<q->getPointCount();++n) {
+                    int32 offset=0;ParamValue v=0.;rt::MidiEvent midi{};
+                    if(q->getPoint(n,offset,v)==kResultOk &&
+                       rt::makeMappedController(q->getParameterId(),v,
+                           absoluteSamplePosition_+static_cast<std::uint64_t>(
+                               std::clamp(offset,0,data.numSamples)),midi))
+                        (void)engine.sendMidi(midi);
+                }
+                continue;
+            }
             int32 offset=0;ParamValue normalized=0.;
             if(q->getPoint(q->getPointCount()-1,offset,normalized)!=kResultOk)
                 continue;
