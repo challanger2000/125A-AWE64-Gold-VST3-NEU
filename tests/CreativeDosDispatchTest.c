@@ -10,10 +10,10 @@ static unsigned char ports[17];
 static int lastPort=-1, lastAck=-1, call=-1, argcLast=0;
 static WORD args[3];
 
-static int _inp(unsigned short p) {
+static int mock_guest_inp(unsigned short p) {
     return p>=0xBEE0u && p<0xBEF1u ? ports[p-0xBEE0u] : 255;
 }
-static int _outp(unsigned short p,int value) {
+static int mock_guest_outp(unsigned short p,int value) {
     lastPort=(int)p;lastAck=value;return value;
 }
 #define MOCK3(name,id) \
@@ -31,7 +31,11 @@ MOCK3(awe32Controller,4)
 MOCK2(awe32ProgramChange,5)
 MOCK2(awe32ChannelPressure,6)
 MOCK3(awe32PitchBend,7)
+#define _inp mock_guest_inp
+#define _outp mock_guest_outp
 #include "AWE64_BRIDGE.H"
+#undef _inp
+#undef _outp
 #define CHECK(x) do { if(!(x)) { \
     fprintf(stderr,"Creative guest dispatch test failed at %d: %s\n",__LINE__,#x); \
     exit(1); \
