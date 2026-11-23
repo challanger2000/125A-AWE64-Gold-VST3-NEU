@@ -47,10 +47,11 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('if(awe64_guest_stop.load',r)
     def test_native_win_x64_dll(self):
         cond="'$(Configuration)|$(Platform)'=='Release SDL2|x64'"
-        s=f'  <PropertyGroup Condition="{cond}" Label="Configuration">\n    <ConfigurationType>Application</ConfigurationType>\n  </PropertyGroup>\n  <PropertyGroup Condition="{cond}">\n    <OutDir>x</OutDir>\n  </PropertyGroup>\n  <ItemDefinitionGroup Condition="{cond}">\n    <ClCompile><PreprocessorDefinitions>WIN32;C_SDL2=1</PreprocessorDefinitions></ClCompile>\n  </ItemDefinitionGroup>'
+        s=f'  <PropertyGroup Condition="{cond}" Label="Configuration">\n    <ConfigurationType>Application</ConfigurationType>\n  </PropertyGroup>\n  <PropertyGroup Condition="{cond}">\n    <OutDir>x</OutDir>\n  </PropertyGroup>\n  <ItemDefinitionGroup Condition="{cond}">\n    <ClCompile><PreprocessorDefinitions>WIN32;C_SDL2=1</PreprocessorDefinitions></ClCompile>\n    <Link><AdditionalDependencies>kernel32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>\n  </ItemDefinitionGroup>'
         r=patch.patch_project(s)
         self.assertIn('<ConfigurationType>DynamicLibrary</ConfigurationType>',r)
         self.assertIn('AWE64_VST3_RUNTIME;WIN32;C_SDL2=1',r)
+        self.assertIn('libvcruntime.lib;libucrt.lib;libcmt.lib;kernel32.lib',r)
         with self.assertRaises(ValueError):patch.patch_project(r)
 if __name__=="__main__":
     unittest.main()

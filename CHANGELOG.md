@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — SDL2-DLL-CRT-Linker und P165-CMake-Syntax korrigiert
+
+- CI 45108405024 (SDL2-internes DOSBox-X als DLL) scheiterte mit fehlenden VCRUNTIME-/UCRT-Symbolen beim DLL-Link; die ursprüngliche SDL2-Konfiguration stammt von einem EXE-Projekt. Beim DLL-Build werden die benötigten **statischen** CRT-Bibliotheken `libvcruntime.lib`, `libucrt.lib`, `libcmt.lib` nun explizit in die SDL2-Release-Linkerabhängigkeiten aufgenommen. Originaler Chip-/MIDI-/Audio-Code bleibt unverändert. Neuer Windows-Nachweis ausstehend.
+- CI 45108564142 scheiterte schon beim portablen CMake-Parser: falsch terminierte CMake-Bracket-Literals der temporären P165-Dialogersetzung sowie escaped Variablen; beide korrigiert. P165-GUI-Originaldatei und Grafikdaten bleiben byteidentisch.
+- Keine Aussage über funktionierenden Creative-Gast oder Klang vor einem tatsächlichen vollständigen Windows-End-to-End-Test.
+
 ## 23.11.2026 — Falsche Win95-/86Box-Dialoge im alten P165-GUI-Build korrigiert
 
 - Die alte P165-GUI verwendet beim ROM/SF2-Klick noch den Win95-/86Box-P007-Wortlaut, der zur festgelegten **DOSBox-X + Creative-DOS**-Architektur falsch ist.

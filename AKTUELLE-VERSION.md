@@ -17,7 +17,7 @@ Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32
 - Steinberg VST3 SDK: `v3.7.12_build_20`.
 - GUI: **Original P165/P007Z**, 1000×708 Pixel, mattschwarze Reglergruppen mit `CColor(7,11,16,186)` (73 %), unveränderter Frontplatten-Git-Blob `7e57ef8e0c90d84fa4c951bea7815b0233762ca7`. Die GUI-Quellen bleiben unverändert; der Build erzeugt nur eine temporäre SDK-Kompatibilitätskopie.
 - Host-MIDI: bevorzugt über **originale MPU-401-UART-Ports 330h/331h** zur originalen unveränderten Creative-DOS-Software. Die ältere BEE0/BEF0-Gastpatch-Alternative ist **nicht** parallel aktiviert.
-- Host-Audio: Original-DOSBox-X-Mixer-PCM per SPSC in den VST3-Callback. **Aktuell nur 44,1 kHz**; 48/96 kHz nicht behaupten. Ein DOSBox-Fenster wird nur im **internen SDL2-DLL-Build** verborgen; die Abtrennung eines zusätzlichen Windows-Audioausgangs nutzt einen internen SDL2-`dummy`-Treiber. **Das klassische `Release|x64` erzeugt SDL1 und darf nicht für das VST3 verwendet werden.**
+- Host-Audio: Original-DOSBox-X-Mixer-PCM per SPSC in den VST3-Callback. **Aktuell nur 44,1 kHz**; 48/96 kHz nicht behaupten. Ein DOSBox-Fenster wird nur im **internen SDL2-DLL-Build** verborgen; die Abtrennung eines zusätzlichen Windows-Audioausgangs nutzt einen internen SDL2-`dummy`-Treiber. **Das klassische `Release|x64` erzeugt SDL1 und darf nicht für das VST3 verwendet werden.** Der erste SDL2-Link-Lauf 45108405024 scheiterte mit 280 fehlenden VCRUNTIME/UCRT-Symbolen, deshalb linker-spezifische explizite statische CRT-Libraries ergänzt. CI-Test ausstehend.
 
 ## Tatsächlich geprüfte Meilensteine
 

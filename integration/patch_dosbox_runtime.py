@@ -220,6 +220,17 @@ def patch_project(s):
     # Classic Release|x64 builds SDL1: no hidden window and no SDL2
     # dummy audio. The internal VST3 runtime MUST use Release SDL2|x64.
     if 'C_SDL2' not in group:raise ValueError('SDL2 build configuration missing')
+    # Original Release SDL2|x64 project was authored for an executable.
+    # When converted to an embedded DLL, VS linker omits the usual CRT
+    # startup-library linkage and yields hundreds of unresolved UCRT/VCRUNTIME
+    # imports. Explicitly name the STATIC CRT family in this DLL-only target.
+    link_pattern=r'(<AdditionalDependencies>)([^<]+)(</AdditionalDependencies>)'
+    def complete_static_crt(m):
+        return (m.group(1)+'libvcruntime.lib;libucrt.lib;libcmt.lib;'
+                +m.group(2)+m.group(3))
+    group,n_crt=re.subn(link_pattern,complete_static_crt,group,count=1)
+    if n_crt!=1:raise ValueError('Release SDL2 x64 linker dependencies missing')
+
     return left+marker+group+'  </ItemDefinitionGroup>'+tail
 
 PATCHES={
