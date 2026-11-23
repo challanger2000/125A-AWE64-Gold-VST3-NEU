@@ -11,6 +11,13 @@
 3. **Original-Creative-DOS-Laufzeit:** Historisch nachgewiesene Ausführung von Creative DOS SF2LIB/DEMO in DOSBox-X mit dem AWE-ROM. **Noch nicht im neuen VST3 verbunden.**
 4. **VST3-Integration:** Noch **nicht implementiert/abgenommen**. Keine alten 86Box-/Win95- oder P009-Engines übernommen. Auch die bestehende GUI muss an die neue Runtime verdrahtet werden.
 
+## Verifizierte DOSBox-X-Version (23.11.2026)
+
+- **Verwendeter AWE32-Fork:** `turican0/dosbox-x-AWE32`, `masterAWE32`, Commit `f3a95b9f19a7f9863295e6481f271cf04733c635` (30.09.2026): **aktuellster Commit dieses AWE32-Branches**.
+- **Letztes AWE32-Release:** `dosbox-x-v2026.08.31-AWE32-0.92` (28.09.2026); danach fünf Commits nur an README und GitHub-Workflows, kein weiterer EMU8000-Quellcode-Commit.
+- **Originales DOSBox-X:** letzter veröffentlichter Stand `2026.10.01` (02.10.2026); offizieller `master` hat bis zum 21.11.2026 weitere Änderungen. **Dieser Basisstand ist neuer als der AWE32-Fork, enthält aber nicht automatisch die Fork-AWE32-Erweiterungen.**
+- **Entscheidung:** Den erprobten, letzten AWE32-Fork-Stand behalten; kein ungetestetes Upstream-Rebase in das einzige Produkt. Spätere gezielte DOSBox-X-Fixes nur bei konkretem Bedarf, Review und Sound-/Realtime-Regression.
+
 ## Einziger nächster technischer Pfad
 
 - Git-Submodul checkout und reproduzierbarer Windows-x64-VST3-Build mit internem DOSBox-X-Kern.
