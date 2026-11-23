@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Workflow-Name nach bestandener echter VST3-Integration präzisiert
+
+- Der nachweislich bestandene Original-DOSBox-X-/VST3-`process()`-Test [45201802002](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45201802002) wird nicht länger unter dem widersprüchlichen Workflow-Titel `NO VST3 PLAYBACK` angezeigt. Neuer Titel `DOSBox-X original + VST3 MIDI/PCM end-to-end (synthetic DOS)` benennt den **wirklich** geprüften bi-direktionalen MIDI-/PCM-Pfad und zugleich dessen synthetischen DOS-PC-Speaker-Gast.
+- Keine Änderung am VST3-Produkt, EMU8000-/DOSBox-X-Chipkern, P165-GUI, Testdaten oder Originaldateien. Immer noch `0.0.0-dev`; privater Creative-Originalklang und DAW-Abnahme nicht erfolgt.
+
+
 ## 23.11.2026 — Echte bidirektionale VST3-MIDI↔Original-DOSBox-I/O-PCM-Abnahme: Windows-PASS
 
 - **[Windows-Integrationslauf 45201802002](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45201802002) vollständig SUCCESS**: echtes Windows-VST3 über `GetPluginFactory`/`IAudioProcessor::process()` mit `IEventList` betrieben, **7 Steinberg-VST3-NoteOn-Events** durch den Original-DOSBox-X-MPU401-UART (Port 330h/331h mit 3Fh/FEh) an ein eigenständiges DOS-MZ-Programm. Diese schaltet nur bei passender Note die original emulierte PIT-/PC-Speaker-Hardware frei; vorher fordert der Host Stille.

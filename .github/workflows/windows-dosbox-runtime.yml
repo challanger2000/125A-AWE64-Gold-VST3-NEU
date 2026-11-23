@@ -1,4 +1,4 @@
-name: DOSBox-X original hardware in-process DLL (NO VST3 PLAYBACK)
+name: DOSBox-X original + VST3 MIDI/PCM end-to-end (synthetic DOS)
 on:
   push:
     branches: [main]

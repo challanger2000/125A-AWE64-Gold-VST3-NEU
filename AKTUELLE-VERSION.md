@@ -36,6 +36,10 @@ Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git
 
 Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
 
+### Windows-Actions-Bezeichnung nach tatsächlich bestätigtem VST3-PCM korrigiert
+
+Der Workflow `.github/workflows/windows-dosbox-runtime.yml` hieß historisch `(NO VST3 PLAYBACK)`. Weil [45201802002](../../actions/runs/45201802002) inzwischen **echte MIDI- und Audio-`process()`-Ausgabe im geladenen VST3** nachweist, ist diese alte Bezeichnung objektiv überholt. Korrigiert zu **`DOSBox-X original + VST3 MIDI/PCM end-to-end (synthetic DOS)`**. **Kein Beleg für Creative-EMU8000-Originalton**; kein Produktcode geändert und kein Release.
+
 ## 23.11.2026 — Vollständiger VST3-MIDI→DOS-MPU→Hardware-Audio→VST3-PCM-Rundweg: PASS
 
 - **[Windows-Actions 45201802002](../../actions/runs/45201802002): vollständig SUCCESS**. Der echte Windows-VST3-Host (`GetPluginFactory`, `IComponent`, `IAudioProcessor`) sendete durch `IEventList` **7 echte NoteOn-Events** bei wiederholten `process()`-Aufrufen (Kanal 0, Ton 60, Velocity 100).
