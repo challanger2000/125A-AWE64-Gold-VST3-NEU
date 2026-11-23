@@ -9,6 +9,8 @@ on:
       - 'tests/WindowsDosBoxGuestSmoke.py'
       - 'tests/MakeMpuCom.py'
       - 'tests/WindowsMpuGuestSmoke.py'
+      - 'tests/WindowsAweHardwareSmoke.py'
+      - 'tests/test_awe_hardware_probe.py'
       - 'tests/test_mpu_probe.py'
       - 'src/**'
       - 'gui/**'
@@ -101,6 +103,12 @@ jobs:
           $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           python tests/WindowsDosBoxGuestSmoke.py --stop-parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Real DOSBox in-process worker shutdown did not complete" }
+      - name: Prove original AWE32 EMU8000 registers receive real AWEUTIL DOS writes
+        shell: pwsh
+        run: |
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
+          python tests/WindowsAweHardwareSmoke.py --parent $dll
+          if ($LASTEXITCODE -ne 0) { throw "Original AWE32 EMU8000 hardware register smoke FAILED" }
       - name: Prove actual 16-bit guest MPU401 UART receives host MIDI through original DOSBox-X
         shell: pwsh
         run: |

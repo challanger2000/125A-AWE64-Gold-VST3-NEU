@@ -36,6 +36,8 @@ jobs:
         run: python -m unittest discover -s tools -p test_private_vst3.py -v
       - name: Verify private Creative audio gate using ONLY generated fake data
         run: python -m unittest discover -s tests -p test_private_creative_guest.py -v
+      - name: Verify original AWE32 hardware gate format WITHOUT proprietary files
+        run: python -m unittest discover -s tests -p test_awe_hardware_probe.py -v
       - name: Configure
         run: cmake -S . -B build -DBUILD_TESTING=ON
       - name: Compile

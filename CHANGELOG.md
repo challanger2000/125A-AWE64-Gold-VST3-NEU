@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Originale EMU8000-Hardware-Register im DOSBox-X-Windows-DLL-Gast prüfen
+
+- Zusätzlich zu DOS-Shell und MPU-401 jetzt originalen AWE32-Hardwarepfad als `sblaster sbtype=sbawe` prüfen: Original-DOSBox-X-Builtin `AWEUTIL /S` soll echte EMU8000-Schreibfolgen auf 620h/A20h/E20h erzeugen, vom **originalen** `EMU8K_TRACE` aufgezeichnet. Keine eigene Chip-Engine, keine geänderten Originalregisterpfade.
+- Nur absichtlich leeres 1-MiB-ROM im temporären Windows-Runner, niemals privates Owner-ROM/Creative/SF2, und keine Ausgabe privater Artefakte. Mindestens 16 EMU8000-Registerwrites an mehreren Ports, tatsächlicher DOS-Gast-Rücksprung; ansonsten FAIL. Timeout 75 Sekunden.
+- Datenfreie Linux/Windows-Python-Regressionsprüfungen für Gastargumente und die originale Trace-Zeilenanalyse ergänzt. **Neu eingeführter Original-DOSBox-X-EMU8000-Windows-Test nicht als PASS ausgeben, bevor der integrierte Lauf beendet ist.** Kein Original-Creative-/VST3-Audioerfolg und kein Release.
+
+
 ## 23.11.2026 — Original-DOSBox-X-Windows-Integration und synthetische Privattest-Regressionen: CI bestätigt
 
 - [Windows-Integration 45175109078](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45175109078) **SUCCESS**: unveränderter AWE32-Kern als in-process-SDL2-DLL, MPU-401 bis in DOS-COM-Programm, echtes Mixer-PCM, Stop/Join und VST3-Bundle-Build auf Windows 2022 bestanden.

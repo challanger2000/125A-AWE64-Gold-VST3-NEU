@@ -36,6 +36,11 @@ Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git
 
 Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
 
+## Original-EMU8000-AWE32-Hardware-Gate – aktuelle Prüfphase
+
+- Windows-DLL-Integration testet zusätzlich mit einem **synthetisch leeren 1-MiB-ROM** den realen `sblaster sbtype=sbawe`-Start (nicht bloß `sb16`), den originalen DOSBox-X-Befehl `AWEUTIL /S`, seine tatsächlichen EMU8000-Registerwrites an 620h/A20h/E20h und die Rückkehr zum Host. Ein hartes Windows-Prozess-Timeout schützt gegen Hänger.
+- Öffentliche Linux/Windows-Tests prüfen nur den Argumentpfad und originalen Trace-Parser ohne ROM-/Creative-Lizenzdateien; **der tatsächliche Windows-AWE32-Integrationserfolg bleibt bis zum beendeten Windows-Actions-Lauf unbestätigt**. Synthetisches ROM erzeugt ausdrücklich keinen Originalklang-Nachweis. `0.0.0-dev` und Original-GUI bleiben unverändert.
+
 ## Festgelegte Architektur
 
 Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32/EMU8000-Quellcode als **intern geladener DLL im VST3-Prozess**, originaler Creative-DOS-SF2LIB/DEMO.EXE als 16-Bit-DOS-Programm im emulierten PC. **Kein** externes DOSBox-Programm, **kein** 86Box-/Windows95-Gast und **kein** nativer Ersatz-SF2-Player.
