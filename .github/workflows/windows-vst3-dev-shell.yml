@@ -1,19 +1,5 @@
 name: Windows VST3 original DOSBox-X integration compile (PRIVATE assets required)
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/DosBoxVst3Shell.cpp'
-      - 'src/DosBoxVst3Shell.hpp'
-      - 'src/DosBoxVst3Factory.cpp'
-      - 'src/DosBoxRuntimeHost.hpp'
-      - 'src/RealtimeQueues.hpp'
-      - 'src/CreativeDosMailbox.hpp'
-      - 'integration/DosBoxHostAdapter.hpp'
-      - 'integration/AWE64_DOSBOX_ABI.h'
-      - 'gui/**'
-      - 'CMakeLists.txt'
-      - '.github/workflows/windows-vst3-dev-shell.yml'
   workflow_dispatch:
 permissions:
   contents: read

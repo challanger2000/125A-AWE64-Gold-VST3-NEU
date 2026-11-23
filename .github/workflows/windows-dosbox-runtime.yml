@@ -8,8 +8,10 @@ on:
       - 'tests/DosBoxHostAdapterTest.cpp'
       - 'tests/WindowsDosBoxGuestSmoke.py'
       - 'src/**'
+      - 'gui/**'
       - 'CMakeLists.txt'
       - '.github/workflows/windows-dosbox-runtime.yml'
+      - '.github/workflows/windows-vst3-dev-shell.yml'
   workflow_dispatch:
 permissions:
   contents: read

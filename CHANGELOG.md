@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Erste tatsächlich zusammengebaute interne DOSBox-X-VST3-Struktur nachgewiesen
+
+- **GitHub Actions 45105475614 erfolgreich (Commit ccdbe3ac)**: originales gepinntes DOSBox-X-AWE32 als Windows-x64-DLL gebaut, alle Exporte geprüft und DLL in einem Windows-Prozess real geladen. Originales DOSBox-X-`main()` ausgeführt, DOS-`exit` erfolgreich mit Rückkehrcode 0 beendet.
+- Im **selben** Windows-Lauf wurde die erhaltene originale P165-Frontplatte als VST3 kompiliert. Host-DLL `AWE64GoldDOSBoxDev.vst3` und originale `AWE64DOSBoxRuntime.dll` liegen gemeinsam innerhalb `AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win/`. **Das ist eine VST3-Bundle-Struktur, keine externe DOSBox-EXE.**
+- Der zusätzliche Original-Creative-DOS-Programmstart, Besitzer-ROM, private `SYNTHGM.SF2`, tatsächliche EMU8000-Register-/PCM-Ausgabe und Studio-Pro-Test sind weiterhin **nicht** geprüft.
+- Windows-CI gestrafft: `windows-dosbox-runtime.yml` bleibt die einzige automatische integrierte Windows-Kompilierung bei Code-/GUI-Änderungen; die reine VST3-DEV-Shell kann bei Bedarf manuell gestartet werden. Verhindert doppelte Windows-Kompilierung in jedem Commit.
+
 ## 23.11.2026 — DOSBox-X-main() läuft und kehrt zurück; zusätzlich echten Worker-Shutdown prüfen
 
 - Windows-Actions 45105475614: Original-DOSBox-X-Windows-DLL kompiliert; tatsächlicher In-Process-DOS-Guest-Boot und der DOS-Befehl `exit` **in einem Python-Windows-Prozess PASS**. Dies beweist **nicht** Creative-DOS-AWE-Audio.
