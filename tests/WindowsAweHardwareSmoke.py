@@ -15,7 +15,7 @@ import subprocess
 import sys
 import tempfile
 
-REGEX = re.compile(r"^(\\d+) ([0-9A-Fa-f]{3,4}) ([0-9A-Fa-f]{4})$")
+REGEX = re.compile(r"^(\d+) ([0-9A-Fa-f]{3,4}) ([0-9A-Fa-f]{4})$")
 
 
 def original_guest_args(rom: Path):

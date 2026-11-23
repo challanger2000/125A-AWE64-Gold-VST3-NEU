@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — AWEUTIL-Porttrace-Regression korrigiert
+
+- Python-Regex `\\d+` und synthetische Trennzeilen auf den tatsächlichen Original-DOSBox-X-EMU8000-Trace abgestimmt; doppelte Escape-Ebene beim Quellenbau entfernt. Portwerte und echte originale EMU8000-Engine bleiben unverändert.
+- Neue Linux-/Windows-Prüfungen müssen auf die beendeten CI-Jobs warten; noch kein Klang- oder Originaldaten-Nachweis.
+
+
 ## 23.11.2026 — Originale EMU8000-Hardware-Register im DOSBox-X-Windows-DLL-Gast prüfen
 
 - Zusätzlich zu DOS-Shell und MPU-401 jetzt originalen AWE32-Hardwarepfad als `sblaster sbtype=sbawe` prüfen: Original-DOSBox-X-Builtin `AWEUTIL /S` soll echte EMU8000-Schreibfolgen auf 620h/A20h/E20h erzeugen, vom **originalen** `EMU8K_TRACE` aufgezeichnet. Keine eigene Chip-Engine, keine geänderten Originalregisterpfade.

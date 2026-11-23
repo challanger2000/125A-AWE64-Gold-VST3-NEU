@@ -22,10 +22,10 @@ class TestOriginalAweHardwareProbe(unittest.TestCase):
         self.assertFalse(any("DEMO.EXE" in x for x in args))
 
     def test_trace_only_original_awe_hardware_word_writes(self):
-        trace = ("# Original trace\\nR 123 620 0001\\n"
-                 "123 620 0001\\n124 A20 0400\\n"
-                 "125 E20 FFFF\\nR 126 A20 0002\\n"
-                 "130 330 1234\\ninvalid\\n")
+        trace = ("# Original trace\nR 123 620 0001\n"
+                 "123 620 0001\n124 A20 0400\n"
+                 "125 E20 FFFF\nR 126 A20 0002\n"
+                 "130 330 1234\ninvalid\n")
         records = probe.parse_writes(trace)
         self.assertEqual(records, [
             (123, 0x620, 0x0001),
