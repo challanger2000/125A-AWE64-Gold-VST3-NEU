@@ -63,6 +63,13 @@ jobs:
         run: |
           python integration/patch_dosbox_runtime.py third_party/dosbox-x-AWE32
           if ($LASTEXITCODE -ne 0) { throw "Source patch failed" }
+      - name: Check private Creative-only setup script PowerShell syntax without original files
+        shell: pwsh
+        run: |
+          $t = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/Run-Private-Creative-AWE-Test.ps1').Path,[ref]$t,[ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) { throw ('Private staging PowerShell syntax error: ' + ($parseErrors | Out-String)) }
       - name: Build in-process x64 DOSBox-X-AWE32 DLL
         shell: pwsh
         working-directory: third_party/dosbox-x-AWE32

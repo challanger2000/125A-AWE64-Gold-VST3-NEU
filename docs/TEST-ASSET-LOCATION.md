@@ -46,3 +46,13 @@ python tests/WindowsPrivateCreativeGuestSmoke.py --bundle PRIVATE/AWE64GoldDOSBo
 ```
 
 Die Prüfung braucht neben dem bereits vorhandenen `awe32.raw` ausdrücklich die originale `DOS/DEMO/DEMO.EXE` (Git-Blob `e10b8705c6a46444a998c4f6aa74a1cda2081506`) und `SYNTHGM.SF2` (SHA-256 `78f8739a25d49e519b3fdc92a7f03d4ddd68588fd0260578a880296e304b7b5f`). Beide stammen aus dem in dieser Datei dokumentierten Creative-ADIP-Originalfundort. Nur nach Originalprüfung privat bereitstellen. Dies ist ein **DLL-Gast-Klangtest**, noch keine automatische VST3-Host-/Studio-Pro-Abnahme. Bei einer Fehlprüfung keine Nachweise erfinden.
+
+## Privat nutzbare Windows-Prüfung ohne GitHub-Upload
+
+Nach vollständig lokal gebautem VST3-Bundle kann der tatsächliche Original-DOS-Creative-Klang **nur auf dem Besitzer-Windows-PC** mit den nicht öffentlich verfügbaren Daten geprüft werden:
+
+```powershell
+pwsh -File tools/Run-Private-Creative-AWE-Test.ps1 -Bundle "build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3" -Rom "C:\Private\awe32.raw"
+```
+
+Das Skript benötigt den eigenen ROM-Dateipfad und ein bereits gebautes VST3-Bundle, klont das öffentliche Original-Creative-Entwicklerarchiv nur **auf den lokalen Windows-PC**, validiert `DEMO.EXE` über den Git-Blob und `SYNTHGM.SF2`/ROM über die dokumentierten SHA-256-Hashes, verweigert das Überschreiben anderer privater Dateien und führt die vollständig echte `WindowsPrivateCreativeGuestSmoke.py`-Prüfung aus. Weder GitHub Actions noch das öffentliche Repository enthalten proprietäre Originaldateien. Das ist kein behaupteter Nachweis eines erfolgreichen privaten Windows-Laufs.

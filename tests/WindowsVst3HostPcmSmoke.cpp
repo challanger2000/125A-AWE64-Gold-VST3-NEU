@@ -8,6 +8,7 @@
 // MakeSyntheticDemoExe.py, deliberately not original Creative DEMO.EXE.
 // This proves VST3 HOST AUDIO TRANSPORT only, NOT original EMU8000 sound.
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX  // Windows.h max/min macros must not break std::max
 #include <windows.h>
 #include "pluginterfaces/base/ipluginbase.h"
 #include "pluginterfaces/base/funknown.h"
@@ -49,7 +50,7 @@ public:
         if(!name)return S::kInvalidArgument;
         constexpr char text[]="125A CI Synthetic VST3 Host";
         for(unsigned i=0;i<sizeof(text);++i)
-            name[i]=static_cast<S::TChar>(text[i]);
+            name[i]=static_cast<V::TChar>(text[i]);
         return S::kResultOk;
     }
     S::tresult PLUGIN_API createInstance(S::TUID,S::TUID,void** obj) override {

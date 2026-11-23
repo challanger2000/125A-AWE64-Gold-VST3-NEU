@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Compilerbefunde beim neuen Steinberg-VST3-Hosttest behoben; Originaldaten privat bereitstellbar
+
+- [Windows-Integrationslauf 45193354491](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45193354491) **FAIL**: original DOSBox-X/EMU8000/MPU/PC-Speaker-PCM weiterhin **PASS**, aber der neu hinzugefügte VST3-Testhost kompiliert nicht wegen irrtümlichem `Steinberg::TChar` (korrekt `Steinberg::Vst::TChar`) und Windows-`min/max`-Makrokollision. Beide Quellfehler im Testhost korrigiert, Original-Emu-Kern und Produkt-DSP bleiben unverändert.
+- Portables [Release-Gate 45193355496](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45193355496) **PASS auf Linux/Windows** und Version [45193355170](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45193355170) PASS. Neuer vollständiger Windows-VST3-Hosttest bis zum Ergebnis **offen**.
+- `tools/Run-Private-Creative-AWE-Test.ps1` integriert: nur lokal auf Besitzer-Windows, ursprüngliches ROM/SF2LIB/`DEMO.EXE` durch SHA-256 und Git-Blob absichern, gegebenenfalls aus öffentlichem Creative-Archiv **herunterladen**, niemals hochladen oder bestehendes Eigentümermaterial überschreiben. Führt das separate private Original-DOS-/EMU8000-Klang-Gate aus; **noch kein privater PASS**.
+- Eine Windows-CI-**Syntax**prüfung des PowerShell-Skripts hinzugefügt; keine privaten ROM-/Creative-Dateien in CI.
+
+
 ## 23.11.2026 — Echten VST3-IPluginFactory/IAudioProcessor-Audio-End-to-End-Test integriert (Ergebnis offen)
 
 - `WindowsVst3HostPcmSmoke.cpp`: tatsächliche Windows-VST3-Factory instanziieren, Instrument aktivieren, 44,1-kHz-Float32-Ausgabe über `process()` empfangen, nicht-stumme Audioframes quantifizieren, Host deaktivieren und sauber terminieren. Kein separater DAW-Emulator und keine vom Testhost generierten Audiosamples.

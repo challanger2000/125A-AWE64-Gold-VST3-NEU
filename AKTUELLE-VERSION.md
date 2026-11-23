@@ -36,6 +36,13 @@ Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git
 
 Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
 
+## Windows-VST3-Hosttest: echte Compilerfehler diagnostiziert, korregiert – CI-Gegenprüfung ausstehend
+
+- **[Windows-Original-AWE-Build 45193354491](../../actions/runs/45193354491): FAIL** in neuem *eigenem* Testhost `WindowsVst3HostPcmSmoke.cpp`, **nicht** in originaler DOSBox-X-AWE32-Hardware: Microsoft Visual C++ meldete `Steinberg::TChar` als nicht existent sowie `std::max`-Parserfehler durch `windows.h`-Makros `min/max`. Die vorangehenden originalen DOSBox-X-DLL-, EMU8000-, MIDI- und PC-Speaker-PCM-Prüfungen im selben Windows-Lauf waren alle PASS.
+- Der kleine Testhost verwendet jetzt korrekt **`Steinberg::Vst::TChar`** sowie Windows-Makro **`NOMINMAX`** vor `windows.h`. Echte Produkt-DSP-/Creative-/EMU8000-Codepfade und originale P165-GUI bleiben unverändert. Bis zum erneut komplett beendeten Windows-Lauf darf der neue VST3-Host-PCM-Gate nicht als PASS gelten.
+- **[45193355496](../../actions/runs/45193355496): Linux- und Windows-Unit-Regressionen PASS**; [45193355170](../../actions/runs/45193355170): Versionskonsistenz PASS.
+- Damit der finale Klangtest tatsächlich mit **privat beschafften Originalbytes** und ohne Veröffentlichung möglich ist, steht `tools/Run-Private-Creative-AWE-Test.ps1` bereit. Das Skript validiert privat das bereits vorhandene Besitzer-ROM per SHA-256, liest die beiden originalen Creative-`DOS/DEMO`-Dateien nur lokal aus dem veröffentlichten `qb40/sound-blaster-awe32`-Archiv, prüft exakte Checksummen, überschreibt niemals bereits vorhandene Besitzerdateien und startet `tests/WindowsPrivateCreativeGuestSmoke.py`. **Dieser echte Originalklang-Test wurde mangels Windows-Host mit Owner-Dateien hier noch nicht ausgeführt.** Keine Daten in öffentlichen GitHub-Actions oder Git, weiterhin `0.0.0-dev`.
+
 ## VST3-Host-End-to-End-PCM: neuer echter Instrumenten-Host-Test (CI noch offen)
 
 - `tests/WindowsVst3HostPcmSmoke.cpp` lädt unter Windows die **tatsächlich gebaute** `AWE64GoldDOSBoxDev.vst3`-Bibliothek und führt über die **echte Steinberg-IPluginFactory**, `IComponent`, `IAudioProcessor`, `setActive`, `setProcessing` und wiederholte `process()`-Aufrufe den vollständigen Windows-VST3-Audiohostpfad aus. Er verlangt messbare PCM-Frames, begrenzte Amplitude und reguläre Deaktivierung.
