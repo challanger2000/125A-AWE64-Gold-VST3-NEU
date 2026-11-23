@@ -8,9 +8,11 @@ real host->MPU-401 MIDI, audio isolation and clean shutdown.
 
 This is an intermediate DLL/guest gate, NOT a VST3-host/Studio-Pro test.
 No original Creative bytes, traces, audio, or packed bundles are uploaded.
-Public CI must NOT execute this test.
+Only the isolated hash-verified archival-reference CI path may use public archival inputs.
 """
 import argparse
+from array import array
+import math
 import ctypes
 from collections import deque
 import hashlib
@@ -117,7 +119,36 @@ def inspect_trace(trace: Path) -> tuple[int, int]:
     return writes, len(ports)
 
 
-def run_child(bundle: Path, seconds: float):
+# Same nominal schedule as native VST3 host. Wall-clock windows,
+# not a sample-aligned or bit-identical oracle.
+REFERENCE_BOUNDARIES = tuple(n * 512 / 44100 for n in (800, 880, 980, 1230))
+
+
+class MixerWindowMetrics:
+    def __init__(self):
+        self.energy = [0] * 4
+        self.samples = [0] * 4
+        self.peak = [0] * 4
+
+    def add(self, elapsed, values):
+        phase = sum(elapsed >= t for t in REFERENCE_BOUNDARIES[:3])
+        if not values:
+            return
+        self.energy[phase] += sum(v * v for v in values)
+        self.samples[phase] += len(values)
+        self.peak[phase] = max(self.peak[phase], max(map(abs, values)))
+
+    def report(self):
+        for i, name in enumerate(("WARMUP", "IDLE", "HELD_NOTE", "RELEASE")):
+            if not self.samples[i]:
+                raise RuntimeError("Missing direct mixer window: " + name)
+            rms = math.sqrt(self.energy[i] / self.samples[i]) / 32768
+            print(f"REFERENCE_{name}_RMS={rms:.9f}")
+            print(f"REFERENCE_{name}_FRAMES={self.samples[i] // 2}")
+            print(f"REFERENCE_{name}_PEAK={self.peak[i] / 32768:.9f}")
+
+
+def run_child(bundle: Path, seconds: float, reference: bool = False):
     if os.name != "nt":
         raise RuntimeError("This test must run on Windows x64")
     dll_file, assets = find_private_bundle(bundle)
@@ -158,6 +189,9 @@ def run_child(bundle: Path, seconds: float):
             peak_after_midi = [0]
             notes_sent = [False]
             note_delivered_to_mpu = [False]
+            delivered = []
+            metrics = MixerWindowMetrics()
+            started = time.monotonic()
 
             @midi_type
             def read_midi(_context, dst, max_len):
@@ -167,6 +201,8 @@ def run_child(bundle: Path, seconds: float):
                 for i, byte in enumerate(message):
                     dst[i] = byte
                 midi_pulled[0] += 1
+                if reference:
+                    delivered.append(message)
                 if message[0] == 0x90:
                     note_delivered_to_mpu[0] = True
                 return len(message)
@@ -176,6 +212,10 @@ def run_child(bundle: Path, seconds: float):
                 if not pcm or frames == 0:
                     return
                 pcm_frames[0] += int(frames)
+                if reference:
+                    values = array('h')
+                    values.frombytes(ctypes.string_at(pcm, int(frames) * 4))
+                    metrics.add(time.monotonic() - started, values)
                 # For proof require a nonzero real 16-bit sample after a note
                 # entered the emulated MPU queue; never generate test tones.
                 if note_delivered_to_mpu[0]:
@@ -191,11 +231,13 @@ def run_child(bundle: Path, seconds: float):
             guest_result = []
             thread = threading.Thread(
                 target=lambda: guest_result.append(start(len(args), argv)), daemon=True)
-            thread.start()
-
+            if reference:
+                pending.extend((bytes((0xb0, 0, 0)), bytes((0xc0, 0))))
             started = time.monotonic()
+            thread.start()
             last_note = 0.0
             isolated_seen = False
+            sent_off = False
             try:
                 while time.monotonic() - started < seconds:
                     if not thread.is_alive():
@@ -205,15 +247,24 @@ def run_child(bundle: Path, seconds: float):
                     elapsed = time.monotonic() - started
                     # Repeat after startup because authentic SF2 loading can
                     # consume variable emulated DOS time. Use CC0, not CC32.
-                    if elapsed >= 3 and elapsed - last_note >= 1.3:
+                    if reference:
+                        if elapsed >= REFERENCE_BOUNDARIES[1] and not notes_sent[0]:
+                            pending.append(bytes((0x90, 60, 100)))
+                            notes_sent[0] = True
+                        if elapsed >= REFERENCE_BOUNDARIES[2] and not sent_off:
+                            pending.append(bytes((0x80, 60, 0)))
+                            sent_off = True
+                        if elapsed >= REFERENCE_BOUNDARIES[3]:
+                            break
+                    elif elapsed >= 3 and elapsed - last_note >= 1.3:
                         pending.extend(probe_midi_sequence())
                         notes_sent[0] = True
                         last_note = elapsed
-                    if peak_after_midi[0] >= 128 and midi_pulled[0] >= 3:
+                    if not reference and peak_after_midi[0] >= 128 and midi_pulled[0] >= 3:
                         break
                     time.sleep(.05)
             finally:
-                if notes_sent[0]:
+                if notes_sent[0] and not sent_off:
                     pending.append(b"\x80\x3C\x00")
                 stop()
                 thread.join(timeout=18)
@@ -232,6 +283,14 @@ def run_child(bundle: Path, seconds: float):
                 raise RuntimeError("Original emulated MPU-401 did not consume bank/program/note")
             if pcm_frames[0] == 0:
                 raise RuntimeError("No original DOSBox PCM callback frames")
+            if reference:
+                expected = [bytes((0xb0, 0, 0)), bytes((0xc0, 0)),
+                            bytes((0x90, 60, 100)), bytes((0x80, 60, 0))]
+                if delivered != expected:
+                    raise RuntimeError('Direct mixer did not deliver complete MIDI sequence')
+                metrics.report()
+                print('DIRECT_DOSBOX_MIXER_MEASURED; NOT_A_MUSICAL_PASS')
+                return
             if peak_after_midi[0] < 128:
                 raise RuntimeError("Creative + original ROM/SF2 produced no detectable note PCM")
             print("PRIVATE_CREATIVE_DOS_AWE_PCM_PASS")
@@ -251,19 +310,26 @@ def main():
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--seconds", type=float, default=30.)
     parser.add_argument("--child", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--reference", action="store_true", help="Measure direct mixer without VST3")
     opt = parser.parse_args()
     if not (5 <= opt.seconds <= 120):
         parser.error("--seconds must be 5..120")
     if opt.child:
-        run_child(opt.bundle, opt.seconds)
+        run_child(opt.bundle, opt.seconds, opt.reference)
         return
     # A native crash or hang must not terminate the controlling test process.
     command = [sys.executable, str(Path(__file__).resolve()), "--child",
                "--bundle", str(opt.bundle), "--seconds", str(opt.seconds)]
+    if opt.reference:
+        if opt.seconds < 20:
+            parser.error('--reference requires at least 20 seconds')
+        command.append('--reference')
     completed = subprocess.run(
         command, capture_output=True, text=True, check=False,
         timeout=opt.seconds + 25)
-    if completed.returncode != 0 or "PRIVATE_CREATIVE_DOS_AWE_PCM_PASS" not in completed.stdout:
+    marker = ("DIRECT_DOSBOX_MIXER_MEASURED; NOT_A_MUSICAL_PASS" if opt.reference
+              else "PRIVATE_CREATIVE_DOS_AWE_PCM_PASS")
+    if completed.returncode != 0 or marker not in completed.stdout:
         print(completed.stdout[-3000:], file=sys.stderr)
         print(completed.stderr[-3000:], file=sys.stderr)
         raise SystemExit("PRIVATE_CREATIVE_DOS_AWE_PCM_FAIL")

@@ -11,6 +11,22 @@ spec.loader.exec_module(module)
 
 
 class CreativePrivateHarnessTest(unittest.TestCase):
+    def test_direct_mixer_window_accounting(self):
+        from contextlib import redirect_stdout
+        import io
+        m = module.MixerWindowMetrics()
+        for elapsed, value in zip((0,) + module.REFERENCE_BOUNDARIES[:3],
+                                  (0, 0, 16384, 8192)):
+            m.add(elapsed, [value, -value])
+        out = io.StringIO()
+        with redirect_stdout(out):
+            m.report()
+        self.assertIn("REFERENCE_IDLE_RMS=0.000000000", out.getvalue())
+        self.assertIn("REFERENCE_HELD_NOTE_RMS=0.500000000", out.getvalue())
+        self.assertIn("REFERENCE_RELEASE_RMS=0.250000000", out.getvalue())
+        with self.assertRaises(RuntimeError):
+            module.MixerWindowMetrics().report()
+
     def test_exact_original_dos_command(self):
         cmd = module.guest_arguments(Path("X:/PRIVATE"))
         self.assertIn("midi mpu401=intelligent", cmd)

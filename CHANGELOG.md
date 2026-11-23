@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Direkter DOSBox-Mixervergleich vor der VST3-Klangabnahme
+
+- [Windows 45276546802](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45276546802): synthetischer Positivtest (1002 nicht-stumme Frames) und strikte Nullsignal-Negativkontrolle PASS. Musikalischer Originaltest FAIL: Ruhe-RMS 0,0761665, gehaltene Note 0,0283831, Release 0,00548934, 100/100 aktive Notenblöcke, 0 Near-Full-Scale-Frames während der Note. Ursache offen; kein Emulationsfehler behauptet. [Linux/Windows 45276546834](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45276546834) und [Versionsprüfung 45276546950](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45276546950) PASS.
+- Der Launcher erfasst vor dem VST3-Gate den direkten PCM-Ausgang derselben DOSBox-DLL ohne VST3-Queue: identisches ROM, GM-SF2, Creative-EXE, 44,1 kHz, MIDI CC0=0/PC0/Note60 Vel100/NoteOff. Vier Fenster (Warmup, Ruhe, Note, Release) mit RMS/Peak/Framezahl, vollständige MIDI-Lieferung und regulärer Stop. Keine samplegenaue Gleichheitsbehauptung oder musikalischer PASS aus der Referenzmessung.
+- Beide Wege jetzt 800 Warmup-, 80 Ruhe-, 100 Noten- und 250 Release-Blöcke à 512 Samples. Native Host-Taktung absolut bei 44100 Hz statt kumulativer Sleep-Rundung. Musikalische Note/Ruhe-Anforderung unverändert. Neuer Lauf noch ausstehend. Kein DSP-/Treiber-/GUI-Eingriff, nur main, `0.0.0-dev`, kein Release.
+
 ## 23.11.2026 — Negativkontrolle vom musikalischen Originaltest getrennt
 
 - [Windows 45275384157](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45275384157) FAIL ausschließlich in der synthetischen Negativkontrolle: gemessene Ruhe-, Note- und Release-RMS sämtlich exakt null. Die neue musikalische Prüfung meldete jedoch einen anderen erwarteten Fehlertext; deshalb wurde der eigentliche Original-Archivtest nicht mehr erreicht. Windows-Build und synthetischer Positivtest (783 nicht-stumme Frames) PASS; [Linux/Windows 45275384197](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45275384197) und [Version 45275384621](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45275384621) SUCCESS.

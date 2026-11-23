@@ -79,6 +79,11 @@ try {
         throw 'VST3 test binary absent. Build awe64_vst3_host_pcm_smoke locally or use -HostExe.'
     }
     $pluginBinary = Join-Path $native 'AWE64GoldDOSBoxDev.vst3'
+    # Acquire direct mixer evidence before the VST3 gate.
+    if ($Seconds -ge 20) {
+        & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds --reference
+        if ($LASTEXITCODE -ne 0) { throw 'Direct DOSBox mixer reference acquisition failed.' }
+    }
     $traceFile = Join-Path $temporary 'original_creative_vst3_emu8000.trace'
     # Unique Windows/DOS-compatible 8.3 filename, scoped to this test run.
     # It captures original Creative "ERROR:" messages (detect/init/SF2)

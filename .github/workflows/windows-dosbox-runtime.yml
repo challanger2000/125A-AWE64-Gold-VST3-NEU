@@ -16,6 +16,8 @@ on:
       - 'tests/MakeMidiTriggeredDemoExe.py'
       - 'tests/WindowsVst3HostPcmSmoke.cpp'
       - 'tests/WindowsRunVst3HostPcmSmoke.py'
+      - 'tests/WindowsPrivateCreativeGuestSmoke.py'
+      - 'tools/Run-Private-Creative-AWE-Test.ps1'
       - 'tests/WindowsVst3CreativeOnlyNegative.py'
       - 'tests/test_synthetic_dos_exe.py'
       - 'tests/test_speaker_probe.py'

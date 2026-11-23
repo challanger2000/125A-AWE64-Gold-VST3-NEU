@@ -222,7 +222,7 @@ int main(int argc,char** argv) {
     float peak=0.;
     double idleEnergy=0., noteEnergy=0., releaseEnergy=0.;
     std::uint64_t idleFrames=0,noteFrames=0,releaseFrames=0,activeNoteBlocks=0,nearFullScale=0;
-    constexpr unsigned warmupBlocks=250, idleBlocks=80, heldBlocks=100, tailBlocks=250;
+    constexpr unsigned warmupBlocks=800, idleBlocks=80, heldBlocks=100, tailBlocks=250;
     constexpr unsigned startNoteBlock=warmupBlocks+idleBlocks;
     constexpr unsigned stopNoteBlock=startNoteBlock+heldBlocks;
     constexpr unsigned endOriginalBlock=stopNoteBlock+tailBlocks;
@@ -236,6 +236,7 @@ int main(int argc,char** argv) {
     // validated short public synthetic DOS test. Preserve the latter.
     const unsigned maxBlocks=originalMode ?
         std::min(static_cast<unsigned>(originalSeconds*1000/12),endOriginalBlock) : 600u;
+    const auto measurementStart=std::chrono::steady_clock::now();
     for(unsigned block=0;block<maxBlocks;++block){
         // Synthetic path retains its short silence check. Original path
         // measures settled idle, one held note and release separately.
@@ -269,7 +270,11 @@ int main(int argc,char** argv) {
            blockEnergy/l.size()>0.000001)++activeNoteBlocks;
         frames+=l.size();
         if(!originalMode && !exclusionMode && peak>minimumPeak&&nonzero>=512)break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(12));
+        if(originalMode) {
+            const auto due=measurementStart+std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>((block+1)*512.0/44100.0));
+            std::this_thread::sleep_until(due);
+        } else std::this_thread::sleep_for(std::chrono::milliseconds(12));
     }
     if(processor->setProcessing(false)!=S::kResultOk)
         return fail("Actual VST3 setProcessing(false) failed");
