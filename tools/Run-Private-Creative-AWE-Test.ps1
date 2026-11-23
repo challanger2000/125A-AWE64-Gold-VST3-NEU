@@ -212,6 +212,43 @@ try {
         [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
         [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
     }
+    # Genuine Creative DOS SysEx type change: observe specific physical
+    # EMU8000 register writes, not merely queued host messages.
+    $effectTrace = Join-Path $temporary 'original_effect_types.trace'
+    $effectBoot = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
+    $previousEffectTest = [Environment]::GetEnvironmentVariable('AWE64_TEST_EFFECT_TYPES','Process')
+    try {
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_EFFECT_TYPES','1','Process')
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE',$effectTrace,'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER','dummy','Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY','1','Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG',$effectBoot,'Process')
+        & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
+        if ($LASTEXITCODE -ne 0) { throw 'Original effect type native VST3 gate failed.' }
+        $pointer = -1
+        $plate = $false
+        $feedback = $false
+        foreach ($line in [System.IO.File]::ReadLines($effectTrace)) {
+            if ($line -match '^(\d+) (620|622|A20|A22|E20|E22) ([0-9A-Fa-f]{4})$') {
+                $frame = [long]$Matches[1]
+                $port = $Matches[2]
+                $word = [Convert]::ToInt32($Matches[3],16)
+                if ($port -eq 'E22') { $pointer = $word -band 255 }
+                if ($frame -gt 176400 -and $port -eq 'A20') {
+                    if ($pointer -eq 0x43 -and $word -eq 0xB4FF) { $plate = $true }
+                    if ($pointer -eq 0x69 -and $word -eq 0xE6C0) { $feedback = $true }
+                }
+            }
+        }
+        if (-not ($plate -and $feedback)) { throw 'Original DOS driver did not write expected plate/short-delay-feedback EMU8000 registers.' }
+        Write-Host 'ORIGINAL_CREATIVE_EFFECT_TYPES_REGISTER_PASS; PLATE; SHORT_DELAY_FEEDBACK'
+    } finally {
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_EFFECT_TYPES',$previousEffectTest,'Process')
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE',$previousTrace,'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER',$previousSdl,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY',$previousOriginal,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG',$previousBootLog,'Process')
+    }
     # Independent secondary original-Creative test in an isolated DLL child.
     & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds
     if ($LASTEXITCODE -ne 0) { throw 'Private Creative ROM/SF2/DEMO DLL-level PCM gate FAILED.' }

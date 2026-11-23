@@ -31,6 +31,15 @@ public:
         written_.store(w + 1, std::memory_order_release);
         return true;
     }
+    // Consumer only: inspect complete packet without consuming it when
+    // the UART cannot currently accept its entire length.
+    [[nodiscard]] bool tryPeek(T& item) const noexcept {
+        const auto r=read_.load(std::memory_order_relaxed);
+        const auto w=written_.load(std::memory_order_acquire);
+        if(w==r)return false;
+        item=data_[static_cast<std::size_t>(r)&(Capacity-1)];
+        return true;
+    }
     [[nodiscard]] bool tryPop(T& item) noexcept {
         const auto r = read_.load(std::memory_order_relaxed);
         const auto w = written_.load(std::memory_order_acquire);
@@ -53,6 +62,7 @@ struct MidiEvent final {
     std::uint8_t data1;
     std::uint8_t data2;
     std::uint8_t size;
+    std::array<std::uint8_t,11> sysex{};
 };
 
 // Audio producer: DOSBox worker; consumer: VST3 audio thread.
@@ -76,6 +86,7 @@ public:
         midiDrops_.fetch_add(1, std::memory_order_relaxed);
         return false;
     }
+    bool peekMidi(MidiEvent& event) const noexcept {return midi_.tryPeek(event);}
     bool popMidi(MidiEvent& event) noexcept { return midi_.tryPop(event); }
     std::size_t readAudio(float* left, float* right, std::size_t frames) noexcept {
         if (!left || !right) return 0;

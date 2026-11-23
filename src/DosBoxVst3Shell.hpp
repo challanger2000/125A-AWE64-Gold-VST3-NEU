@@ -30,6 +30,8 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::atomic<std::uint8_t> program_{0};
     std::atomic<std::uint8_t> bank_{0};
     std::atomic<float> master_{1.f};
+    std::atomic<std::uint8_t> reverbType_{4},chorusType_{2};
+    std::uint8_t lastReverbType_=4,lastChorusType_=2;
     rt::HostRateConverter rateConverter_{};
     // Lifecycle changes on the host/editor thread. The audio callback uses
     // try_lock, never waits for the emulator or a disk operation.

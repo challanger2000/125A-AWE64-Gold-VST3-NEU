@@ -34,6 +34,20 @@ int main(){
  CHECK(integration::DosBoxHostAdapter::pullMidi(&pa,packet,3)==0);
  CHECK(integration::DosBoxHostAdapter::pullMidi(nullptr,packet,3)==0);
  CHECK(integration::DosBoxHostAdapter::pullMidi(&pa,packet,2)==0);
+ const auto reverb=rt::makeCreativeEffectType(702,false,5);
+ CHECK(rt::validCreativeEffectType(reverb));
+ CHECK(a.pushMidi(reverb));CHECK(a.pushMidi({703,0x90,60,100,3}));
+ unsigned char sysex[11]{};
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&pa,sysex,10)==0);
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&pa,sysex,11)==11);
+ for(unsigned i=0;i<11;i++)CHECK(sysex[i]==reverb.sysex[i]);
+ CHECK(sysex[0]==0xf0&&sysex[7]==0x30&&sysex[8]==5&&sysex[10]==0xf7);
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&pa,packet,3)==3&&packet[0]==0x90);
+ for(unsigned i=0;i<8;i++){
+   auto ev=rt::makeCreativeEffectType(704,true,static_cast<std::uint8_t>(i));
+   CHECK(rt::validCreativeEffectType(ev)&&ev.sysex[7]==0x38&&ev.sysex[8]==i);
+   ev.sysex[4]^=1;CHECK(!rt::validCreativeEffectType(ev));
+ }
  float lb[1]{},rb[1]{};
  CHECK(b.readAudio(lb,rb,1)==0);
  CHECK(integration::DosBoxHostAdapter::readPort(nullptr,0xBEE0)==0xffu);

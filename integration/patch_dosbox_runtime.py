@@ -136,11 +136,20 @@ static void AWE64_PumpGuestMidi() {
     if(!pull)return;
     // The original UART FIFO holds 32 bytes. Queue complete messages only.
     for(unsigned n=0;n<8 && mpu.queue_used<=MPU401_QUEUE-3;++n) {
-        unsigned char buf[3]{};
-        unsigned len=pull(awe64_mpu_ctx.load(std::memory_order_acquire),buf,3);
+        unsigned char buf[11]{};
+        const unsigned free_bytes=MPU401_QUEUE-mpu.queue_used;
+        const unsigned capacity=free_bytes<11u?free_bytes:11u;
+        unsigned len=pull(awe64_mpu_ctx.load(std::memory_order_acquire),buf,capacity);
         if(len==0)break;
         const unsigned type=buf[0]&0xf0u;
-        if(buf[0]<0x80u || buf[0]>=0xf0u ||
+        if(len>capacity)continue;
+        if(buf[0]==0xf0u) {
+            // Complete documented 11-byte Creative effect SysEx only.
+            if(len!=11u||buf[10]!=0xf7u)continue;
+            bool valid=true;
+            for(unsigned i=1;i<10u;++i)if(buf[i]>=0x80u)valid=false;
+            if(!valid)continue;
+        } else if(buf[0]<0x80u || buf[0]>=0xf0u ||
            len!=((type==0xc0u || type==0xd0u)?2u:3u))continue;
         for(unsigned i=0;i<len;++i)QueueByte(buf[i]);
     }

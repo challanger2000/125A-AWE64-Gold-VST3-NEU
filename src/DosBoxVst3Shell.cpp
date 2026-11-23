@@ -1,6 +1,7 @@
 #include "DosBoxVst3Shell.hpp"
 #include "CreativeMidiBankSelect.hpp"
 #include "CreativeMidiControllers.hpp"
+#include "CreativeEffectMidi.hpp"
 #include "ExternalSoundFont.hpp"
 #include "PresetBrowserView.h"
 #include "pluginterfaces/base/ustring.h"
@@ -20,6 +21,7 @@ using namespace Steinberg;
 using namespace Steinberg::Vst;
 namespace {
 constexpr ParamID kProgram = 1000u, kMaster = 1001u, kBank = 1002u;
+constexpr ParamID kReverbType=1200u,kChorusType=1201u;
 constexpr std::array<const char*,12> kControlLabels{
     "AMP ATTACK","AMP DECAY","AMP SUSTAIN","AMP RELEASE",
     "FILTER ATTACK","FILTER DECAY","FILTER SUSTAIN","FILTER RELEASE",
@@ -60,8 +62,8 @@ tresult PLUGIN_API DosBoxVst3Shell::initialize(FUnknown* context) {
         parameters.addParameter(new RangeParameter(name,1100u+static_cast<ParamID>(i),
             STR16("%"),0.,100.,0.));
     }
-    parameters.addParameter(new RangeParameter(STR16("Reverb Type"),1200u,nullptr,0.,7.,2.,7));
-    parameters.addParameter(new RangeParameter(STR16("Chorus Type"),1201u,nullptr,0.,7.,3.,7));
+    parameters.addParameter(new RangeParameter(STR16("Reverb Type"),kReverbType,nullptr,0.,7.,4.,7));
+    parameters.addParameter(new RangeParameter(STR16("Chorus Type"),kChorusType,nullptr,0.,7.,2.,7));
     // Host MIDI CC routing via the standard IMidiMapping interface.
     // Defaults are metadata only; never send CCs at boot that would alter
     // the original Creative bank's initial controller state.
@@ -169,6 +171,7 @@ bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected) {
         initialProgramSent_=false;
         absoluteSamplePosition_=0;
         rateConverter_.reset();
+        lastReverbType_=4;lastChorusType_=2;
         return true;
     } catch (...) {
         stopRuntimeLocked();
@@ -252,6 +255,8 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
                 case kMaster:
                     master_.store(static_cast<float>(value),std::memory_order_release);
                     break;
+                case kReverbType:reverbType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);break;
+                case kChorusType:chorusType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);break;
                 default:break;
             }
         }
@@ -272,6 +277,12 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
             initialProgramSent_=true;lastBank_=bank;lastProgram_=program;
         }
     }
+    const auto reverb=reverbType_.load(std::memory_order_acquire);
+    const auto chorus=chorusType_.load(std::memory_order_acquire);
+    if(reverb!=lastReverbType_&&engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,false,reverb)))
+        lastReverbType_=reverb;
+    if(chorus!=lastChorusType_&&engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,true,chorus)))
+        lastChorusType_=chorus;
     if(data.inputEvents){
         const int32 count=data.inputEvents->getEventCount();
         for(int32 i=0;i<count;++i){
@@ -333,6 +344,10 @@ tresult PLUGIN_API DosBoxVst3Shell::setParamNormalized(ParamID id,ParamValue val
                     std::memory_order_release);
     else if(id==kMaster)
         master_.store(static_cast<float>(value),std::memory_order_release);
+    else if(id==kReverbType)
+        reverbType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);
+    else if(id==kChorusType)
+        chorusType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);
     return kResultOk;
 }
 tresult PLUGIN_API DosBoxVst3Shell::getState(IBStream* stream) {
@@ -340,7 +355,8 @@ tresult PLUGIN_API DosBoxVst3Shell::getState(IBStream* stream) {
     std::array<std::uint8_t,kStateLength> image{};
     for(unsigned i=0;i<4;i++)image[i]=kSignature[i];
     const auto selected=requestedSoundFont();
-    image[4]=selected.empty()?1:2; // v2 adds length-prefixed UTF-8 source path
+    const std::array<std::uint8_t,2> effects{reverbType_.load(std::memory_order_acquire),chorusType_.load(std::memory_order_acquire)};
+    image[4]=(effects[0]!=4||effects[1]!=2)?3:(selected.empty()?1:2);
     image[5]=bank_.load(std::memory_order_acquire);
     image[6]=program_.load(std::memory_order_acquire);
     const auto level=static_cast<std::uint32_t>(std::lround(
@@ -351,10 +367,13 @@ tresult PLUGIN_API DosBoxVst3Shell::getState(IBStream* stream) {
     int32 written=0;
     if(stream->write(image.data(),static_cast<int32>(image.size()),&written)!=kResultOk ||
        written!=static_cast<int32>(image.size()))return kResultFalse;
-    if(selected.empty())return kResultOk;
+    if(image[4]==3){
+        if(stream->write(const_cast<std::uint8_t*>(effects.data()),2,&written)!=kResultOk||written!=2)return kResultFalse;
+    } else if(selected.empty())return kResultOk;
     const auto n=static_cast<std::uint32_t>(selected.size());
     std::array<std::uint8_t,4> length{std::uint8_t(n),std::uint8_t(n>>8),std::uint8_t(n>>16),std::uint8_t(n>>24)};
     if(stream->write(length.data(),4,&written)!=kResultOk||written!=4)return kResultFalse;
+    if(n==0)return kResultOk;
     return stream->write(const_cast<char*>(selected.data()),static_cast<int32>(n),&written)==kResultOk &&
            written==static_cast<int32>(n)?kResultOk:kResultFalse;
 }
@@ -365,25 +384,29 @@ tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
     if(stream->read(image.data(),static_cast<int32>(image.size()),&read)!=kResultOk||
        read!=static_cast<int32>(image.size())||
        !std::equal(kSignature.begin(),kSignature.end(),image.begin())||
-       (image[4]!=1&&image[4]!=2)||image[9]!=0x5a||image[10]!=0xa5||
+       (image[4]!=1&&image[4]!=2&&image[4]!=3)||image[9]!=0x5a||image[10]!=0xa5||
        image[5]>127||image[6]>127)return kResultFalse;
     const unsigned volume=image[7]|(static_cast<unsigned>(image[8])<<8);
     if(volume>10000)return kResultFalse;
+    std::array<std::uint8_t,2> effects{4,2};
+    if(image[4]==3&&(stream->read(effects.data(),2,&read)!=kResultOk||read!=2||effects[0]>7||effects[1]>7))return kResultFalse;
     std::string selected;
-    if(image[4]==2){
+    if(image[4]==2||image[4]==3){
         std::array<std::uint8_t,4> length{};
         if(stream->read(length.data(),4,&read)!=kResultOk||read!=4)return kResultFalse;
         const auto n=std::uint32_t(length[0])|(std::uint32_t(length[1])<<8)|
                      (std::uint32_t(length[2])<<16)|(std::uint32_t(length[3])<<24);
-        if(n==0||n>32768)return kResultFalse;
+        if((n==0&&image[4]==2)||n>32768)return kResultFalse;
         selected.resize(n);
-        if(stream->read(selected.data(),static_cast<int32>(n),&read)!=kResultOk||
-           read!=static_cast<int32>(n))return kResultFalse;
+        if(n&&(stream->read(selected.data(),static_cast<int32>(n),&read)!=kResultOk||
+           read!=static_cast<int32>(n)))return kResultFalse;
     }
     if(!requestSoundFont(selected))return kResultFalse;
     (void)setParamNormalized(kBank,static_cast<double>(image[5])/127.);
     (void)setParamNormalized(kProgram,static_cast<double>(image[6])/127.);
     (void)setParamNormalized(kMaster,static_cast<double>(volume)/10000.);
+    (void)setParamNormalized(kReverbType,effects[0]/7.);
+    (void)setParamNormalized(kChorusType,effects[1]/7.);
     return kResultOk;
 }
 tresult PLUGIN_API DosBoxVst3Shell::setComponentState(IBStream* stream) {

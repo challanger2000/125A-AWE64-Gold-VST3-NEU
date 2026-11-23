@@ -1,6 +1,7 @@
 #pragma once
 // Same-process DOSBox-X C ABI -> original Creative DOS mailbox / real mixer PCM.
 #include "CreativeDosMailbox.hpp"
+#include "CreativeEffectMidi.hpp"
 #include <cstdint>
 #if defined(_WIN32)
 #define AWE64_ABI_CALL __cdecl
@@ -33,6 +34,14 @@ public:
         if(!ctx||!out||capacity<3u)return 0u;
         rt::MidiEvent ev{};
         auto& queue=static_cast<DosBoxHostAdapter*>(ctx)->queues_;
+        if(!queue.peekMidi(ev))return 0u;
+        if(ev.status==0xf0u) {
+            if(!rt::validCreativeEffectType(ev)){(void)queue.popMidi(ev);return 0u;}
+            if(capacity<ev.size)return 0u; // preserve FIFO ordering and whole SysEx
+            if(!queue.popMidi(ev))return 0u;
+            for(unsigned i=0;i<ev.size;++i)out[i]=ev.sysex[i];
+            return ev.size;
+        }
         if(!queue.popMidi(ev))return 0u;
         const unsigned status=ev.status;
         const unsigned category=status&0xf0u;

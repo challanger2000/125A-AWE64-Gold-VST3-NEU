@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Original-Creative-Reverb-/Chorustyp über DOS-SysEx
+
+- Originales ADIP v3.01, Part II, awe32Sysex (https://doczz.net/doc/8351592/developer-s-information-pack): dokumentiert 11-Byte-GS-Effektvariationsbefehle; die unveränderte Creative-DEMO empfängt SysEx bereits. Erweiterung ausschließlich der Host-MIDI-Transportlänge/FIFO: vollständige Nachricht oder warten, keine Teilpakete, normale MIDI-Nachrichten unverändert.
+- Aktiviert beide vorhandenen P165-Typmenüs im SDK-Kompatibilitätsquelltext, Hall 2 = 4, Chorus 3 = 2, echte Projekt-/Parameteranbindung; v3-State für abweichende Effektvariationen, v1/v2 kompatibel. Kein Eingriff in Chip-DSP. NRPN laut ADIP und originalem DEMO ausdrücklich **nicht** durch SF2LIB unterstützt; ADSR/Filter und exakte Send-Stärken bleiben offen. Keine falsche Funktionsfreigabe.
+- Neuer nativer Originaltest: Plate/Short Delay Feedback über IEditController und State-Roundtrip, anschließende Original-Registertrace-Kontrolle (INIT1 3 = B4FF, INIT3 9 = E6C0; unabhängige Referenz https://codebrowser.dev/linux/linux/sound/isa/sb/emu8000.c.html). Noch unbestätigt. Keine Besitzerdateien/Audio/Traces veröffentlichen, nur main.
+
 ## 24.11.2026 — Native 44,1 kHz unverändert; Hostrate-Konverter
 
 - 44,1-kHz-DOSBox-Mixer unverändert, bittransparenter Bypass bei 44,1-kHz-DAW. Für höhere Hostraten bis 192 kHz: 32-Tap-Blackman-Sinc, 1024 Phasen mit Interpolation, exakte rationale Phase, 16 native Samples FIR-Verzögerung, keine Allokation im Callback. Keine Änderung des EMU8000-Takts oder Creative-Treibers. Asynchrone Transportlatenz und Pufferstabilität bleiben separate offene Prüfungen.

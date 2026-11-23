@@ -144,6 +144,7 @@ int main(int argc,char** argv) {
     const char* hostRateEnv=std::getenv("AWE64_TEST_HOST_RATE");
     const double hostRate=hostRateEnv?std::atof(hostRateEnv):44100.;
     if(hostRate!=44100.&&hostRate!=48000.)return fail("Unsupported native test host rate");
+    const bool effectTest=std::getenv("AWE64_TEST_EFFECT_TYPES")!=nullptr;
     const bool originalMode=(argc==4 && std::strcmp(argv[2],"--original")==0);
     const bool exclusionMode=(argc==3 && std::strcmp(argv[2],"--negative")==0);
     const int originalSeconds=originalMode ? std::atoi(argv[3]) : 0;
@@ -319,6 +320,9 @@ int main(int argc,char** argv) {
             return fail("Active external SF2 state did not roundtrip");
         std::cout<<"REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS\n";
     }
+    V::IEditController* effectController=nullptr;
+    if(effectTest&&component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&effectController))!=S::kResultOk)
+        return fail("Effect test controller unavailable");
     const auto measurementStart=std::chrono::steady_clock::now();
     for(unsigned block=0;block<maxBlocks;++block){
         // Synthetic path retains its short silence check. Original path
@@ -326,6 +330,26 @@ int main(int argc,char** argv) {
         // Startup transients cannot satisfy the musical note gate.
         const bool sendNote=originalMode ? block==startNoteBlock : (block>=15 && block%15u==0u);
         const bool sendNoteOff=originalMode && block==stopNoteBlock;
+        if(effectTest&&block==warmupBlocks) {
+            if(effectController->setParamNormalized(1200,5./7.)!=S::kResultOk||
+               effectController->setParamNormalized(1201,1.)!=S::kResultOk)
+                return fail("Original Creative effect type controller edit failed");
+            S::MemoryStream fx;
+            if(component->getState(&fx)!=S::kResultOk||fx.getSize()!=17||
+               static_cast<unsigned char>(fx.getData()[4])!=3||
+               static_cast<unsigned char>(fx.getData()[11])!=5||
+               static_cast<unsigned char>(fx.getData()[12])!=7)
+                return fail("Original effect type project state invalid");
+            if(effectController->setParamNormalized(1200,4./7.)!=S::kResultOk||
+               effectController->setParamNormalized(1201,2./7.)!=S::kResultOk)
+                return fail("Effect default edit failed");
+            S::MemoryStream restored(fx.getData(),fx.getSize());
+            if(component->setState(&restored)!=S::kResultOk||
+               std::abs(effectController->getParamNormalized(1200)-5./7.)>0.00001||
+               std::abs(effectController->getParamNormalized(1201)-1.)>0.00001)
+                return fail("Effect type project recall failed");
+            std::cout<<"REAL_VST3_EFFECT_TYPE_RECALL_PASS\n";
+        }
         midiEvents.setEnabled(sendNote||sendNoteOff,sendNoteOff);
         if(sendNote)++noteEventsSent;
         if(sendNoteOff)++noteOffEventsSent;
@@ -377,6 +401,7 @@ int main(int argc,char** argv) {
         return fail("Actual VST3 deactivation failed");
     if(component->terminate()!=S::kResultOk)
         return fail("Actual VST3 terminate() failed");
+    if(effectController)effectController->release();
     processor->release();
     component->release();
     factory->release();

@@ -158,6 +158,14 @@ void PresetBrowserView::ChooseRom() {
 }
 ]=])
   set(AWE64_GUI_SRC "${AWE64_GUI_BEFORE}${AWE64_ROM_DIALOG}${AWE64_GUI_AFTER}")
+  # Original effect-type menus now route documented SysEx through the
+  # unchanged Creative guest. No modifications to the approved artwork.
+  string(REPLACE "reverbMenu_->setMouseEnabled(false)" "reverbMenu_->setMouseEnabled(true)" AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  string(REPLACE "chorusMenu_->setMouseEnabled(false)" "chorusMenu_->setMouseEnabled(true)" AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  string(REPLACE "    // Retain the disabled historic presets without claiming DAW recall." [=[
+    if(reverbMenu_)reverbMenu_->setValue(static_cast<float>(std::lround(controller_->getParamNormalized(kReverbType)*7.)));
+    if(chorusMenu_)chorusMenu_->setValue(static_cast<float>(std::lround(controller_->getParamNormalized(kChorusType)*7.)));
+]=] AWE64_GUI_SRC "${AWE64_GUI_SRC}")
   set(AWE64_GUI_COMPAT_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/PresetBrowserViewSdkCompat.cpp")
   file(WRITE "${AWE64_GUI_COMPAT_SOURCE}" "${AWE64_GUI_SRC}")
 
