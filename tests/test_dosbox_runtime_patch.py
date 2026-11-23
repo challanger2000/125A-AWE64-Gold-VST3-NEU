@@ -45,6 +45,13 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertNotIn('| SDL_WINDOW_SHOWN |',r)
         self.assertNotIn('awe64_guest_stop.store(false',r)
         self.assertIn('if(awe64_guest_stop.load',r)
+    def test_sdl2_static_library_cannot_supply_dll_crt_entry(self):
+        original='#if (!defined(HAVE_LIBC) || defined(__WATCOMC__)) && !defined(SDL_STATIC_LIB)'
+        patched=patch.patch_sdl2_static(original)
+        self.assertIn('#define SDL_STATIC_LIB 1',patched)
+        self.assertIn(original,patched)
+        with self.assertRaises(ValueError):
+            patch.patch_sdl2_static(patched)
     def test_native_win_x64_dll(self):
         cond="'$(Configuration)|$(Platform)'=='Release SDL2|x64'"
         s=f'  <PropertyGroup Condition="{cond}" Label="Configuration">\n    <ConfigurationType>Application</ConfigurationType>\n  </PropertyGroup>\n  <PropertyGroup Condition="{cond}">\n    <OutDir>x</OutDir>\n  </PropertyGroup>\n  <ItemDefinitionGroup Condition="{cond}">\n    <ClCompile><PreprocessorDefinitions>WIN32;C_SDL2=1</PreprocessorDefinitions></ClCompile>\n    <Link><AdditionalDependencies>kernel32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>\n  </ItemDefinitionGroup>'

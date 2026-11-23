@@ -201,6 +201,19 @@ extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
 }
 #endif
 '''
+def patch_sdl2_static(s):
+    # The pinned fork statically links SDL2 from vs/sdl2/VisualC/SDL.
+    # However vs/sdl2/src/SDL.c still compiles its own Windows
+    # _DllMainCRTStartup when SDL_STATIC_LIB is undefined, which clashes
+    # with the embedded DLL's proper CRT startup. Disable only SDL's
+    # duplicate entrypoint in this CI working copy; SDL callback/DSP stay.
+    anchor='#if (!defined(HAVE_LIBC) || defined(__WATCOMC__)) && !defined(SDL_STATIC_LIB)'
+    if s.count(anchor)!=1:
+        raise ValueError('SDL2 startup anchor missing/duplicated')
+    return once(s,anchor,
+         '#define SDL_STATIC_LIB 1 /* 125A embedded DLL: SDL2 is a static library */\n'
+         +anchor)
+
 def patch_project(s):
     cond="'$(Configuration)|$(Platform)'=='Release SDL2|x64'"
     pre='  <PropertyGroup Condition="'+cond+'" Label="Configuration">\n'
@@ -238,7 +251,8 @@ PATCHES={
     'src/hardware/mixer.cpp':patch_mixer,
     'src/hardware/mpu401.cpp':patch_mpu,
     'src/gui/sdlmain.cpp':patch_main,
-    'vs/dosbox-x.vcxproj':patch_project
+    'vs/dosbox-x.vcxproj':patch_project,
+    'vs/sdl2/src/SDL.c':patch_sdl2_static
 }
 def main():
     parser=argparse.ArgumentParser()

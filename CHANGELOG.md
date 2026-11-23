@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Doppelte SDL2-DLL-Einstiegsfunktion aus statischer Originallibrary entfernen
+
+- Windows-`Release SDL2|x64` Run **45108821043** zeigt wichtige Verbesserung: Die zuvor ca. 280 fehlenden CRT-Symbole wurden durch explizite `libvcruntime/libucrt/libcmt`-Abhängigkeiten beseitigt. Verbleibende **eine** Link-Sperre: `sdl2.lib(SDL.obj)` definiert selbst `_DllMainCRTStartup`, obwohl SDL2 im Originalprojekt als **StaticLibrary** gelinkt wird und das übergeordnete DOSBox-VST3 bereits den echten CRT-DLL-Startpunkt besitzt.
+- Das Original-`vs/sdl2/src/SDL.c` verwendet `!defined(SDL_STATIC_LIB)` als Schalter für genau diese zusätzliche DllMain-Definition. In der **temporären** DOSBox-Working-Copy nun `#define SDL_STATIC_LIB 1` direkt vor dieser Originalbedingung gesetzt. Ursprüngliche SDL2-Audio-Callbacks und Hardwareemulation bleiben unverändert; Original-Git-Submodul bleibt fixiert.
+- Eindeutiger statischer Regressionstest verhindert das versehentliche Einführen eines zweiten CRT-DLL-Entrypoints. Vollständiger Windows-Build und Gast-/PCM-Tests zu diesem Commit noch offen.
+
 ## 23.11.2026 — Realen Original-DOSBox-X-PCM-Callback und CI-Build-Isolation prüfen
 
 - Der Windows-Guest-Smoke registriert `AWE64_HostRegisterPCM` über C-ABI als echte Python-Hostfunktion. Er verlangt einen vom originalen DOSBox-X-Stereo-Mixer gelieferten PCM-Block, während der Original-DOSBox-Guest startet und kein zusätzliches Windows-Audiohardwaregerät öffnet. Keine künstliche Klangerzeugung; ohne Creative-ROM darf das PCM-Signal hier noch still sein.
