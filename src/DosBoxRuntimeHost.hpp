@@ -125,8 +125,11 @@ public:
         try {
             queues_=std::make_unique<rt::RealtimeQueues>();
             adapter_=std::make_unique<DosBoxHostAdapter>(*queues_);
+            // Original DOSBox-X sblaster.cpp forces SBT_NONE if opt_silent.
+            // A sounding AWE64 must NEVER include the -silent flag.
+            // -nogui and -nomenu suppress UI without disabling hardware.
             argvStorage_={
-                "AWE64DOSBoxRuntime", "-noconfig", "-silent", "-nogui", "-nomenu",
+                "AWE64DOSBoxRuntime", "-noconfig", "-nogui", "-nomenu",
                 "-set", "sblaster sbtype=sbawe",
                 "-set", "sblaster awe32ram=28672",
                 "-set", "sblaster awe32rom="+utf8(rom),

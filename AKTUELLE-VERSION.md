@@ -36,6 +36,14 @@ Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git
 
 Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
 
+## Blockierender Fehler im AWE64-DOSBox-VST3-Start behoben – 23.11.2026
+
+- **Fehler anhand unveränderten Upstreams belegt:** `sblaster.cpp` im gepinnten `turican0/dosbox-x-AWE32` setzt mit `if (control->opt_silent) type = SBT_NONE;` die gesamte Sound-Blaster-Karte außer Betrieb. Das produktive VST3 und beide Original-AWE-Testharnesses verwendeten jedoch fälschlich **`-silent`**.
+- **Konkreter Fehlbefund:** [Originalhardware-Windows-Lauf 45184081242](../../actions/runs/45184081242) endete **FAIL** mit fehlender `EMU8K_TRACE`-Datei. Das vorherige erfolgreiche Starten des DOSBox-Main und des MPU-401-Bus konnte wegen `-silent` niemals einen Sound-Blaster- oder EMU8000-Klangtest ersetzen.
+- **Korrektur:** `-silent` aus `DosBoxRuntimeHost.hpp`, `WindowsAweHardwareSmoke.py` und `WindowsPrivateCreativeGuestSmoke.py` entfernt. Die Oberflächenflags `-nogui -nomenu` bleiben gesetzt. Originaler EMU8000-Code, Creative-Software und P165-GUI unverändert.
+- **Rückfallsperre:** synthetische Linux-/Windows-Regressionen prüfen, dass der echte VST3-Start und beide AWE-Tests `-silent` nicht erneut übergeben.
+- **Nachweisgrenze:** Dieser Commit repariert die Ursache; erst der **neue beendete Windows-Hardwaretest** darf EMU8000-Portschreibvorgänge als bestanden bestätigen. Original-Creative-ROM-/SF2-Klang innerhalb des VST3 bleibt unbewiesen, Entwicklungskennung `0.0.0-dev`, keine Freigabe.
+
 ## Original-EMU8000-AWE32-Hardware-Gate – aktuelle Prüfphase
 
 - Windows-DLL-Integration testet zusätzlich mit einem **synthetisch leeren 1-MiB-ROM** den realen `sblaster sbtype=sbawe`-Start (nicht bloß `sb16`), den originalen DOSBox-X-Befehl `AWEUTIL /S`, seine tatsächlichen EMU8000-Registerwrites an 620h/A20h/E20h und die Rückkehr zum Host. Ein hartes Windows-Prozess-Timeout schützt gegen Hänger.

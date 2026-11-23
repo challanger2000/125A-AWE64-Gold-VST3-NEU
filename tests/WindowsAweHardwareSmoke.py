@@ -20,7 +20,7 @@ REGEX = re.compile(r"^(\d+) ([0-9A-Fa-f]{3,4}) ([0-9A-Fa-f]{4})$")
 
 def original_guest_args(rom: Path):
     return [
-        "AWE64DOSBoxRuntime", "-noconfig", "-silent", "-nogui", "-nomenu",
+        "AWE64DOSBoxRuntime", "-noconfig", "-nogui", "-nomenu",
         "-set", "sblaster sbtype=sbawe",
         "-set", "sblaster awe32ram=28672",
         "-set", "sblaster awe32rom=" + str(rom),

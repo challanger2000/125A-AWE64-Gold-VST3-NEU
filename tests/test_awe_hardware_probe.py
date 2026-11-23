@@ -17,9 +17,20 @@ class TestOriginalAweHardwareProbe(unittest.TestCase):
         self.assertIn("sblaster awe32rom=" + str(Path("C:/PROBE/awe32.raw")), args)
         self.assertIn("midi mpu401=intelligent", args)
         self.assertIn("AWEUTIL /S", args)
+        self.assertNotIn("-silent", args)
+        self.assertIn("-nogui", args)
+        self.assertIn("-nomenu", args)
         self.assertEqual(args[-1], "exit")
         self.assertFalse(any("86box" in x.lower() for x in args))
         self.assertFalse(any("DEMO.EXE" in x for x in args))
+
+    def test_vst3_real_runtime_cannot_mute_its_soundblaster(self):
+        source = (Path(__file__).resolve().parents[1] / "src" /
+                  "DosBoxRuntimeHost.hpp").read_text(encoding="utf-8")
+        self.assertNotIn('"-silent"', source)
+        self.assertIn('"sblaster sbtype=sbawe"', source)
+        self.assertIn('"DEMO.EXE /SBK:SYNTHGM.SF2"', source)
+        self.assertIn('"-nogui"', source)
 
     def test_trace_only_original_awe_hardware_word_writes(self):
         trace = ("# Original trace\nR 123 620 0001\n"

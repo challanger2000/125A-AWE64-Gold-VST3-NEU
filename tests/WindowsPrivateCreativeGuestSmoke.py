@@ -68,7 +68,7 @@ def find_private_bundle(bundle: Path):
 
 def guest_arguments(assets: Path):
     return [
-        "AWE64DOSBoxRuntime", "-noconfig", "-silent", "-nogui", "-nomenu",
+        "AWE64DOSBoxRuntime", "-noconfig", "-nogui", "-nomenu",
         "-set", "sblaster sbtype=sbawe",
         "-set", "sblaster awe32ram=28672",
         "-set", "sblaster awe32rom=" + str(assets / "awe32.raw"),

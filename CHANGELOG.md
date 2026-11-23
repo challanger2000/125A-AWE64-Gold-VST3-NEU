@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Kritischen `-silent`-Klangkiller aus Original-DOSBox-Start entfernt
+
+- **Grundursache:** Gepinnter originaler DOSBox-X-Quellcode `src/hardware/sblaster.cpp` erzwingt bei `control->opt_silent` die Emulation `SBT_NONE`. Dadurch verhinderten sowohl VST3-Produktstart als auch beide Original-EMU8000-Prüfpfade aktiv die Sound-Blaster-/AWE32-Hardware.
+- Originalhardware-Windows-Gate [45184081242](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45184081242) **FAIL**: keine `EMU8K_TRACE`-Datei. Diesen Fehlschlag nicht als Erfolgsnachweis werten.
+- In `src/DosBoxRuntimeHost.hpp`, `tests/WindowsAweHardwareSmoke.py` und `tests/WindowsPrivateCreativeGuestSmoke.py` genau `-silent` entfernt. `-nogui -nomenu` verbleiben; originale Synthese, P165-GUI und Creative DOS unberührt.
+- Datenfreie Windows-/Linux-Testfälle verhindern Rückfall; Hardware- und echter Original-Creative-Klang-PASS erst nach beendeten End-to-End-Läufen deklarieren. Noch kein Release, `0.0.0-dev`.
+
+
 ## 23.11.2026 — CI-Pfadregression an Windows-Pathlib angepasst
 
 - Fehlgeschlagenen Windows-Harness-Test im Job 45183835257 ausgewertet: `Path('C:/PROBE/awe32.raw')` erzeugt auf Windows Backslash-Trennzeichen, der Test erwartete aber hart codierte Forward Slashes. Test benutzt jetzt `str(Path(...))` für das tatsächliche Gastargument, ohne Emulator-/Soundcode anzufassen.
