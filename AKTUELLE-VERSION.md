@@ -3,7 +3,7 @@
 **Produkt:** 125A AWE64 Gold (Windows x64 VST3, DOSBox-X)  
 **Stand:** 23.11.2026  
 **Entwicklungskennung:** `0.0.0-dev`  
-**Release / abgenommenes Instrument:** **NEIN – noch nicht gebaut**  
+**Release / abgenommenes Instrument:** **NEIN – Entwicklungsversion gebaut, Original-Creative-Klang/DAW-Abnahme offen**  
 **Einziger Branch:** `main`  
 **Exakter neuester Quellstand:** [oberster Commit auf main](../../commits/main) (nicht auf eine veraltende SHA im Text verlassen)
 
@@ -36,12 +36,13 @@ Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git
 
 Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
 
-## Original-DOS-Audio-Mixer: neuer Nicht-Stille-End-to-End-Test (Prüfung offen)
+## 23.11.2026 — Nicht-stummer DOSBox-Mixer/PCM-Originalpfad tatsächlich PASS
 
-- `tests/MakeSpeakerCom.py` baut eine kleine **eigene** 16-Bit-DOS-`SPEAKER.COM` (52 Bytes). Dieses Programm steuert **die wirklich emulierten PIT-/PC-Speaker-Ports 43h/42h/61h**, hält den Ton rund eine halbe Sekunde per BIOS-Tick und beendet die Tonhardware sauber. Es stellt **keine** WAV-Daten bereit; der Python-Host erzeugt **keinen** synthetischen Ton.
-- `tests/WindowsSpeakerPcmSmoke.py` startet die gepinnte original-DOSBox-X-Windows-DLL im selben Prozess mit aktiviertem AWE32-Kern und einem **privatdatenfreien Null-ROM**; die eigentliche hörbare PCM-Antwort kann ausschließlich durch den originalen DOSBox-X-PC-Speaker, das Original-Mixer-Callback und `AWE64_HostRegisterPCM` entstehen. Ein harter Kindprozess-Timeout verhindert Hänger.
-- Testabnahme verlangt DOS-Exitcode 0, intern ausschließliches SDL2-Dummy-Audio, originale PCM-Framereihen, mindestens 512 echte PCM-Frames ungleich null und einen messbaren 16-Bit-Peak. Die öffentliche Linux-/Windows-CI testet zusätzlich COM-Maschinencode und DOSBox-Konfiguration **ohne Creative-Originalmaterial**.
-- **Bewertung bewusst getrennt:** Dieser Test beweist bei einem PASS echte nicht-stumme **DOSBox-Mixer-Audioweitergabe vom PC-Speaker**, **nicht** hörbaren Original-EMU8000-Sound, **nicht** Creative-`DEMO.EXE` und **nicht** VST3-Host-PCM. Stand des neuen Tests bis zur abgeschlossenen CI ausdrücklich **offen**, `0.0.0-dev`.
+- **[Windows-Original-DOSBox-X-Lauf 45189311093](../../actions/runs/45189311093): vollständig SUCCESS**. Im Gast lief die eigens erzeugte 52-Byte-16-Bit-`SPEAKER.COM`; sie spielte über **Original-PIT-/PC-Speaker-Ports 43h/42h/61h**, nicht über einen vom Testhost erzeugten Ton.
+- Der **originale DOSBox-X-Mixer** leitete dabei **68.608 Stereoframes** an das ursprüngliche Host-PCM-Callback weiter, davon **17.633 tatsächlich nicht-stumm**, 16-Bit-Spitzenpegel **9.990**. Internes SDL2-Audiogerät nachweislich **dummy**, DOS-Gast exit 0; Original-EMU8000-AWEUTIL-Registerprüfung (9.688 Writes) und echter MPU-401-MIDI-Gast-Test ebenfalls bestanden.
+- **Original-DOSBox-X-Windows-x64-DLL und VST3-Host** mit originaler P165-Oberfläche wurden **im selben erfolgreichen Windows-Lauf** kompiliert und in ein VST3-Bundle zusammengefügt; dessen tatsächliches Spielen innerhalb eines VST3-Hosts/DAW wurde dadurch **nicht** nachgewiesen.
+- Die datenfreien regressiven Python-/C++-Tests sind auf Linux und Windows im Release-Modus **[45189310952](../../actions/runs/45189310952) erfolgreich**; die Versionsprüfung **[45189310913](../../actions/runs/45189310913) erfolgreich**.
+- **Abgrenzung:** Der hörbare Signalursprung war **PC-Speaker-Hardware**, nicht der EMU8000. Das 1-MiB-ROM war synthetisch mit Nullen gefüllt. **Original-Creative-`DEMO.EXE`, echtes `awe32.raw`, `SYNTHGM.SF2` und deren hörbarer AWE-Klang im VST3 bleiben unbewiesen.** Keine Schutzdaten in öffentlicher CI; `0.0.0-dev` und Release-**NO-GO**.
 
 ## Originalhardware erstmals nachweislich aktiv – Windows-PASS 23.11.2026
 

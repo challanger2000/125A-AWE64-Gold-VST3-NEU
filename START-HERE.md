@@ -11,6 +11,11 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **Submodul:** `third_party/dosbox-x-AWE32` auf `f3a95b9f19a7f9863295e6481f271cf04733c635` gepinnt. **Einziger Branch:** `main`.
 
+## Zusätzlicher tatsächlich bestandener Original-DOS-Audio-Test (23.11.2026)
+
+- **[Windows 45189311093](../../actions/runs/45189311093) PASS:** echtes PC-Speaker-PIT-Tonprogramm innerhalb des originalen DOSBox-X-Gasts, **68.608 originale Mixer-PCM-Stereoframes**, **17.633 nicht-stumm**, PCM16-Peak **9.990** und ausschließlich internem SDL2-Dummy-Audiogerät. Original-EMU8000-Registerwrites und MPU401 weiter PASS; Host/Runtime-Windows-VST3-Bundle gebaut.
+- **[Linux/Windows 45189310952](../../actions/runs/45189310952) PASS:** Originalgerät-spezifische synthetische Tests. Ein PC-Speaker ist **nicht** der EMU8000 und beweist **keinen** echten Creative-SF2-Sound im VST3. Release bleibt NO-GO.
+
 ## Neue echte Hardware-Abnahme (23.11.2026)
 
 - **[Windows-Prüflauf 45186047184](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45186047184) vollständig erfolgreich:** Original-DOSBox-X startet jetzt die echte AWE32/EMU8000-Hardware; 9.688 tatsächliche EMU8000-Portschreibvorgänge durch DOSBox-`AWEUTIL /S` nachgewiesen. Originaler MPU-401, separater SDL2-Dummy-Audioweg, kontrollierter Stop und Windows-VST3-Bundle-Build ebenfalls PASS. In öffentlicher CI nur synthetisches Nullen-ROM, kein Original-Creative-Klang.

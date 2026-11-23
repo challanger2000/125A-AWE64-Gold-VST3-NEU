@@ -1,11 +1,11 @@
 # Änderungsverlauf
 
-## 23.11.2026 — Echten originalen DOSBox-X-Mixer mit hörbarem DOS-Hardware-Signal prüfen
+## 23.11.2026 — Echte nicht-stumme Original-DOSBox-X-Mixer-Audioausgabe + Windows-VST3-Bundle: PASS
 
-- Neue getrennte Windows-Hardware-PCM-Prüfung `tests/WindowsSpeakerPcmSmoke.py`: Erzeugt ein eigenes 52-Byte-DOS-`SPEAKER.COM` aus `MakeSpeakerCom.py`, das **echte PC-Speaker/PIT-Ports im Original-DOSBox-X** anspricht. Der Testhost erzeugt keine Klänge; er misst ausschließlich den originalen PCM-Callback im laufenden Emulator.
-- Harte Prüfgates: mindestens 1.024 PCM-Stereoframes, 512 nicht-stumme PCM-Frames, Mess-Peak >=128, bestätigter interner SDL2-Dummy-Ausgang, DOS-Gast-Exitcode 0. Kindprozess mit Timeout; No-Creative/Fake-ROM ausschließlich zur öffentlichen CI.
-- Neue Windows-Gateprüfung in `windows-dosbox-runtime.yml` sowie datenfreie `test_speaker_probe.py`-Regression in Linux/Windows-`audio-bridge-tests.yml`. Bei Fehler explizit FAIL, **vor beendeter CI nicht als PASS bezeichnen**.
-- Klare Abgrenzung: selbst bei bestandenem PC-Speaker-Test kein Nachweis von Creative-`DEMO.EXE`-, `SYNTHGM.SF2`- oder originalem EMU8000-Klang innerhalb des VST3. Keine Freigabe.
+- **[Windows-Lauf 45189311093](../../actions/runs/45189311093) vollständig SUCCESS**. Realer originaler DOSBox-X-SDL2-Windows-Emulator führt ein unabhängiges 52-Byte-16-Bit-DOS-Programm aus, das **echte PC-Speaker-/PIT-Hardwareports** steuert. Der original DOSBox-X-Audiomixer hat dabei **68.608 Stereo-PCM-Frames** geliefert, darunter **17.633 nicht-stumme Frames**, Peak PCM16 **9.990**; nur internes SDL2-Dummy-Audiogerät, DOS-Gast-Exit 0.
+- Im selben Run auch **9.688 echte EMU8000-Registerwrites** durch `AWEUTIL /S`, originaler MPU-401-16-Bit-MIDI-Test, Gaststart/Stop und Windows-x64-VST3-Bundle-Build mit originaler DOSBox-X-DLL **PASS**.
+- **[Linux- und Windows-Regressionslauf 45189310952](../../actions/runs/45189310952): SUCCESS**, [Versionsprüfung 45189310913](../../actions/runs/45189310913): SUCCESS.
+- **Beweisgrenze:** Klangquelle dieser öffentlichen, komplett datenfreien Prüfung war **DOS-PC-Speaker**, nicht Creative-EMU8000. Kein echter Creative-`DEMO.EXE`-/`SYNTHGM.SF2`-/ROM-Klang im VST3 getestet; noch keine echte VST3-Host-/Studio-Pro-Abnahme. Weiterhin `0.0.0-dev`, kein Release.
 
 
 ## 23.11.2026 — 9.688 echte EMU8000-Registerwrites / Windows-VST3-Bundle PASS
