@@ -18,7 +18,8 @@ Es gibt nur **`main`** als Entwicklungsbranch. Keine neuen Forschungs-, Phasen- 
 gui/                     Originale P165/P007Z-Oberfläche und Grafiken
 third_party/dosbox-x-AWE32  Fixierter Upstream-DOSBox-X-AWE32-Fork (Git-Submodul)
 docs/                    Herkunft, technische Grenzen, Abnahmebedingungen
-src/                     Künftiger gemeinsamer VST3-/DOSBox-Adapter
+src/                     Windows-VST3-Host und originaler DOSBox-X-DLL-Loader (noch nicht klanggeprüft)
+integration/             Gepinnter DOSBox-X-Quellpatch, originale MPU-401-MIDI- und PCM-Schnittstellen
 ```
 
 **Die gesicherte GUI ist zunächst Quellmaterial, keine nachgewiesene fertige DOSBox-X-VST3-Integration.** Der bisherige 86Box-Win95-P007-Code und die native P009/AWE32Emu-Anwendung werden **nicht** als Runtime übernommen.

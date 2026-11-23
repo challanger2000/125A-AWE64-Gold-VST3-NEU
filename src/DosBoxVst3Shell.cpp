@@ -46,27 +46,138 @@ tresult PLUGIN_API DosBoxVst3Shell::initialize(FUnknown* context) {
 }
 tresult PLUGIN_API DosBoxVst3Shell::setActive(TBool state) {
     if(state) {
-        // Guardrail: not a functioning plugin until original DOSBox-X and
-        // Creative DOS execution are REALLY implemented.
-        return kResultFalse;
+        if(runtime_)return kResultOk;
+        // Host activation is non-RT: check the authentic private Creative
+        // executable, private ROM, valid SF2 and compiled DOSBox-X DLL.
+        // Never substitute a synthetic renderer or silently ignore assets.
+        try {
+            auto engine=std::make_unique<integration::DosBoxRuntimeHost>();
+            const auto ownBinary=engine->pluginBinaryPath();
+            if(ownBinary.empty() || !engine->begin(
+                ownBinary,integration::DosBoxRuntimeHost::privateAssetsDir(ownBinary))) {
+                guestStatus_.store(-1,std::memory_order_release);
+                return kResultFalse;
+            }
+            runtime_=std::move(engine);
+            guestStatus_.store(1,std::memory_order_release);
+            initialProgramSent_=false;
+            absoluteSamplePosition_=0;
+        } catch (...) {
+            guestStatus_.store(-1,std::memory_order_release);
+            return kResultFalse;
+        }
+        return SingleComponentEffect::setActive(true);
     }
+    if(runtime_) {
+        runtime_->stop();
+        runtime_.reset();
+    }
+    guestStatus_.store(0,std::memory_order_release);
     return SingleComponentEffect::setActive(false);
 }
 tresult PLUGIN_API DosBoxVst3Shell::canProcessSampleSize(int32 size) {
     return size==kSample32?kResultTrue:kResultFalse;
 }
 tresult PLUGIN_API DosBoxVst3Shell::setProcessing(TBool) {return kResultOk;}
+tresult PLUGIN_API DosBoxVst3Shell::setupProcessing(ProcessSetup& setup) {
+    // Do not play distorted/pitched audio at a mismatched host sample rate.
+    // 48000/96000 Hz are NOT falsely advertised until true resampling exists.
+    if(std::abs(setup.sampleRate-44100.0)>0.5)return kResultFalse;
+    return SingleComponentEffect::setupProcessing(setup);
+}
 tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
-    // This method is NOT a synthesizer. It cannot claim AWE/EMU8000 audio.
-    // Do not submit this development binary for end-user installation.
-    if(data.outputs)for(int32 i=0;i<data.numOutputs;i++){
-        const auto& out=data.outputs[i];
-        if(!out.channelBuffers32)continue;
-        for(int32 ch=0;ch<out.numChannels;ch++)
-            if(out.channelBuffers32[ch] && data.numSamples>0)
-                std::fill_n(out.channelBuffers32[ch],data.numSamples,0.f);
+    // No DOSBox/Creative emulator on the DAW realtime callback.
+    // Only bounded SPSC MIDI enqueue and actual original mixer PCM dequeue.
+    if(!runtime_)return kResultFalse;
+    auto& engine=*runtime_;
+    if(engine.finished()) {
+        guestStatus_.store(-2,std::memory_order_release);
+        return kResultFalse; // original DOS guest exited; no fake playback
     }
-    return kResultFalse;
+    if(engine.running())guestStatus_.store(2,std::memory_order_release);
+
+    if(data.inputParameterChanges) {
+        for(int32 i=0;i<data.inputParameterChanges->getParameterCount();++i) {
+            auto* q=data.inputParameterChanges->getParameterData(i);
+            if(!q || q->getPointCount()<1)continue;
+            int32 offset=0;ParamValue normalized=0.;
+            if(q->getPoint(q->getPointCount()-1,offset,normalized)!=kResultOk)
+                continue;
+            const double value=std::clamp(normalized,0.,1.);
+            switch(q->getParameterId()) {
+                case kProgram:
+                    program_.store(static_cast<std::uint8_t>(std::lround(value*127.)),
+                                   std::memory_order_release);break;
+                case kBank:
+                    bank_.store(static_cast<std::uint8_t>(std::lround(value*127.)),
+                                std::memory_order_release);break;
+                case kMaster:
+                    master_.store(static_cast<float>(value),std::memory_order_release);
+                    break;
+                default:break;
+            }
+        }
+    }
+    const auto bank=bank_.load(std::memory_order_acquire);
+    const auto program=program_.load(std::memory_order_acquire);
+    if(!initialProgramSent_||lastBank_!=bank||lastProgram_!=program) {
+        // Bank select MSB/LSB and ProgramChange reach ORIGINAL Creative DOS
+        // SF2LIB via the real MPU-401 I/O controller, not direct EMU writes.
+        bool accepted=true;
+        if(!initialProgramSent_||lastBank_!=bank){
+            accepted=engine.sendMidi({absoluteSamplePosition_,0xB0,0,0,3})&&accepted;
+            accepted=engine.sendMidi({absoluteSamplePosition_,0xB0,32,bank,3})&&accepted;
+        }
+        accepted=engine.sendMidi({absoluteSamplePosition_,0xC0,program,0,2})&&accepted;
+        if(accepted) {
+            initialProgramSent_=true;lastBank_=bank;lastProgram_=program;
+        }
+    }
+    if(data.inputEvents){
+        const int32 count=data.inputEvents->getEventCount();
+        for(int32 i=0;i<count;++i){
+            Event event{};
+            if(data.inputEvents->getEvent(i,event)!=kResultOk)continue;
+            std::uint8_t status=0,note=0,velocity=0;
+            int32 channel=0,offset=0,pitch=0;
+            if(event.type==Event::kNoteOnEvent){
+                const auto& on=event.noteOn;
+                channel=on.channel;offset=on.sampleOffset;pitch=on.pitch;
+                status=0x90u;
+                velocity=static_cast<std::uint8_t>(std::lround(
+                    std::clamp(double(on.velocity),0.,1.)*127.));
+            } else if(event.type==Event::kNoteOffEvent){
+                const auto& off=event.noteOff;
+                channel=off.channel;offset=off.sampleOffset;pitch=off.pitch;
+                status=0x80u;
+                velocity=static_cast<std::uint8_t>(std::lround(
+                    std::clamp(double(off.velocity),0.,1.)*127.));
+            } else continue;
+            if(channel<0||channel>15||pitch<0||pitch>127)continue;
+            note=static_cast<std::uint8_t>(pitch);
+            const auto when=absoluteSamplePosition_+
+                static_cast<std::uint64_t>(std::clamp(offset,0,data.numSamples));
+            (void)engine.sendMidi({when,static_cast<std::uint8_t>(status|channel),
+                                   note,velocity,3});
+        }
+    }
+    if(data.outputs&&data.numOutputs>0&&data.outputs[0].channelBuffers32&&
+       data.outputs[0].numChannels>=2&&data.numSamples>0){
+        auto* left=data.outputs[0].channelBuffers32[0];
+        auto* right=data.outputs[0].channelBuffers32[1];
+        if(left&&right){
+            // Initial version: the original DOSBox mixer runs at 44100 Hz.
+            // setupProcessing rejects other rates until verified resampling.
+            engine.readAudio(left,right,static_cast<std::size_t>(data.numSamples));
+            const float gain=master_.load(std::memory_order_acquire);
+            for(int32 i=0;i<data.numSamples;i++){
+                left[i]*=gain;right[i]*=gain;
+            }
+        }
+    }
+    if(data.numSamples>0)
+        absoluteSamplePosition_+=static_cast<std::uint64_t>(data.numSamples);
+    return kResultOk;
 }
 tresult PLUGIN_API DosBoxVst3Shell::setParamNormalized(ParamID id,ParamValue value) {
     if(!std::isfinite(value)||value<0.||value>1.)return kInvalidArgument;
@@ -123,8 +234,20 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
     if(!name||std::strcmp(name,"P007P165Panel")!=0)return nullptr;
     return new AWE125::PresetBrowserView({0,0,1000,708},this,
         originalMidiCatalog_,unusedFmCatalog_,std::string{},
-        [](){return std::string("DOSBOX-X: ORIGINALER CREATIVE-DOS-TREIBER NICHT GESTARTET");},
-        [](){return std::string("ENTWICKLUNGSBUILD | AUDIOENGINE FEHLT");},
+        [this](){
+            const int s=guestStatus_.load(std::memory_order_acquire);
+            return s==2 ? std::string("DOSBOX-X: ORIGINALER CREATIVE-DOS-GAST AKTIV") :
+                   s==1 ? std::string("DOSBOX-X: ORIGINALER CREATIVE-DOS-GAST STARTET") :
+                   s==-1 ? std::string("DOSBOX-X: ORIGINAL-DATEIEN ODER DLL FEHLEN") :
+                   s==-2 ? std::string("DOSBOX-X: GAST IST BEENDET") :
+                           std::string("DOSBOX-X: GAST NICHT GESTARTET");
+        },
+        [this](){
+            const int s=guestStatus_.load(std::memory_order_acquire);
+            return s==2 ? std::string("ORIGINAL DOSBOX-X / CREATIVE SF2LIB LAEUFT") :
+                   s==1 ? std::string("ORIGINAL DOSBOX-X STARTET") :
+                           std::string("AWE64 GOLD | KEIN AUDIO-GAST");
+        },
         [](const std::string&){return false;},
         [](const std::string&){return false;},
         [](){return std::string{};},

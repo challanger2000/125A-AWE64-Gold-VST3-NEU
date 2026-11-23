@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — VST3-Host mit tatsächlich eingebetteter DOSBox-X-Windows-DLL verbinden
+
+- `src/DosBoxRuntimeHost.hpp`: Windows-Host lädt ausschließlich eine echte `AWE64DOSBoxRuntime.dll` **innerhalb desselben VST3-Bundles**. Prüft private Original-AWE-Wave-ROM-Datei (exakt 1 MiB), Original-Creative-DOS-`DEMO.EXE` und privates `SYNTHGM.SF2` vor jeder Aktivierung. Kein extern gestarteter Emulatorprozess.
+- Kein gefälschter DSP: Gaststart auf separatem Worker-Thread, originale MPU-401-Bytes via SPSC, ausschließlich echtes DOSBox-X-Mixer-PCM per SPSC zum Audio-Callback. Bank/Programchange und 16 MIDI-NoteOn/Off-Kanäle werden über denselben Guest-UART übertragen.
+- Host bei ≠44,1 kHz noch absichtlich abweisend, bis echte Sampleratenkonvertierung gemessen wurde. Mehrfachinstanzen bis zur DOSBox-Global-State-Isolation absichtlich abweisend. Der originalen GUI wurde kein neues Design gegeben.
+- CMake und Windows-Actions bauen den Host; Windows-DOSBox-Workflow führt beide DLLs **im VST3-Bundle** zusammen. Zum Commit **keine** Aussage über bestandene Host-/Gast-Audio- oder Exit-/Shutdown-Tests möglich.
 ## 23.11.2026 — Geordneter In-Process-Gaststopp als Original-DOSBox-Signal
 
 - AWE64_RequestStop als externes Windows-DLL-ABI implementiert. Setzt atomare Stop-Anforderung, geprüft am ursprünglichen DOSBox-X-GFX_Events-Dispatcher; wirft dessen schon vorhandenes Shutdown-Signal auf dem Emulator-Thread. Kein `exit()` in der DAW und keine externe Anwendung.

@@ -10,13 +10,13 @@
 
 | Bereich | Aktueller Stand | Referenz |
 | --- | --- | --- |
-| GUI | **Gesichert, nicht mit neuer Runtime verbunden** | P165/P007Z, Quellcommit `988b04aa2b6a02884d17fc792244919e7f9384d4`; 73 % Regler-Abdunklung, originale Grafiken |
+| GUI | **Gesichert; Windows-VST3-Controller mit internem Original-DOSBox-X-Ladepfad verdrahtet, Host-Klangprüfung ausstehend** | P165/P007Z, Quellcommit `988b04aa2b6a02884d17fc792244919e7f9384d4`; 73 % Regler-Abdunklung, originale Grafiken |
 | Originalfrontplatte | **Gesichert, Git-Hash geprüft** | Git-Blob `7e57ef8e0c90d84fa4c951bea7815b0233762ca7` |
 | DOSBox-X/AWE32 | **Als Quell-Submodul eingebunden, noch nicht im VST3 ausgeführt** | `turican0/dosbox-x-AWE32`, `masterAWE32`, `f3a95b9f19a7f9863295e6481f271cf04733c635` |
 | Creative-DOS-Treiber | **Integrationsnachweis im neuen Plugin ausstehend** | Originale Creative-DOS-Software ist Ziel, keine rekonstruierte Ersatztreiberlogik |
 | ROM, SYNTHGM.SBK, SF2 | **Private Testdaten in ChatGPT-Dateibibliothek auffindbar** | [TEST-ASSET-LOCATION.md](docs/TEST-ASSET-LOCATION.md); keine öffentlichen Binärdaten |
 | Echtzeit-Audio-/MIDI-Transport | **SPSC-Queue-Quellcode implementiert; Linux- und Windows-C++20-Tests PASS** (FIFO, Overflow, Underrun, getrennte Instanzen, 200.000 übertragene Nachrichten im Zweithread); tatsächliche DOSBox/EMU8000-Klangfunktion NICHT GEPRÜFT | `src/RealtimeQueues.hpp`, `tests/RealtimeQueuesTest.cpp` |
-| Windows-x64-VST3 DEV-Shell | **Windows-MSVC kompiliert**, Original-P165-GUI enthalten; Aktivierung absichtlich blockiert solange kein DOSBox-Gast aktiv. Kein Validator-/Klangerfolg, kein Endprodukt. | `src/DosBoxVst3Shell.*` |
+| Windows-x64-VST3 DEV-Shell | **Host-Code für echte, im VST3 enthaltene DOSBox-X-Windows-DLL programmiert.** Originaldateien und Worker-Lebensdauer werden geprüft. Aktivierung scheitert ohne PRIVATE/ROM/Creative DEMO/SF2, echte Gast-/Host-Klangprüfung ausstehend. Der nächste CI-Build prüft MSVC-Kompilierung und gemeinsame Bundle-Struktur; kein Endprodukt. | `src/DosBoxVst3Shell.*` |
 | Creative-DOS-Bankformat-Vorstufe | **SF2-2.01-Formatversionsanpassung an SF2LIB 3.01 implementiert; synthetische Linux-/Windows-C++20-Tests PASS (Actions 45101292255); lokale Original-SF2-Metadatenprüfung PASS; noch nicht an DOS-Gast angebunden** | `src/Sf2CreativeDosCompatibility.hpp` |
 | Original-Creative-DOS-Gast-Kommunikation | **Protokoll/Quellvorbereitung implementiert**, kein DOSBox-I/O-Handler eingebunden und kein DOS-Guest-Binary gebaut; Mailbox-/Patchtests unter Linux und Windows PASS (CI 45101919395); Creative-DOS-API-Dispatch-Mock nach Windows-Intrinsic-Korrektur Linux+Windows PASS (Actions 45102214476); ausschließlich synthetische API-Mocks, kein echter Gastprogramm-Test | `src/CreativeDosMailbox.hpp`, `guest/AWE64_BRIDGE.H` |
 | Funktionsfähiges Windows-x64-VST3 | **Noch nicht gebaut** | Kein freigegebener Installer, kein bestandener Hosttest |

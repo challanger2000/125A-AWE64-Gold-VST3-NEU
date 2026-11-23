@@ -89,13 +89,18 @@ if(AWE64_BUILD_VST3_DEV)
     src/DosBoxVst3Shell.cpp
     src/DosBoxVst3Factory.cpp
     src/RealtimeQueues.hpp
+    src/DosBoxRuntimeHost.hpp
+    integration/DosBoxHostAdapter.hpp
+    integration/AWE64_DOSBOX_ABI.h
+    src/CreativeDosMailbox.hpp
     gui/PresetBrowserView.h "${AWE64_GUI_COMPAT_SOURCE}"
     gui/PresetCatalog.h gui/PresetBrowserModel.h gui/IbkBank.h
     "${AWE64_VST3SDK}/public.sdk/source/vst/vstsinglecomponenteffect.cpp"
     "${AWE64_VST3SDK}/public.sdk/source/main/dllmain.cpp")
   target_include_directories(AWE64GoldDOSBoxDev PRIVATE
     "${AWE64_VST3SDK}" "${CMAKE_CURRENT_SOURCE_DIR}/gui"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/integration")
   target_link_libraries(AWE64GoldDOSBoxDev PRIVATE sdk vstgui_support comdlg32)
   target_compile_features(AWE64GoldDOSBoxDev PRIVATE cxx_std_20)
   smtg_target_configure_version_file(AWE64GoldDOSBoxDev)
