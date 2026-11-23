@@ -1,6 +1,6 @@
 # 125A AWE64 Gold VST3 — Neustart
 
-**Projektstatus:** Quellcode-Neuaufbau. **Noch kein lauffähiges oder freigegebenes VST3.**
+**Projektstatus:** Original-DOSBox-X-In-Process-DLL und Windows-VST3-Bundle mit originaler P165-GUI erfolgreich gebaut; **kein abgenommenes, musikalisch funktionsfähiges Instrument und kein Release.** Siehe [AKTUELLE-VERSION.md](AKTUELLE-VERSION.md).
 
 ## Festgelegte Architektur
 
@@ -22,7 +22,7 @@ src/                     Windows-VST3-Host und originaler DOSBox-X-DLL-Loader (n
 integration/             Gepinnter DOSBox-X-Quellpatch, originale MPU-401-MIDI- und PCM-Schnittstellen
 ```
 
-**Die gesicherte GUI ist zunächst Quellmaterial, keine nachgewiesene fertige DOSBox-X-VST3-Integration.** Der bisherige 86Box-Win95-P007-Code und die native P009/AWE32Emu-Anwendung werden **nicht** als Runtime übernommen.
+**Die gesicherte GUI und die originale DOSBox-X-AWE32-DLL sind tatsächlich im selben Windows-VST3-Bundle kompiliert. Vollständige Original-Creative-DOS-/ROM-/SF2-Klangabnahme steht noch aus.** Der bisherige 86Box-Win95-P007-Code und die native P009/AWE32Emu-Anwendung werden **nicht** als Runtime übernommen.
 
 ## Entwicklungs- und Freigaberegeln
 

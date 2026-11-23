@@ -8,6 +8,7 @@
 - **Originale Creative-DOS-Software** zur Ansteuerung der emulierten EMU8000-Hardware verwenden; keinen nachgebauten Creative-Treiber oder nativen SF2-Player als stillschweigenden Ersatz.
 - **Primäre MIDI-Architektur ab 23.11.2026:** DAS ORIGINALE Creative-DOS-DEMO.EXE liest UART-Port 330h/331h. Deshalb MIDI vom VST3 in die **originale MPU-401-Eingangsqueue der gepinnten DOSBox-X** einspeisen (AWE64_HostRegisterMidi). Den älteren BEE0/BEF0-Patch eines DOS-Gastprogramms nur als nicht gleichzeitig aktives, experimentelles Fallback behandeln. Nicht beide auf denselben SPSC-MIDI-Consumer schalten.
 - Keine 86Box-PC-VM, kein Windows-95-Gast, keine native P009-AWE32Emu-Ersatz-Engine. Der im DOSBox-X-Fork enthaltene 86Box-abgeleitete **EMU8000-Chipcode** gehört ausdrücklich zur erlaubten Grundlage.
+- **Aktueller Originalkern:** `integration/patch_dosbox_runtime.py` erzeugt nur im Windows-CI-Arbeitsverzeichnis Quellpatches (Original-DOSBox-X-MPU401/EMU8000/Mixer/SDL2), das Submodul bleibt fest gepinnt. Die DOSBox-X-DLL wird im VST3-Bundle neben dem Host geladen. Der originale Creative-DOS-Guest muss für echte Klangtests privat bereitstehen. SDL-Fenster und echter Windows-Audioausgang dürfen im VST3 **nicht** erscheinen; nur P165-GUI und Audio über DAW.
 - **Originale P165/P007Z-Hardware-GUI** in `gui/` erhalten: 1000×708-Frontplatte, originale Hardware-Reglergrafiken, nachträglich abgedunkelte Reglergruppen `CColor(7,11,16,186)` (73 %). Kein neues Design.
 
 ## Einfache Entwicklung, verbindlicher Versionsstand
@@ -15,12 +16,13 @@
 - Bei **jeder** Änderung an Code, GUI, Buildsystem oder Submodul **im selben Commit** `AKTUELLE-VERSION.md` und `CHANGELOG.md` aktualisieren. Versionsworkflow darf nicht umgangen werden.
 - `AKTUELLE-VERSION.md` nennt die **neueste tatsächlich nachgewiesene Version** und den Prüfstand. `CHANGELOG.md` führt Änderungen und Prüfergebnisse chronologisch. Commit-Head im Zweifel direkt aus Git ermitteln.
 - Keine fingierten erfolgreichen Tests, keine Version für bloß erfolgreiche Kompilierung als fertiges Plugin ausgeben. `implementiert`, `kompiliert`, `getestet`, `abgenommen` sind unterschiedliche Zustände.
-- Zum 23.11.2026 ist `0.0.0-dev` nur die Entwicklungskennung: **keine funktionsfähige DOSBox-X-VST3-Integration nachgewiesen**.
+- Zum 23.11.2026 ist `0.0.0-dev` nur die Entwicklungskennung. **DOSBox-X-DLL/VST3-Bundle und ein DOS-Shell-Boot sind gebaut und getestet, aber Original-Creative-DOS-SF2/EMU8000-Audio in diesem VST3 noch nicht nachgewiesen.**
 - Konsistenz von Plugin-Metadaten, Installer, Release-ZIP, Git-Tag, Dokumentation und Plugin-Anzeige vor einer tatsächlichen Releasefreigabe herstellen.
 
 ## Private Originaldaten
 - `awe32.raw` (ROM), `SYNTHGM.SBK` und zahlreiche SF2 befinden sich in der **privaten ChatGPT-Dateibibliothek**. Exakte Dateinamen/Größen in `docs/TEST-ASSET-LOCATION.md`. **Vor erneuter Uploadbitte zuerst dort suchen.**
 - Codex, GitHub Actions und externe Hosts haben **nicht automatisch Zugriff** auf diese private Bibliothek. Eine lokale Testumgebung benötigt gesonderten **privaten** Zugriff.
+- Wichtig: die originale **Creative-SF2LIB-`SYNTHGM.SF2` (42.726 Bytes)** aus `DOS/DEMO` ist **nicht** identisch zur vorhandenen `SYNTHGM.SBK` (34.832 Bytes); `DEMO.EXE` erwartet tatsächlich **`/SBK:`**, nicht das irreführend dokumentierte `/SF2:`.
 - **Niemals** proprietäre Creative-ROMs, originale Creative-Treiberprogramme, private SF2/SBK, Windows-Images oder private Testdaten in das öffentliche GitHub, öffentliches CI, Artefakte oder Logs schreiben. `PRIVATE/` ist gitignoriert.
 - GPL und Rechte an Creative-Software vor jeder Veröffentlichung klären.
 

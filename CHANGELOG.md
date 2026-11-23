@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Verbindlichen Quell-/Prüfstand für Codex und spätere Chats konsolidiert
+
+- `AKTUELLE-VERSION.md` komplett neu strukturiert: **gebaut/real getestet**, **nur implementiert** und **NO-GO bis Original-AWE-Sound** strikt getrennt. Exakte gepinnte Versionen, Referenz-CI-Läufe und private Datenfundorte stehen an einer Stelle.
+- `START-HERE.md`, `README.md`, `AGENTS.md` auf denselben tatsächlich nachgewiesenen Stand gebracht; keine veraltete Behauptung mehr, die originale DOSBox-X-DLL sei noch überhaupt nicht als VST3-Bundle gebaut worden.
+- Entwicklungskennung bleibt `0.0.0-dev`. **Ungeprüfte Audiofunktionen und der ausstehende Creative-DOS-Gaststart sind keine produktive Freigabe.**
+
 ## 23.11.2026 — Echter MPU-401-Hardwarepfad in 16-bit-DOS-Guest (unabhängiger Integrationstest)
 
 - Eigenes winziges DOS-`MPUPROBE.COM` ohne Creative-Dateien (Assembler in `tests/MakeMpuCom.py`): spricht tatsächliche emulierte MPU-401-UART-Ports 331h/330h an, wartet auf ACK, liest drei MIDI-Bytes und schreibt die gelesenen Bytes mit originalen DOS-INT21-Funktionen in `MIDI.BIN`.
