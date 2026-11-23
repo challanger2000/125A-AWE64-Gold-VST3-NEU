@@ -17,6 +17,10 @@ if(BUILD_TESTING)
   add_executable(awe64_creative_dos_mailbox_test tests/CreativeDosMailboxTest.cpp)
   target_include_directories(awe64_creative_dos_mailbox_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   add_test(NAME AWE64_CreativeDosMailbox COMMAND awe64_creative_dos_mailbox_test)
+  add_executable(awe64_creative_dos_dispatch_test tests/CreativeDosDispatchTest.c)
+  target_include_directories(awe64_creative_dos_dispatch_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/guest")
+  set_target_properties(awe64_creative_dos_dispatch_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON)
+  add_test(NAME AWE64_CreativeDosDispatch COMMAND awe64_creative_dos_dispatch_test)
 endif()
 
 # The DEV plugin is deliberately not a product release: VST3 activation
