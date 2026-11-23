@@ -19,6 +19,7 @@ typedef unsigned int (AWE64_CALL *AWE64_PullMidiFn)(void*,unsigned char*,unsigne
 typedef void (AWE64_CALL *AWE64_RegisterMidiFn)(void*,AWE64_PullMidiFn);
 typedef int (AWE64_CALL *AWE64_StartGuestFn)(int,char**);
 typedef void (AWE64_CALL *AWE64_RequestStopFn)(void);
+typedef int (AWE64_CALL *AWE64_IsInternalAudioOnlyFn)(void);
 #ifdef __cplusplus
 }
 #endif

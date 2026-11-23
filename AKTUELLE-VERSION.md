@@ -33,6 +33,8 @@
 
 - **Headless host (Quellstand):** originale SDL-Emulationsfenster der internen DOSBox-X-DLL mit `SDL_WINDOW_HIDDEN` angelegt, Startargumente `-nogui -nomenu` ergänzt. Nur originale VST3-P165-Bedienoberfläche sichtbar. Windows-Gast-Regression bei diesem Commit noch ausstehend.
 
+- **DAW-Audioisolierung (neuer Stand, CI noch offen):** interne DOSBox-X-SDL2-Laufzeit über originalen SDL-`dummy`-Treiber statt zusätzlicher Windows-Audiohardware. Der originale DOSBox-Mixer erzeugt weiter PCM, das als einziger Ausgang im VST3 erscheint. Windows-Prozess-Smoke verlangt einen nachweislich laufenden Dummy-SDL-Treiber; ohne diesen Test kein PASS.
+
 ## Unveränderliche Versionsregeln
 
 1. **Diese Datei ist die zentrale Versions- und Statusreferenz.** Sie wird im **selben Commit** wie jede technische Änderung an `src/`, `gui/`, dem DOSBox-X-Submodul oder dem VST3-Buildsystem aktualisiert. Ein GitHub-Actions-Check prüft, ob sie bei entsprechenden Änderungen mitgeändert wurde.

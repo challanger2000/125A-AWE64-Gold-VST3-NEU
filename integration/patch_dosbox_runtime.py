@@ -70,6 +70,30 @@ def patch_mixer(s):
     s=once(s,'#define MIXER_SSIZE 4',
         '#ifdef AWE64_VST3_RUNTIME\n#include <atomic>\n#endif\n'+PCM_BRIDGE+
         '\n#define MIXER_SSIZE 4')
+    # SDL2 is statically linked into this private DOSBox DLL. Switch ONLY
+    # this runtime's SDL audio backend to dummy so Studio Pro/ASIO never gets
+    # a second hardware output. Dummy runs the same original callback clock.
+    snd='    if (mixer.nosound) {'
+    s=once(s,snd,'''#ifdef AWE64_VST3_RUNTIME
+    if(!mixer.nosound && SDL_AudioInit("dummy")<0) {
+        LOG(LOG_MISC,LOG_ERROR)("125A AWE64: internal SDL dummy audio unavailable: %s",SDL_GetError());
+        mixer.nosound=true;  // fail closed, never open physical output
+    }
+#endif
+'''+snd)
+    status='extern "C" __declspec(dllexport) int __cdecl AWE64_IsInternalAudioOnly() noexcept {'
+    s=once(s,'#define MIXER_SSIZE 4', '''#define MIXER_SSIZE 4
+#ifdef AWE64_VST3_RUNTIME
+// Windows host can verify the real internal dummy device while DOSBox runs.
+extern "C" __declspec(dllexport) int __cdecl AWE64_IsInternalAudioOnly() noexcept {
+#ifdef C_SDL2
+    const char* name=SDL_GetCurrentAudioDriver();
+    return name && strcmp(name,"dummy")==0 && SDL2_AudioDevice!=0 ? 1 : 0;
+#else
+    return 0;
+#endif
+}
+#endif''')
     anchor='    }\n}\n\nstd::string mixerinfo() {'
     return once(s,anchor,'''    }
 #ifdef AWE64_VST3_RUNTIME

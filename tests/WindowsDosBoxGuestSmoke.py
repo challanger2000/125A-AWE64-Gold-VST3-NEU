@@ -14,7 +14,6 @@ import time
 
 def child(dllpath):
     os.environ['SDL_VIDEODRIVER']='dummy'
-    os.environ['SDL_AUDIODRIVER']='dummy'
     with os.add_dll_directory(str(dllpath.parent)):
         lib=ctypes.WinDLL(str(dllpath))
         fn=lib.AWE64_StartGuest
@@ -55,6 +54,9 @@ def stop_child(dllpath):
         stop=lib.AWE64_RequestStop
         stop.argtypes=[]
         stop.restype=None
+        check=lib.AWE64_IsInternalAudioOnly
+        check.argtypes=[]
+        check.restype=ctypes.c_int
         args=[b'AWE64DOSBoxRuntime',b'-noconfig',b'-nomenu',b'-noconsole',
               b'-set',b'sblaster sbtype=sb16']
         argv=(ctypes.c_char_p*(len(args)+1))(*args,None)
@@ -63,9 +65,14 @@ def stop_child(dllpath):
             result.append(start(len(args),argv))
         thread=threading.Thread(target=launch,daemon=True)
         thread.start()
-        time.sleep(1.25)
+        deadline=time.monotonic()+8.0
+        while thread.is_alive() and check()!=1 and time.monotonic()<deadline:
+            time.sleep(.05)
         if not thread.is_alive():
             raise SystemExit('DOSBox background worker exited before stop request')
+        if check()!=1:
+            raise SystemExit('Physical/audio backend not isolated: expected SDL dummy output')
+        print('ORIGINAL_DOSBOX_INTERNAL_AUDIO_DRIVER=dummy',flush=True)
         stop()
         thread.join(18)
         if thread.is_alive():

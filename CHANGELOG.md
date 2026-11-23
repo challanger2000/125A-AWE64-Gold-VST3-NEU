@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Ausschließlich DAW-Audioausgabe: interner SDL-Audiotreiber ohne Hardwareausgang
+
+- `mixer.cpp` im gepinnten **internen** DOSBox-X-Windows-DLL-Build auf SDL2-`dummy`-Audiotreiber umgestellt. Die Original-Mixer-Callback-Synthese bleibt identisch und liefert PCM an den VST3-Ring; die Zusatz-Windows-Audiohardware bleibt geschlossen. Kein globales `SDL_AUDIODRIVER`-Environment im DAW-Prozess.
+- Win32-Export `AWE64_IsInternalAudioOnly()` prüft, dass der originale interne SDL2-Treiber tatsächlich `dummy` ist **und** ein Audio-Callback-Gerät existiert. Windows-Lebensdauer-Test prüft dies ohne gesetztes `SDL_AUDIODRIVER`.
+- Bei fehlgeschlagener SDL-`dummy`-Initialisierung kein Fallback auf eine physische Soundkarte; der Mixer bleibt im No-Sound-Modus. Windows-Compiler-/Laufzeittest zum Commit ausstehend.
+- Weiterhin keine Original-Creative-DOS-Audio- und Studio-Pro-Abnahme.
+
 ## 23.11.2026 — Eigenes DOSBox-Fenster im DAW-Plugin unterdrücken
 
 - Korrigierter tatsächlicher Original-SDL2-Codepfad: im Build der internen DOSBox-X-AWE32-DLL wird `SDL_WINDOW_SHOWN` durch `SDL_WINDOW_HIDDEN` ersetzt. Das einzige sichtbare Bedienfeld bleibt die erhaltene originale P165-VST3-GUI.
