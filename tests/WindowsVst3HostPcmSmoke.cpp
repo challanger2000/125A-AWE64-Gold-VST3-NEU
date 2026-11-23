@@ -136,6 +136,7 @@ static int fail(const std::string& reason) {
 }
 
 int main(int argc,char** argv) {
+    std::cout<<std::unitbuf;std::cerr<<std::unitbuf;
     const bool originalMode=(argc==4 && std::strcmp(argv[2],"--original")==0);
     const bool exclusionMode=(argc==3 && std::strcmp(argv[2],"--negative")==0);
     const int originalSeconds=originalMode ? std::atoi(argv[3]) : 0;
@@ -289,6 +290,7 @@ int main(int argc,char** argv) {
     if(!externalState.empty()){
         // Allow the initial original Creative guest to settle before
         // exercising stop/join/unload/restart inside the same component.
+        std::cout<<"ACTIVE_EXTERNAL_PRE_SWITCH_START\n";
         const auto begin=std::chrono::steady_clock::now();
         for(unsigned i=0;i<800;++i){
             midiEvents.setEnabled(false);
@@ -296,6 +298,7 @@ int main(int argc,char** argv) {
             std::this_thread::sleep_until(begin+std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                 std::chrono::duration<double>((i+1)*512.0/44100.0)));
         }
+        std::cout<<"ACTIVE_EXTERNAL_RESTART_ENTER\n";
         S::MemoryStream switched(externalState.data(),externalState.size());
         if(component->setState(&switched)!=S::kResultOk)
             return fail("Active external SF2 guest restart failed");
@@ -346,6 +349,7 @@ int main(int argc,char** argv) {
             std::this_thread::sleep_until(due);
         } else std::this_thread::sleep_for(std::chrono::milliseconds(12));
     }
+    if(!externalState.empty())std::cout<<"ACTIVE_EXTERNAL_PCM_MEASURED\n";
     if(processor->setProcessing(false)!=S::kResultOk)
         return fail("Actual VST3 setProcessing(false) failed");
     if(component->setActive(false)!=S::kResultOk)

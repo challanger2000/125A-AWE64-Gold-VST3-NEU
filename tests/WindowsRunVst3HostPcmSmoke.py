@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import sys
 import time
 
@@ -29,8 +30,16 @@ def run_private_creative_host(command: list[str], plugin: Path, seconds: int):
     if log.exists():
         raise RuntimeError("Private Creative boot diagnostic already exists; refusing stale log")
     deadline = time.monotonic() + seconds + 30
-    process = subprocess.Popen(command, stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE, text=True, errors="replace")
+    # DOSBox emits large diagnostic output. Undrained PIPE handles can
+    # deadlock the guest or its shutdown before poll() ever sees exit.
+    # Use disposable local spools; do not publish their contents as artifacts.
+    out = tempfile.TemporaryFile(mode="w+b")
+    err = tempfile.TemporaryFile(mode="w+b")
+    process = subprocess.Popen(command, stdout=out, stderr=err)
+    def tail(stream):
+        stream.seek(0, os.SEEK_END)
+        stream.seek(max(0, stream.tell()-16384))
+        return stream.read().decode("utf-8", errors="replace")
     try:
         while process.poll() is None and time.monotonic() < deadline:
             if log.is_file():
@@ -44,8 +53,12 @@ def run_private_creative_host(command: list[str], plugin: Path, seconds: int):
                                        "; ".join(errors)[:1800])
             time.sleep(.2)
         if process.poll() is None:
+            process.kill()
+            process.wait(timeout=8)
+            print(tail(out), file=sys.stderr)
+            print(tail(err), file=sys.stderr)
             raise TimeoutError("Real Creative-DOS VST3 host exceeded private test timeout")
-        stdout, stderr = process.communicate(timeout=8)
+        stdout, stderr = tail(out), tail(err)
         if not log.is_file():
             raise RuntimeError("Creative DEMO.EXE never created its DOS stdout boot log")
         final_text = log.read_bytes()[:32768].decode("cp437", errors="replace")
@@ -58,7 +71,9 @@ def run_private_creative_host(command: list[str], plugin: Path, seconds: int):
     finally:
         if process.poll() is None:
             process.kill()
-            process.communicate(timeout=8)
+            process.wait(timeout=8)
+        out.close()
+        err.close()
 
 
 def run_native_host(exe: Path, vst3: Path, original: bool = False,

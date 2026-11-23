@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Aktiver SF2-Test: Timeout mit sicherer Log-Erfassung untersuchen
+
+- Windows 45288976627: Build, synthetische Positiv-/Negativkontrollen und musikalischer Original-GM-Test erreicht (Held Note RMS 0,00795573). Separater aktiver SF2-/Recall-Test nach 90 s Timeout; Ursache nicht nachgewiesen. Transport/Version PASS.
+- Beseitigt einen realen Deadlock-Pfad im Python-Testhost: Windows-Subprozess schrieb in nicht kontinuierlich geleerte stdout/stderr-PIPEs, während Elternprozess nur pollte. Temporäre lokale Dateien statt Pipes, begrenzte Diagnose bei Timeout, sofort geflushte native Marker vor/nach Wechsel. Keine Änderung der Klangschwellen oder Emulation. Neuer aktiver Windows-Test offen.
+
 ## 24.11.2026 — Native Recall-Testhost korrekt mit SDK MemoryStream linken
 
 - Windows 45287430560 und 45287808293: Build des VST3 selbst nicht als fehlerhaft ausgewiesen; nativer Testhost scheiterte beim Linken an fünf undefinierten Steinberg-MemoryStream-Symbolen. Kein SF2-Klangurteil aus diesen Läufen. Transporttests 45287430562 und 45287808294 sowie Versionsprüfungen PASS.
