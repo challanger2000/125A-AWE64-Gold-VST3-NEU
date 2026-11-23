@@ -10,6 +10,9 @@ on:
       - 'tests/MakeMpuCom.py'
       - 'tests/WindowsMpuGuestSmoke.py'
       - 'tests/WindowsAweHardwareSmoke.py'
+      - 'tests/MakeSpeakerCom.py'
+      - 'tests/WindowsSpeakerPcmSmoke.py'
+      - 'tests/test_speaker_probe.py'
       - 'tests/test_awe_hardware_probe.py'
       - 'tests/test_mpu_probe.py'
       - 'src/**'
@@ -109,6 +112,12 @@ jobs:
           $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           python tests/WindowsAweHardwareSmoke.py --parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Original AWE32 EMU8000 hardware register smoke FAILED" }
+      - name: Prove non-silent PCM from real DOS PC-speaker hardware through ORIGINAL DOSBox-X mixer
+        shell: pwsh
+        run: |
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
+          python tests/WindowsSpeakerPcmSmoke.py --parent $dll
+          if ($LASTEXITCODE -ne 0) { throw "Original DOS hardware speaker PCM callback test FAILED" }
       - name: Prove actual 16-bit guest MPU401 UART receives host MIDI through original DOSBox-X
         shell: pwsh
         run: |

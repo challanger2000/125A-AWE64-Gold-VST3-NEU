@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Echten originalen DOSBox-X-Mixer mit hörbarem DOS-Hardware-Signal prüfen
+
+- Neue getrennte Windows-Hardware-PCM-Prüfung `tests/WindowsSpeakerPcmSmoke.py`: Erzeugt ein eigenes 52-Byte-DOS-`SPEAKER.COM` aus `MakeSpeakerCom.py`, das **echte PC-Speaker/PIT-Ports im Original-DOSBox-X** anspricht. Der Testhost erzeugt keine Klänge; er misst ausschließlich den originalen PCM-Callback im laufenden Emulator.
+- Harte Prüfgates: mindestens 1.024 PCM-Stereoframes, 512 nicht-stumme PCM-Frames, Mess-Peak >=128, bestätigter interner SDL2-Dummy-Ausgang, DOS-Gast-Exitcode 0. Kindprozess mit Timeout; No-Creative/Fake-ROM ausschließlich zur öffentlichen CI.
+- Neue Windows-Gateprüfung in `windows-dosbox-runtime.yml` sowie datenfreie `test_speaker_probe.py`-Regression in Linux/Windows-`audio-bridge-tests.yml`. Bei Fehler explizit FAIL, **vor beendeter CI nicht als PASS bezeichnen**.
+- Klare Abgrenzung: selbst bei bestandenem PC-Speaker-Test kein Nachweis von Creative-`DEMO.EXE`-, `SYNTHGM.SF2`- oder originalem EMU8000-Klang innerhalb des VST3. Keine Freigabe.
+
+
 ## 23.11.2026 — 9.688 echte EMU8000-Registerwrites / Windows-VST3-Bundle PASS
 
 - Vollständiger [Windows-Actions-Lauf 45186047184](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45186047184) **SUCCESS**: originaler DOSBox-X-AWE32-Chip als in-process-SDL2-DLL, echter DOS-Gast, Hardwarestart per `AWEUTIL /S`, **9.688 originale EMU8000-Registerschreibzugriffe**, originale MPU-401-UART-Bytes, clean shutdown und Windows-VST3-Host samt Original-P165-GUI in einem Bundle gebaut.

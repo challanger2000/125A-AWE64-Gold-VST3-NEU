@@ -36,6 +36,13 @@ Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git
 
 Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
 
+## Original-DOS-Audio-Mixer: neuer Nicht-Stille-End-to-End-Test (Prüfung offen)
+
+- `tests/MakeSpeakerCom.py` baut eine kleine **eigene** 16-Bit-DOS-`SPEAKER.COM` (52 Bytes). Dieses Programm steuert **die wirklich emulierten PIT-/PC-Speaker-Ports 43h/42h/61h**, hält den Ton rund eine halbe Sekunde per BIOS-Tick und beendet die Tonhardware sauber. Es stellt **keine** WAV-Daten bereit; der Python-Host erzeugt **keinen** synthetischen Ton.
+- `tests/WindowsSpeakerPcmSmoke.py` startet die gepinnte original-DOSBox-X-Windows-DLL im selben Prozess mit aktiviertem AWE32-Kern und einem **privatdatenfreien Null-ROM**; die eigentliche hörbare PCM-Antwort kann ausschließlich durch den originalen DOSBox-X-PC-Speaker, das Original-Mixer-Callback und `AWE64_HostRegisterPCM` entstehen. Ein harter Kindprozess-Timeout verhindert Hänger.
+- Testabnahme verlangt DOS-Exitcode 0, intern ausschließliches SDL2-Dummy-Audio, originale PCM-Framereihen, mindestens 512 echte PCM-Frames ungleich null und einen messbaren 16-Bit-Peak. Die öffentliche Linux-/Windows-CI testet zusätzlich COM-Maschinencode und DOSBox-Konfiguration **ohne Creative-Originalmaterial**.
+- **Bewertung bewusst getrennt:** Dieser Test beweist bei einem PASS echte nicht-stumme **DOSBox-Mixer-Audioweitergabe vom PC-Speaker**, **nicht** hörbaren Original-EMU8000-Sound, **nicht** Creative-`DEMO.EXE` und **nicht** VST3-Host-PCM. Stand des neuen Tests bis zur abgeschlossenen CI ausdrücklich **offen**, `0.0.0-dev`.
+
 ## Originalhardware erstmals nachweislich aktiv – Windows-PASS 23.11.2026
 
 - **[Windows-Integrationslauf 45186047184](../../actions/runs/45186047184): vollständig SUCCESS.** Original-DOSBox-X-AWE32-SDL2-DLL, echter DOSBox-Start, interne SDL2-Isolation, kontrollierter Gaststopp, originaler MPU-401-MIDI-Nachweis und vollständiger Windows-VST3-Bundle-Build mit unveränderter P165-Oberfläche erfolgreich.
