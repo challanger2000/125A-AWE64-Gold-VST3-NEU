@@ -40,6 +40,12 @@ Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den 
 
 Der Workflow `.github/workflows/windows-dosbox-runtime.yml` hieß historisch `(NO VST3 PLAYBACK)`. Weil [45201802002](../../actions/runs/45201802002) inzwischen **echte MIDI- und Audio-`process()`-Ausgabe im geladenen VST3** nachweist, ist diese alte Bezeichnung objektiv überholt. Korrigiert zu **`DOSBox-X original + VST3 MIDI/PCM end-to-end (synthetic DOS)`**. **Kein Beleg für Creative-EMU8000-Originalton**; kein Produktcode geändert und kein Release.
 
+## 23.11.2026 — Lokales Original-Creative-Build-/Prüfverfahren: CI-Quell- und Syntaxabnahme bestanden
+
+- [Linux-/Windows-Transport-/Contract-Lauf 45215251617](../../actions/runs/45215251617) **vollständig SUCCESS**: echte synthetische C++-Regressionssuite, Python-Checks des **Besitzer-only Windows-Repro-Builders** und **PowerShell-AST-Parserprüfung beider privaten Original-Creative-Skripte** unter Windows bestanden. Der vorherige rein textuelle `SHA-256`/PowerShell-`SHA256`-Testfehler ist damit abgearbeitet.
+- [Versions-/Changelog-Konsistenz 45215251656](../../actions/runs/45215251656) **SUCCESS**. **Einziger Branch `main`**. Beide private Besitzer-Skripte bleiben lokal; keine Original-ROM-, `DEMO.EXE`-, `SYNTHGM.SF2`-Bytes wurden in öffentlicher CI verwendet oder hochgeladen.
+- **Beweisgrenze unverändert:** Ein Syntax-PASS und datenfreie Regression beweisen **keinen** realen originalen Creative-EMU8000-Sound. Das neue `Build-And-Test-Private-AWE64.ps1` ist zwar einsatzbereit geprüft, aber **nicht auf dem Besitzer-Windows-PC mit authentischen Dateien ausgeführt**. Weiterhin `0.0.0-dev`, Release-NO-GO, Fender-Studio-Pro-Endabnahme offen.
+
 ## 23.11.2026 — Neue statische Testbehauptung anhand realer PowerShell-Syntax korrigiert
 
 - [Linux-/Windows-Regression 45214831987](../../actions/runs/45214831987) **FAIL** im neu hinzugefügten **Text-Contract-Test**, nicht im DOSBox-/VST3-Code: Der Test verlangte die wörtliche Zeichenfolge `SHA-256`, obwohl das PowerShell-Skript korrekt `Get-FileHash -Algorithm SHA256 -LiteralPath $romPath` ausführt. Die Negativkontrolle prüft jetzt den **exakten tatsächlichen SHA256-Prüfaufruf** statt eines Kommentars. Der private Windows-Build/Creative-Klangtest wurde auch durch den fehlgeschlagenen Test **nicht ausgeführt**.

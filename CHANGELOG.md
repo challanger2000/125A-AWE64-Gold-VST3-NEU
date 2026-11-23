@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Original-Creative-Privat-Build: Linux-/Windows-Syntax- und Quellvertrag vollständig bestanden
+
+- [GitHub-Actions 45215251617](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45215251617) **SUCCESS** (Ubuntu + Windows): Vollständige bestehende Audio-/MIDI-C++-Suite, neue datenfreie Private-Builder-Sicherheitsregression und echte Windows-PowerShell-**AST-Syntaxprüfung** für `Build-And-Test-Private-AWE64.ps1` sowie `Run-Private-Creative-AWE-Test.ps1` erfolgreich.
+- [Versionslauf 45215251656](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45215251656) **SUCCESS**. Den vorherigen rein statischen SHA256-Schreibweisenfehler korrigiert, keine Produkt-DSP-/Original-EMU8000-/P165-GUI-Änderungen.
+- **Noch kein Original-Creative-Klang-PASS:** Diese öffentliche CI führt keine owner-only-ROM-/Creative-Originaldateien aus. Ein echter Klangnachweis erfordert den lokalen privaten Windows-Gesamtlauf. `0.0.0-dev`, nur `main`, kein Release.
+
+
 ## 23.11.2026 — Falsche SHA-256-Textassertion im neuen Privatskript-Test behoben
 
 - Der [initiale Linux-/Windows-Test 45214831987](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45214831987) schlug **im neuen Static-Test** fehl, weil die Prüfung eine wörtliche Bindestrichschreibweise `SHA-256` forderte, während die echte Windows-PowerShell-API die gültige Syntax `Get-FileHash -Algorithm SHA256` verwendet. Die Regression fordert nun die tatsächliche SHA256-Operation inklusive `-LiteralPath`, ohne einen Produktions- oder EMU8000-Codepfad zu verändern.

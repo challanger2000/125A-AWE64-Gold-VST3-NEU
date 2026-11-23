@@ -15,6 +15,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **[Windows 45205416871](../../actions/runs/45205416871) SUCCESS:** Neu erweiterter Windows-VST3-Testhost mit privatem Creative-`--original`-Modus tatsächlich kompiliert, weiterhin echter synthetischer MIDI-zu-PCM-VST3-Rundweg bestanden (979 nicht-stumme Stereo-Frames, 7 NoteOn). [Linux/Windows 45205416646](../../actions/runs/45205416646) PASS. **Original-ROM/Creative-`DEMO.EXE`/echte `SYNTHGM.SF2` wurden dabei nicht ausgeführt.** Privater Originalklang weiterhin nicht abgenommen; `0.0.0-dev`.
 
+## Neuester geprüfter Stand (23.11.2026)
+
+**[Linux-/Windows-Prüflauf 45215251617](../../actions/runs/45215251617) vollständig PASS:** neue private PowerShell-Builder-Quellregression, tatsächliche Windows-PowerShell-Parserprüfung der beiden Owner-only-Skripte und sämtliche datenfreien Audio-Bridge-Tests. Versions-/Changelog-Konsistenz ebenfalls PASS [45215251656](../../actions/runs/45215251656). **Die originalen Creative-ROM/SF2/DEMO-Klangtests sind damit nicht ausgeführt.** Nur `main`, `0.0.0-dev`.
+
 ## Teststand: SHA256-Contract-Assertion korrigiert
 
 Der erste synthetische Builder-Test ([45214831987](../../actions/runs/45214831987)) hatte eine falsche Textassertion (`SHA-256` gegenüber der tatsächlichen `-Algorithm SHA256`-Syntax). Die Assertion ist korrigiert. **Der Besitzer-Windows-Original-Creative-Klangtest selbst bleibt unausgeführt**, `0.0.0-dev`.
