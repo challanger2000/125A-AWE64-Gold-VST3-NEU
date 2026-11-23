@@ -15,6 +15,7 @@ on:
       - 'tests/MakeSyntheticDemoExe.py'
       - 'tests/MakeMidiTriggeredDemoExe.py'
       - 'tests/WindowsVst3HostPcmSmoke.cpp'
+      - 'tests/CreativeMidiBankSelectTest.cpp'
       - 'tests/WindowsRunVst3HostPcmSmoke.py'
       - 'tests/WindowsPrivateCreativeGuestSmoke.py'
       - 'tools/Run-Private-Creative-AWE-Test.ps1'
