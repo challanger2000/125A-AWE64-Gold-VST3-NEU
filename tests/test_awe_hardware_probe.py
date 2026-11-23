@@ -14,7 +14,7 @@ class TestOriginalAweHardwareProbe(unittest.TestCase):
         args = probe.original_guest_args(Path("C:/PROBE/awe32.raw"))
         self.assertIn("sblaster sbtype=sbawe", args)
         self.assertIn("sblaster awe32ram=28672", args)
-        self.assertIn("sblaster awe32rom=C:/PROBE/awe32.raw", args)
+        self.assertIn("sblaster awe32rom=" + str(Path("C:/PROBE/awe32.raw")), args)
         self.assertIn("midi mpu401=intelligent", args)
         self.assertIn("AWEUTIL /S", args)
         self.assertEqual(args[-1], "exit")

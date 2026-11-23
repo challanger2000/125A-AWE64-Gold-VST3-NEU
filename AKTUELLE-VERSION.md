@@ -43,6 +43,8 @@ Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den 
 
 Die ursprünglichen zwei Einführungs-Quelltests enthielten zu stark maskierte Python-Regex-/String-Newline-Literale. Diese wurden vor dem Windows-EMU8K-Hardwaretest korrigiert, damit Trace-Records tatsächlich erkannt werden und der portable Test echte mehrzeilige Originaltraces nachstellt. **CI-Nachweis erst nach Abschluss.**
 
+- **Korrektur:** Ein plattformübergreifender Original-ROM-Pfadtest verwendete fest vorgegebene POSIX-Schrägstriche, obwohl Windows `pathlib.Path` korrekterweise Backslashes liefert. Der Test prüft nun die jeweils tatsächlich generierte Windows-/Linux-Pfadangabe; der Emulator-Code blieb unverändert. Vor bestandener Windows-CI keine PASS-Aussage.
+
 ## Festgelegte Architektur
 
 Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32/EMU8000-Quellcode als **intern geladener DLL im VST3-Prozess**, originaler Creative-DOS-SF2LIB/DEMO.EXE als 16-Bit-DOS-Programm im emulierten PC. **Kein** externes DOSBox-Programm, **kein** 86Box-/Windows95-Gast und **kein** nativer Ersatz-SF2-Player.

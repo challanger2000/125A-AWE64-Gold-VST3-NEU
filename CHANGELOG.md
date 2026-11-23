@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — CI-Pfadregression an Windows-Pathlib angepasst
+
+- Fehlgeschlagenen Windows-Harness-Test im Job 45183835257 ausgewertet: `Path('C:/PROBE/awe32.raw')` erzeugt auf Windows Backslash-Trennzeichen, der Test erwartete aber hart codierte Forward Slashes. Test benutzt jetzt `str(Path(...))` für das tatsächliche Gastargument, ohne Emulator-/Soundcode anzufassen.
+- Neue Windows-Datenfrei- und echte Original-DOSBox-X-Hardware-CI prüfen; bis dahin kein Hardware-PASS.
+
+
 ## 23.11.2026 — AWEUTIL-Porttrace-Regression korrigiert
 
 - Python-Regex `\\d+` und synthetische Trennzeilen auf den tatsächlichen Original-DOSBox-X-EMU8000-Trace abgestimmt; doppelte Escape-Ebene beim Quellenbau entfernt. Portwerte und echte originale EMU8000-Engine bleiben unverändert.
