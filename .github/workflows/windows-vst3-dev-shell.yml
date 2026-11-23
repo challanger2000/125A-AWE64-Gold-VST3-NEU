@@ -2,6 +2,13 @@ name: Windows VST3 developer shell compilation (NO AUDIO ENGINE)
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/DosBoxVst3Shell.cpp'
+      - 'src/DosBoxVst3Shell.hpp'
+      - 'src/DosBoxVst3Factory.cpp'
+      - 'gui/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/windows-vst3-dev-shell.yml'
   workflow_dispatch:
 permissions:
   contents: read
