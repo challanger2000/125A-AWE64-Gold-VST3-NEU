@@ -80,6 +80,12 @@ def guest_arguments(assets: Path):
     ]
 
 
+def probe_midi_sequence():
+    # Exactly the actual original Creative-DOS MIDI controller and note bytes.
+    return (bytes((0xB0, 0, 0)), bytes((0xC0, 0)),
+            bytes((0x90, 60, 112)))
+
+
 def inspect_trace(trace: Path) -> int:
     # Original upstream EMU8000 trace format: <frame> <hexport> <hexvalue>.
     # Exclude reads (which begin with 'R ') and require real register writes.
@@ -129,6 +135,7 @@ def run_child(bundle: Path, seconds: float):
             pcm_frames = [0]
             peak_after_midi = [0]
             notes_sent = [False]
+            note_delivered_to_mpu = [False]
 
             @midi_type
             def read_midi(_context, dst, max_len):
@@ -138,6 +145,8 @@ def run_child(bundle: Path, seconds: float):
                 for i, byte in enumerate(message):
                     dst[i] = byte
                 midi_pulled[0] += 1
+                if message[0] == 0x90:
+                    note_delivered_to_mpu[0] = True
                 return len(message)
 
             @pcm_type
@@ -147,7 +156,7 @@ def run_child(bundle: Path, seconds: float):
                 pcm_frames[0] += int(frames)
                 # For proof require a nonzero real 16-bit sample after a note
                 # entered the emulated MPU queue; never generate test tones.
-                if notes_sent[0]:
+                if note_delivered_to_mpu[0]:
                     for i in range(int(frames) * 2):
                         val = abs(int(pcm[i]))
                         if val > peak_after_midi[0]:
@@ -175,8 +184,7 @@ def run_child(bundle: Path, seconds: float):
                     # Repeat after startup because authentic SF2 loading can
                     # consume variable emulated DOS time. Use CC0, not CC32.
                     if elapsed >= 3 and elapsed - last_note >= 1.3:
-                        pending.extend((b"\xB0\x00\x00", b"\xC0\x00",
-                                        b"\x90\x3C\x70"))
+                        pending.extend(probe_midi_sequence())
                         notes_sent[0] = True
                         last_note = elapsed
                     if peak_after_midi[0] >= 128 and midi_pulled[0] >= 3:

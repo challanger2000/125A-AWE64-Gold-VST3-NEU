@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Private Creative-Prüfung mit öffentlichen, datenfreien Regressionen verbunden
+
+- Linux-/Windows-`audio-bridge-tests.yml` führt den privaten Creative-Klangtest **nicht** aus, sondern prüft mit Fake-Dateien SHA/Git-Blob-Verifikation, Original-DOSBox-Konfiguration, MPU-MIDI-Bytes und trace-write-Erkennung. Kein Original-ROM, Creative-Binary oder privates Audio in CI.
+- PCM-Auswertung startet erst, nachdem eine echte NoteOn-Nachricht vom Original-MPU-401-Callback abgerufen wurde; zuvor auftretende DOSBox-Initialisierungsframes können damit nicht als NoteOn-Audio gelten.
+- Klang- und DAW-Abnahme weiterhin offen, `0.0.0-dev`.
+
+
 ## 23.11.2026 — Binäre Testbytes und Trace-Parser im privaten Klang-Gate korrigiert
 
 - Escape-Sequenzen für originale MIDI-Statusbytes, Git-Blob-Hashheader und echten EMU8000-Zeitstempelregulärausdruck in der Windows-Gateprüfung berichtigt; portable synthetische Regressionen verifizieren das Format. Keine Originaldateien in CI.

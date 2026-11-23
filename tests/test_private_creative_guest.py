@@ -34,6 +34,20 @@ class CreativePrivateHarnessTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 module.find_private_bundle(root)
 
+    def test_midi_uses_original_creative_cc0_uart_bytes(self):
+        self.assertEqual(module.probe_midi_sequence(),
+                         (bytes((0xB0, 0, 0)), bytes((0xC0, 0)),
+                          bytes((0x90, 60, 112))))
+
+    def test_git_blob_hash_for_synthetic_file(self):
+        with tempfile.TemporaryDirectory() as t:
+            file = Path(t) / "fake"
+            file.write_bytes(b"hello")
+            self.assertEqual(module.digest(file, True),
+                             "b6fc4c620b67d95f953a5c1c1230aaab5db5a1b0")
+            self.assertEqual(module.digest(file), 
+                             "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824")
+
     def test_trace_detects_writes_and_excludes_reads(self):
         with tempfile.TemporaryDirectory() as t:
             trace = Path(t) / "emu.trace"

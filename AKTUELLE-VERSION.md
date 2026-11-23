@@ -28,6 +28,8 @@ Der neue reine MIDI-Bankwahltest prüft 16 Kanäle × 128 Banken und 16 Kanäle 
 ### Eingebaute Prüfungssicherung
 Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git-Blob-/SHA-Hashberechnung, korrekte binäre MIDI-Testbytes und Original-EMU-Porttrace-Erkennung. Sie wird öffentlich nur mit synthetischen Testdaten validiert, nicht als Klangerfolg gewertet.
 
+Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
+
 ## Festgelegte Architektur
 
 Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32/EMU8000-Quellcode als **intern geladener DLL im VST3-Prozess**, originaler Creative-DOS-SF2LIB/DEMO.EXE als 16-Bit-DOS-Programm im emulierten PC. **Kein** externes DOSBox-Programm, **kein** 86Box-/Windows95-Gast und **kein** nativer Ersatz-SF2-Player.
