@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Windows-VST3-Event-Header und MIDI-Zeitstempel korrigiert
+
+- Run 45104591680: echte Windows-VST3-Integration an nicht vollständig inkludierten VST3-SDK-Interfaces IEventList/IParameterChanges gescheitert. Vollständige VST3-Event- und ParamChanges-Header ergänzt.
+- Gemäß Original-Steinberg-`ivstevents.h` trägt `Event::sampleOffset` den MIDI-Sampleoffset (nicht `NoteOnEvent` oder `NoteOffEvent`); korrigiert. Host-Klang weiterhin nicht nachgewiesen.
+
 ## 23.11.2026 — VST3-Host mit tatsächlich eingebetteter DOSBox-X-Windows-DLL verbinden
 
 - `src/DosBoxRuntimeHost.hpp`: Windows-Host lädt ausschließlich eine echte `AWE64DOSBoxRuntime.dll` **innerhalb desselben VST3-Bundles**. Prüft private Original-AWE-Wave-ROM-Datei (exakt 1 MiB), Original-Creative-DOS-`DEMO.EXE` und privates `SYNTHGM.SF2` vor jeder Aktivierung. Kein extern gestarteter Emulatorprozess.

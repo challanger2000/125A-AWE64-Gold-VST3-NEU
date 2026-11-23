@@ -3,6 +3,8 @@
 #include "pluginterfaces/base/ustring.h"
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/vsttypes.h"
+#include "pluginterfaces/vst/ivstevents.h"
+#include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "pluginterfaces/vst/vstspeaker.h"
 #include "vstgui/plugin-bindings/vst3editor.h"
 #include <algorithm>
@@ -142,13 +144,13 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
             int32 channel=0,offset=0,pitch=0;
             if(event.type==Event::kNoteOnEvent){
                 const auto& on=event.noteOn;
-                channel=on.channel;offset=on.sampleOffset;pitch=on.pitch;
+                channel=on.channel;offset=event.sampleOffset;pitch=on.pitch;
                 status=0x90u;
                 velocity=static_cast<std::uint8_t>(std::lround(
                     std::clamp(double(on.velocity),0.,1.)*127.));
             } else if(event.type==Event::kNoteOffEvent){
                 const auto& off=event.noteOff;
-                channel=off.channel;offset=off.sampleOffset;pitch=off.pitch;
+                channel=off.channel;offset=event.sampleOffset;pitch=off.pitch;
                 status=0x80u;
                 velocity=static_cast<std::uint8_t>(std::lround(
                     std::clamp(double(off.velocity),0.,1.)*127.));
