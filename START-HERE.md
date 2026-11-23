@@ -11,6 +11,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **Submodul:** `third_party/dosbox-x-AWE32` auf `f3a95b9f19a7f9863295e6481f271cf04733c635` gepinnt. **Einziger Branch:** `main`.
 
+## Aktueller erster VST3-`process()`-PCM-End-to-End-PASS (23.11.2026)
+
+**[Windows 45197768158](../../actions/runs/45197768158): SUCCESS.** Der echte Windows-x64-VST3-Host hat das gebaute Plugin über die Steinberg-Factory aktiviert und seinen Audio-Callback ausgeführt: **80.384 Float32-Stereoframes, 568 nicht-stumme Frames, Peak 0,304871**. Quelle war die emulierte **DOS-PC-Speaker-Hardware**, nicht der EMU8000. Originale ROM-, `DEMO.EXE`- und `SYNTHGM.SF2`-Dateien sind hier **bewusst nicht vorhanden**; ein vollständiges Creative-AWE64-Instrument ist noch nicht freigegeben. `0.0.0-dev`, `main`, Original-P165-GUI unverändert. Weitere Details in [AKTUELLE-VERSION.md](AKTUELLE-VERSION.md).
+
 ## Zusätzlicher tatsächlich bestandener Original-DOS-Audio-Test (23.11.2026)
 
 - **[Windows 45189311093](../../actions/runs/45189311093) PASS:** echtes PC-Speaker-PIT-Tonprogramm innerhalb des originalen DOSBox-X-Gasts, **68.608 originale Mixer-PCM-Stereoframes**, **17.633 nicht-stumm**, PCM16-Peak **9.990** und ausschließlich internem SDL2-Dummy-Audiogerät. Original-EMU8000-Registerwrites und MPU401 weiter PASS; Host/Runtime-Windows-VST3-Bundle gebaut.

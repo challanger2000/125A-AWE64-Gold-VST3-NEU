@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Echte VST3-Host-Audioausgabe aus Original-DOSBox: vollständiger Windows-PASS
+
+- **[Windows-Actions 45197768158](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45197768158) SUCCESS.** Reales Windows-`AWE64GoldDOSBoxDev.vst3` über tatsächliche Steinberg-`GetPluginFactory`/`IComponent`/`IAudioProcessor` aktiviert, `process()` bei **44,1 kHz / Float32** ausgeführt und echte nicht-stumme PCM durch das VST3 empfangen. **80.384 Stereo-Frames**, **568 nicht-stumme Frames**, **Peak 0,304871**; Deaktivierung, Beenden und Freigabe ebenfalls PASS.
+- Echtes unverändertes Original-DOSBox-X-AWE32-Audiogerät, originaler Mixer und VST3-PCM-Bridge; Tonquelle ausschließlich eigenständig erzeugtes DOS-PC-Speaker-Programm. Keine andere Host-Ton-Engine, keine privaten Creative-ROM-/SF2-Bytes im öffentlichen CI-Workflow. Testbezeichnung `SYNTHETIC_DOS_FIXTURE_REAL_VST3_HOST_PCM_PASS` bedeutet **nicht** Original-Creative-Klang.
+- Im selben Windows-Lauf originale EMU8000-AWEUTIL-Registertests (**9.688 reale Registerwrites**), 16-Bit-DOS-MPU-401, PCM-Transport, Worker-Stop und vollständige VST3-Kompilierung **PASS**. [Release-Regressionen 45197768094](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45197768094) auf Linux und Windows PASS, [Dokumentationsprüfung 45197768039](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45197768039) PASS.
+- **NO-GO für Auslieferung:** Original-Creative-DOS-`DEMO.EXE`, echtes Owner-`awe32.raw`, authentische `SYNTHGM.SF2` und Original-AWE-MIDI-Klang im VST3 bisher **nicht nachgewiesen**; Fender Studio Pro erst nach abschließenden weiteren Prüfungen. `0.0.0-dev`, P165-GUI unverändert; nur `main`.
+
+
 ## 23.11.2026 — Schützendes VST3-Host-Gate: PowerShell-`$Host`-Variable ersetzt und DLL-Buildcache eingerichtet
 
 - [Windows 45195522027](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45195522027): originale DOSBox-X-AWE32-Windows-DLL und eigentlicher VST3-Host samt eigenem Hosttest-C++ **erfolgreich kompiliert**; originale EMU8000-I/O-, MPU-UART- und Nicht-Stille-PC-Speaker-Tests PASS. Das neue VST3-`process()`-Audio-Gate **FAIL ohne Testdurchführung**, da `$host` in PowerShell schreibgeschütztes `$Host` referenziert.
