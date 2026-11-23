@@ -40,6 +40,11 @@ Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den 
 
 Der Workflow `.github/workflows/windows-dosbox-runtime.yml` hieß historisch `(NO VST3 PLAYBACK)`. Weil [45201802002](../../actions/runs/45201802002) inzwischen **echte MIDI- und Audio-`process()`-Ausgabe im geladenen VST3** nachweist, ist diese alte Bezeichnung objektiv überholt. Korrigiert zu **`DOSBox-X original + VST3 MIDI/PCM end-to-end (synthetic DOS)`**. **Kein Beleg für Creative-EMU8000-Originalton**; kein Produktcode geändert und kein Release.
 
+## 23.11.2026 — Neue statische Testbehauptung anhand realer PowerShell-Syntax korrigiert
+
+- [Linux-/Windows-Regression 45214831987](../../actions/runs/45214831987) **FAIL** im neu hinzugefügten **Text-Contract-Test**, nicht im DOSBox-/VST3-Code: Der Test verlangte die wörtliche Zeichenfolge `SHA-256`, obwohl das PowerShell-Skript korrekt `Get-FileHash -Algorithm SHA256 -LiteralPath $romPath` ausführt. Die Negativkontrolle prüft jetzt den **exakten tatsächlichen SHA256-Prüfaufruf** statt eines Kommentars. Der private Windows-Build/Creative-Klangtest wurde auch durch den fehlgeschlagenen Test **nicht ausgeführt**.
+- Der restliche Source-Code, Original-P165, originaler AWE32-Kern und `main` sind unverändert. Erst nach den erneut beendeten Linux-/Windows-Prüfläufen darf dieser Fix als PASS markiert werden. **`0.0.0-dev`, kein Release.**
+
 ## 23.11.2026 — Original-Creative-Klangprüfung als lokaler Windows-Gesamtlauf vorbereitet (KEIN Klang-PASS)
 
 - **Neuer Besitzer-only Komplettablauf:** `tools/Build-And-Test-Private-AWE64.ps1` baut auf dem Besitzer-Windows-PC den gepinnten **unveränderten DOSBox-X-AWE32-Kern** (`f3a95b9`) als eigene x64-SDL2-DLL, den exakten **Steinberg-VST3-Host 3.7.12** und die zugehörige reale `IAudioProcessor`-Testhost-EXE. Die unveränderte P165-Oberfläche wird über die verpflichtende Artwork-Git-Blob-Prüfung in CMake erzwungen.

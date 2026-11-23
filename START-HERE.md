@@ -15,6 +15,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **[Windows 45205416871](../../actions/runs/45205416871) SUCCESS:** Neu erweiterter Windows-VST3-Testhost mit privatem Creative-`--original`-Modus tatsächlich kompiliert, weiterhin echter synthetischer MIDI-zu-PCM-VST3-Rundweg bestanden (979 nicht-stumme Stereo-Frames, 7 NoteOn). [Linux/Windows 45205416646](../../actions/runs/45205416646) PASS. **Original-ROM/Creative-`DEMO.EXE`/echte `SYNTHGM.SF2` wurden dabei nicht ausgeführt.** Privater Originalklang weiterhin nicht abgenommen; `0.0.0-dev`.
 
+## Teststand: SHA256-Contract-Assertion korrigiert
+
+Der erste synthetische Builder-Test ([45214831987](../../actions/runs/45214831987)) hatte eine falsche Textassertion (`SHA-256` gegenüber der tatsächlichen `-Algorithm SHA256`-Syntax). Die Assertion ist korrigiert. **Der Besitzer-Windows-Original-Creative-Klangtest selbst bleibt unausgeführt**, `0.0.0-dev`.
+
 ## Reproduzierbare Original-Creative-Klangabnahme lokal vorbereitet (noch KEIN PASS)
 
 `tools/Build-And-Test-Private-AWE64.ps1` führt auf dem Besitzer-Windows-PC den gesamten gepinnten DOSBox-X-/VST3-Build und danach das echte, private Creative-DOS-Klanggate aus. Es hält **das originale Submodul sauber**, kompiliert in `PRIVATE/working-upstream` und gibt keine Originaldateien weiter. Benötigt originale ROM-Datei, Windows x64 mit Visual Studio 2022/CMake/Python/Git und Zugriff auf den öffentlichen Steinberg-SDK-/Creative-Quellcode. **In dieser Sitzung nur die Quell-/Syntaxprüfungen, keine echte Originaldatei-Audioausführung.**

@@ -49,7 +49,7 @@ class PrivateBuildRunnerContract(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, lower)
         self.assertIn("Refusing to apply source patch over owner modifications", source)
-        self.assertIn("SHA-256", source)
+        self.assertIn("Get-FileHash -Algorithm SHA256 -LiteralPath $romPath", source)
         self.assertIn("no release", lower)
 
     def test_public_ci_parses_scripts_but_never_invokes_private_originals(self):

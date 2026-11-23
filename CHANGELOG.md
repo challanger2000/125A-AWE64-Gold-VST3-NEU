@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Falsche SHA-256-Textassertion im neuen Privatskript-Test behoben
+
+- Der [initiale Linux-/Windows-Test 45214831987](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45214831987) schlug **im neuen Static-Test** fehl, weil die Prüfung eine wörtliche Bindestrichschreibweise `SHA-256` forderte, während die echte Windows-PowerShell-API die gültige Syntax `Get-FileHash -Algorithm SHA256` verwendet. Die Regression fordert nun die tatsächliche SHA256-Operation inklusive `-LiteralPath`, ohne einen Produktions- oder EMU8000-Codepfad zu verändern.
+- Der private Besitzer-Originalklang-Lauf wurde dadurch **nicht** ausgeführt. Neuer Windows-PowerShell-Parser- und Linux-/Windows-Regressions-PASS bis zum Abschluss offen. `0.0.0-dev`, nur `main`.
+
+
 ## 23.11.2026 — Private reproduzierbare Windows-Gesamtprüfung ab Quellcode
 
 - `tools/Build-And-Test-Private-AWE64.ps1` automatisiert auf dem **Besitzer-Windows-Host** den vollständigen bisherigen Windows-CI-Build: gepinnte Original-DOSBox-X-AWE32-SDL2-DLL (`f3a95b9`), SDK 3.7.12, Original-P165-Windows-VST3 samt nativer Steinberg-Audiotest-EXE, Zusammenführung im **einen** VST3-Bundle. Anschließend alle drei authentischen Creative-`DEMO.EXE`-/`SYNTHGM.SF2`-/Wave-ROM-Hashprüfungen und der echte private EMU8000-Port-/MIDI-/PCM-Test.
