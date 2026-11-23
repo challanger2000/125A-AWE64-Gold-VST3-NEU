@@ -130,7 +130,7 @@ public:
                 "-set", "sblaster sbtype=sbawe",
                 "-set", "sblaster awe32ram=28672",
                 "-set", "sblaster awe32rom="+utf8(rom),
-                "-set", "midi mpu401=uart",
+                "-set", "midi mpu401=intelligent",
                 "-set", "mixer rate=44100",
                 "-c", "mount c \""+utf8(privateDir)+"\"",
                 "-c", "c:",

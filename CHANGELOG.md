@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Original-Creative-MPU401-Initialisierung korrigiert (kritischer 0x3F-ACK)
+
+- Originales gepinntes `src/hardware/mpu401.cpp` direkt überprüft: `MPU401_WriteCommand` ignoriert im **bereits aktiven UART-Modus** jeden Befehl außer 0xFF (Zeile 135). Die ursprüngliche Host-Konfiguration `midi mpu401=uart` verhinderte dadurch den ACK auf 0x3F und konnte `DEMO.EXE` mit `ERROR: MPU401 initialization failed` scheitern lassen.
+- Die originale Creative DOS-Demo sendet nach ihrem Reset ausdrücklich `MPU_ENTER_UART = 0x3F` und wartet auf `MPU_ACK_OK=0xFE`. Korrekte Vorgabe **`midi mpu401=intelligent`**: emulierter Chip startet im Intelligent-Modus, Creative schaltet selbst zur echten UART-Betriebsart, originaler Hardware-ACK bleibt erhalten.
+- Diesen Pfad sowohl beim **VST3-Guest-Start** als auch beim eigenständigen echten DOS-COM-MPU-Hardwaretest korrigiert. Keine Creative-Code-Änderung und keine native Treiber-Emulation. Neuer CI-Nachweis erforderlich.
+
 ## 23.11.2026 — SDL2-DLL-CRT-Linker und P165-CMake-Syntax korrigiert
 
 - CI 45108405024 (SDL2-internes DOSBox-X als DLL) scheiterte mit fehlenden VCRUNTIME-/UCRT-Symbolen beim DLL-Link; die ursprüngliche SDL2-Konfiguration stammt von einem EXE-Projekt. Beim DLL-Build werden die benötigten **statischen** CRT-Bibliotheken `libvcruntime.lib`, `libucrt.lib`, `libcmt.lib` nun explizit in die SDL2-Release-Linkerabhängigkeiten aufgenommen. Originaler Chip-/MIDI-/Audio-Code bleibt unverändert. Neuer Windows-Nachweis ausstehend.

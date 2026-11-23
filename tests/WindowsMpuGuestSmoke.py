@@ -36,7 +36,7 @@ def run_child(dllpath):
                 start.restype=ctypes.c_int
                 args=["AWE64DOSBoxRuntime","-noconfig","-nogui","-nomenu",
                       "-silent","-set","sblaster sbtype=sb16",
-                      "-set","midi mpu401=uart","-c",
+                      "-set","midi mpu401=intelligent","-c",
                       'mount c "'+str(folder)+'"','-c',"c:","-c","MPUPROBE.COM",
                       "-c","exit"]
                 a=[x.encode("utf-8") for x in args]
