@@ -36,6 +36,13 @@ Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git
 
 Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
 
+## VST3-Host-End-to-End-PCM: neuer echter Instrumenten-Host-Test (CI noch offen)
+
+- `tests/WindowsVst3HostPcmSmoke.cpp` lädt unter Windows die **tatsächlich gebaute** `AWE64GoldDOSBoxDev.vst3`-Bibliothek und führt über die **echte Steinberg-IPluginFactory**, `IComponent`, `IAudioProcessor`, `setActive`, `setProcessing` und wiederholte `process()`-Aufrufe den vollständigen Windows-VST3-Audiohostpfad aus. Er verlangt messbare PCM-Frames, begrenzte Amplitude und reguläre Deaktivierung.
+- **Klare Originaldaten-Grenze:** In öffentlicher GitHub-CI wird ausschließlich eine **synthetisch aus eigenem Code erzeugte MZ-DOS-EXE** namens `DEMO.EXE` in einem temporären Testbundle verwendet. Sie spielt per echten emulierten PIT-/PC-Speaker-Ports 43h/42h/61h – **keine** Creative-`DEMO.EXE`, Creative-SF2, User-ROM oder emulierter SoundFont. Die ursprüngliche DOSBox-X-DLL und das VST3 selbst bleiben echt. `MakeSyntheticDemoExe.py` verweigert Überschreiben schon vorhandener Originaldateien.
+- Das tatsächliche **Original-Creative-Klang-Gate** bleibt ein getrenntes ausschließlich privates Verfahren mit der echten Creative-`DEMO.EXE`/`SYNTHGM.SF2` und dem echten Wave-ROM. Die öffentliche Synthetic-PCM-Prüfung darf diesen Klang **niemals** als bewiesen melden.
+- Neue datenfreie Linux-/Windows-Regressionsprüfungen validieren DOS-EXE-MZ-Header, Hardware-Port-Instruktionen und Fixture-Schutz. **Ergebnisse dieser neuen VST3-Hostintegration vor beendetem Windows-Actions-Lauf ausdrücklich offen.** Entwicklungskennung `0.0.0-dev`, kein Release.
+
 ## 23.11.2026 — Nicht-stummer DOSBox-Mixer/PCM-Originalpfad tatsächlich PASS
 
 - **[Windows-Original-DOSBox-X-Lauf 45189311093](../../actions/runs/45189311093): vollständig SUCCESS**. Im Gast lief die eigens erzeugte 52-Byte-16-Bit-`SPEAKER.COM`; sie spielte über **Original-PIT-/PC-Speaker-Ports 43h/42h/61h**, nicht über einen vom Testhost erzeugten Ton.

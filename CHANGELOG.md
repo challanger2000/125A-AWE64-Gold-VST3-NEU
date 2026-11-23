@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Echten VST3-IPluginFactory/IAudioProcessor-Audio-End-to-End-Test integriert (Ergebnis offen)
+
+- `WindowsVst3HostPcmSmoke.cpp`: tatsächliche Windows-VST3-Factory instanziieren, Instrument aktivieren, 44,1-kHz-Float32-Ausgabe über `process()` empfangen, nicht-stumme Audioframes quantifizieren, Host deaktivieren und sauber terminieren. Kein separater DAW-Emulator und keine vom Testhost generierten Audiosamples.
+- Für öffentliche CI nur **selbst generiertes und frei verwendbares DOS-MZ-Testprogramm** als klar markierte `DEMO.EXE`-Fixture, 1-MiB-Null-ROM und nichtwertige SF2-Textdatei. Die echte DOSBox-X-AWE32-DLL und das echte Windows-VST3 arbeiten dabei unverändert. Nicht mit echter Creative-`DEMO.EXE`/Original-SF2 verwechseln.
+- Schutz vor Überschreiben vorhandener privater Originaldateien; harte Windows-Prozess-Timeout-Grenze. Windows-Workflow baut zusätzlich die separate Host-Test-EXE, startet realen VST3-Prozesspfad und meldet bei Stille/Crash/Timeout ausdrücklich FAIL; Linux-/Windows-Syntax-/Fixture-Regression ergänzt. Neue CI-Ergebnisse vor tatsächlichem Abschluss **offen**, kein Klang-Release.
+
+
 ## 23.11.2026 — Echte nicht-stumme Original-DOSBox-X-Mixer-Audioausgabe + Windows-VST3-Bundle: PASS
 
 - **[Windows-Lauf 45189311093](../../actions/runs/45189311093) vollständig SUCCESS**. Realer originaler DOSBox-X-SDL2-Windows-Emulator führt ein unabhängiges 52-Byte-16-Bit-DOS-Programm aus, das **echte PC-Speaker-/PIT-Hardwareports** steuert. Der original DOSBox-X-Audiomixer hat dabei **68.608 Stereo-PCM-Frames** geliefert, darunter **17.633 nicht-stumme Frames**, Peak PCM16 **9.990**; nur internes SDL2-Dummy-Audiogerät, DOS-Gast-Exit 0.

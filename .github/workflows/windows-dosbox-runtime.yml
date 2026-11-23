@@ -12,6 +12,10 @@ on:
       - 'tests/WindowsAweHardwareSmoke.py'
       - 'tests/MakeSpeakerCom.py'
       - 'tests/WindowsSpeakerPcmSmoke.py'
+      - 'tests/MakeSyntheticDemoExe.py'
+      - 'tests/WindowsVst3HostPcmSmoke.cpp'
+      - 'tests/WindowsRunVst3HostPcmSmoke.py'
+      - 'tests/test_synthetic_dos_exe.py'
       - 'tests/test_speaker_probe.py'
       - 'tests/test_awe_hardware_probe.py'
       - 'tests/test_mpu_probe.py'
@@ -131,7 +135,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "VST3 SDK acquisition failed" }
           cmake -S . -B build-vst3 -G "Visual Studio 17 2022" -A x64 -DAWE64_BUILD_VST3_DEV=ON -DAWE64_VST3SDK="$env:RUNNER_TEMP\vst3sdk" -DBUILD_TESTING=OFF
           if ($LASTEXITCODE -ne 0) { throw "VST3 configuration failed" }
-          cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev --parallel 2
+          cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev awe64_vst3_host_pcm_smoke --parallel 2
           if ($LASTEXITCODE -ne 0) { throw "VST3 Windows build failed" }
           $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win'
           $native='third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
@@ -140,4 +144,15 @@ jobs:
           Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
           if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
           Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
+      - name: Verify REAL VST3 factory and process audio with PUBLIC DOS speaker MZ (NOT Creative)
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3'
+          $plugin=Join-Path $bundle 'Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3'
+          $host='build-vst3/Release/awe64_vst3_host_pcm_smoke.exe'
+          python tests/MakeSyntheticDemoExe.py --bundle $bundle
+          if ($LASTEXITCODE -ne 0) { throw 'Safe synthetic test DOS EXE staging failed' }
+          python tests/WindowsRunVst3HostPcmSmoke.py --exe $host --plugin $plugin
+          if ($LASTEXITCODE -ne 0) { throw 'VST3 process() failed to deliver original mixer audio' }
       # Source-only test; no public runtime binaries or private ROM/SF2 uploaded.

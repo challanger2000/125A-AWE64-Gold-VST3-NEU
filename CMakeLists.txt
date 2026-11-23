@@ -129,6 +129,14 @@ if(AWE64_BUILD_VST3_DEV)
     "${CMAKE_CURRENT_SOURCE_DIR}/integration")
   target_link_libraries(AWE64GoldDOSBoxDev PRIVATE sdk vstgui_support comdlg32)
   target_compile_features(AWE64GoldDOSBoxDev PRIVATE cxx_std_20)
+  # The real Steinberg factory/process() is exercised on Windows with a
+  # PUBLIC synthetic DOS executable: NO original Creative assets in CI.
+  # This is a transport gate, never a substitute EMU8000/Creative synth.
+  add_executable(awe64_vst3_host_pcm_smoke tests/WindowsVst3HostPcmSmoke.cpp)
+  target_include_directories(awe64_vst3_host_pcm_smoke PRIVATE "${AWE64_VST3SDK}")
+  target_link_libraries(awe64_vst3_host_pcm_smoke PRIVATE sdk base)
+  target_compile_features(awe64_vst3_host_pcm_smoke PRIVATE cxx_std_20)
+
   smtg_target_configure_version_file(AWE64GoldDOSBoxDev)
   smtg_target_add_plugin_resources(AWE64GoldDOSBoxDev RESOURCES
     gui/resource/p007_p165.uidesc
