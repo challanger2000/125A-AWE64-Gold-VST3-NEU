@@ -6,7 +6,7 @@
 
 ## Was wirklich vorhanden ist
 
-1. **GUI:** Originale komplette P165/P007Z-Hardware-GUI als exakt übernommene Quelldateien in `gui/`; nachträgliche Abdunklung der Reglerflächen auf 73 %, Alpha 186 (Quellcommit `988b04aa2b6a02884d17fc792244919e7f9384d4`). Die unveränderte P165-Frontplatte wird anhand des verifizierten Git-Blob-Hashes `7e57ef8e0c90d84fa4c951bea7815b0233762ca7` eingebracht.
+1. **GUI:** Originale komplette P165/P007Z-Hardware-GUI als exakt übernommene Quelldateien in `gui/`; nachträgliche Abdunklung der Reglerflächen auf 73 %, Alpha 186 (Quellcommit `988b04aa2b6a02884d17fc792244919e7f9384d4`). Die unveränderte originale P165-Frontplatte **ist bereits im Repository enthalten**; ihr Git-Blob-Hash `7e57ef8e0c90d84fa4c951bea7815b0233762ca7` wurde bei der Übernahme geprüft.
 2. **DOSBox-X:** Fertiger öffentlicher AWE32-Fork als Git-Submodul unter `third_party/dosbox-x-AWE32`, fixiert auf `f3a95b9f19a7f9863295e6481f271cf04733c635` (`masterAWE32`).
 3. **Original-Creative-DOS-Laufzeit:** Historisch nachgewiesene Ausführung von Creative DOS SF2LIB/DEMO in DOSBox-X mit dem AWE-ROM. **Noch nicht im neuen VST3 verbunden.**
 4. **VST3-Integration:** Noch **nicht implementiert/abgenommen**. Keine alten 86Box-/Win95- oder P009-Engines übernommen. Auch die bestehende GUI muss an die neue Runtime verdrahtet werden.
