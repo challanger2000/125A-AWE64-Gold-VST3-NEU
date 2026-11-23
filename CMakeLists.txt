@@ -181,7 +181,8 @@ void PresetBrowserView::ChooseRom() {
   # The real Steinberg factory/process() is exercised on Windows with a
   # PUBLIC synthetic DOS executable: NO original Creative assets in CI.
   # This is a transport gate, never a substitute EMU8000/Creative synth.
-  add_executable(awe64_vst3_host_pcm_smoke tests/WindowsVst3HostPcmSmoke.cpp)
+  add_executable(awe64_vst3_host_pcm_smoke tests/WindowsVst3HostPcmSmoke.cpp
+    "${AWE64_VST3SDK}/public.sdk/source/common/memorystream.cpp")
   target_include_directories(awe64_vst3_host_pcm_smoke PRIVATE "${AWE64_VST3SDK}")
   target_link_libraries(awe64_vst3_host_pcm_smoke PRIVATE sdk base)
   target_compile_features(awe64_vst3_host_pcm_smoke PRIVATE cxx_std_20)

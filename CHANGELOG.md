@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Native Recall-Testhost korrekt mit SDK MemoryStream linken
+
+- Windows 45287430560 und 45287808293: Build des VST3 selbst nicht als fehlerhaft ausgewiesen; nativer Testhost scheiterte beim Linken an fünf undefinierten Steinberg-MemoryStream-Symbolen. Kein SF2-Klangurteil aus diesen Läufen. Transporttests 45287430562 und 45287808294 sowie Versionsprüfungen PASS.
+- CMake bindet die Implementierung `public.sdk/source/common/memorystream.cpp` aus demselben gepinnten SDK explizit im Testhost ein. Keine Änderung an EMU8000, Creative oder GUI. Neuer Windows-Lauf erforderlich; kein Release.
+
 ## 24.11.2026 — Aktiver SF2-/ROM-Wechsel und echte sparse Presetliste
 
 - Transport 45287430562 und Version 45287430420 PASS; Windows-Originalgate 45287430560 läuft noch. Neuer Lauf darf die ausstehende Originalprüfung nicht abbrechen (CI-Warteschlange statt Abbruch).
