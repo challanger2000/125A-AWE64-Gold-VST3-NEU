@@ -68,7 +68,7 @@ jobs:
           path=pathlib.Path('third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll').resolve()
           with os.add_dll_directory(str(path.parent)):
               dll=ctypes.WinDLL(str(path))
-              names=('AWE64_StartGuest','AWE64_HostRegisterIO','AWE64_HostRegisterPCM','AWE64_HostRegisterMidi')
+              names=('AWE64_StartGuest','AWE64_HostRegisterIO','AWE64_HostRegisterPCM','AWE64_HostRegisterMidi','AWE64_RequestStop')
               for name in names: assert getattr(dll,name,None) is not None, name
               dll.AWE64_HostRegisterMidi.argtypes=(ctypes.c_void_p,ctypes.c_void_p)
               dll.AWE64_HostRegisterMidi.restype=None

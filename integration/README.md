@@ -16,3 +16,5 @@ The old BEE0/BEF0 guest mailbox remains in source solely as a non-default experi
 DosBoxHostAdapter.hpp now exports pullMidi, host PCM and the non-default experimental port mailbox callbacks. Only pullMidi is intended for the production path.
 
 Current limitations: the DLL Windows CI build may still fail; VST3 loading, DOSBox guest boot, original Creative binary, private ROM/SBK/SF2, playback, headless SDL, clean shutdown, resampling, multi-instance isolation and DAW recall remain unproven. Original DOSBox-X uses global emulator state, so more than one active runtime is unsafe until resolved. No releases or downloaded runtime artifacts are permitted from this test.
+
+The original DOSBox-X event loop now supports AWE64_RequestStop. It sets an atomic flag, and the DOS emulator thread throws the original DOSBox shutdown signal when GFX_Events next polls. The caller must wait for the worker to exit before unloading the DLL. This is **not** yet an end-to-end lifecycle proof, and a blocked guest may not be interruptible.

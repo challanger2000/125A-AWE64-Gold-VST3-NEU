@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Geordneter In-Process-Gaststopp als Original-DOSBox-Signal
+
+- AWE64_RequestStop als externes Windows-DLL-ABI implementiert. Setzt atomare Stop-Anforderung, geprüft am ursprünglichen DOSBox-X-GFX_Events-Dispatcher; wirft dessen schon vorhandenes Shutdown-Signal auf dem Emulator-Thread. Kein `exit()` in der DAW und keine externe Anwendung.
+- Plattformunabhängige Quellpatch-Tests um Stop-Signal ergänzt. Echte Windows-DLL-Kompilierung und Worker-Join/Shutdown werden getrennt nachgewiesen.
+
 ## 23.11.2026 — Originale DOSBox-X-Windows-DLL erfolgreich gebaut; direkter MPU-401-MIDI-Pfad
 
 - **Actions 45103209697 PASS:** Gepinnter DOSBox-X-AWE32-Originalquellcode erfolgreich als Windows-x64-DLL kompiliert, DLL-Datei vorhanden, Exporte AWE64_StartGuest, AWE64_HostRegisterIO und AWE64_HostRegisterPCM tatsächlich geprüft. Original-ROM, Creative-DOS-Binary und echte Audioausgabe waren NICHT Teil dieses Tests.

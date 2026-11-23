@@ -32,10 +32,12 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('if(mpu.mode!=M_UART)return;',r)
         with self.assertRaises(ValueError):patch.patch_mpu(r)
     def test_guest_entry(self):
-        s='int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {}'
+        s='void GFX_Events() {}\nint main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {}'
         r=patch.patch_main(s)
         self.assertIn('AWE64_StartGuest(',r)
         self.assertIn('return main(argc,argv);',r)
+        self.assertIn('AWE64_RequestStop',r)
+        self.assertIn('if(awe64_guest_stop.load',r)
     def test_native_win_x64_dll(self):
         cond="'$(Configuration)|$(Platform)'=='Release|x64'"
         s=f'  <PropertyGroup Condition="{cond}" Label="Configuration">\n    <ConfigurationType>Application</ConfigurationType>\n  </PropertyGroup>\n  <PropertyGroup Condition="{cond}">\n    <OutDir>x</OutDir>\n  </PropertyGroup>\n  <ItemDefinitionGroup Condition="{cond}">\n    <ClCompile><PreprocessorDefinitions>WIN32</PreprocessorDefinitions></ClCompile>\n  </ItemDefinitionGroup>'

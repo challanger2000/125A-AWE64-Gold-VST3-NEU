@@ -18,6 +18,7 @@ typedef void (AWE64_CALL *AWE64_RegisterPCMFn)(void*,AWE64_PcmFn);
 typedef unsigned int (AWE64_CALL *AWE64_PullMidiFn)(void*,unsigned char*,unsigned int);
 typedef void (AWE64_CALL *AWE64_RegisterMidiFn)(void*,AWE64_PullMidiFn);
 typedef int (AWE64_CALL *AWE64_StartGuestFn)(int,char**);
+typedef void (AWE64_CALL *AWE64_RequestStopFn)(void);
 #ifdef __cplusplus
 }
 #endif

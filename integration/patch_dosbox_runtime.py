@@ -145,11 +145,28 @@ def patch_main(s):
     a='int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {'
     if s.count(a)!=1 or 'AWE64_StartGuest(' in s:
         raise ValueError('Unknown or already patched DOSBox main')
+    event='void GFX_Events() {'
+    injected='''
+#ifdef AWE64_VST3_RUNTIME
+#include <atomic>
+static std::atomic<bool> awe64_guest_stop{false};
+// Never exit() the DAW process. The emulator thread observes this flag,
+// throws DOSBox-X's existing shutdown signal and releases its own state.
+extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
+    awe64_guest_stop.store(true,std::memory_order_release);
+}
+#endif
+'''
+    s=once(s,event,injected+'\n'+event+'''
+#ifdef AWE64_VST3_RUNTIME
+    if(awe64_guest_stop.load(std::memory_order_acquire))throw(0);
+#endif''')
     return s+'''
 #ifdef AWE64_VST3_RUNTIME
 // Must be invoked on a dedicated host-owned worker, inside the VST3 process.
 extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
     int argc,char** argv) {
+    awe64_guest_stop.store(false,std::memory_order_release);
     return main(argc,argv);
 }
 #endif

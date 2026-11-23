@@ -29,7 +29,7 @@
 - Implementiert: `integration/DosBoxHostAdapter.hpp`, welcher die vorhandenen SPSC-/Creative-DOS-Brücken mit den C ABI-Aufrufen verbindet. Originaler EMU8000-Code und Creative-Synthesizerlogik unverändert.
 - **Originaler DOSBox-X-AWE32-Quellcode als Windows-x64-DLL kompiliert und drei Exporte nachgewiesen** (GitHub Actions 45103209697: PASS). Das beweist nur die native DOSBox-Komponente, **keinen** Creative-DOS-Gaststart, keinen VST3-Klang.
 - **Neue bevorzugte MIDI-Anbindung:** hostseitige DAW-MIDI-Nachrichten in das originale emulierte MPU-401-UART-Gerät (0x330/0x331), welches das unveränderte Creative-DOS-DEMO.EXE bereits liest und an die originalen Creative-SF2LIB-Funktionen weitergibt. Quellcode implementiert, zugehöriger Windows-DLL-Kompilierungs-/UART-Integrationstest noch ausstehend.
-- **Nicht implementiert/abgenommen:** echte DOS-Gastlaufzeit im VST3, ROM/SBK/SF2-Klang, Host-Rate-Konvertierung, zuverlässiger Shutdown, Mehrfachinstanzisolierung, DAW-Recall und Studio-Pro-Praxistest.
+- **Neu:** Export `AWE64_RequestStop()` implementiert, der das bestehende DOSBox-X-Shutdown-Signal über den emulierten Eventloop auslöst; Test noch ausstehend. **Nicht implementiert/abgenommen:** echte DOS-Gastlaufzeit im VST3, ROM/SBK/SF2-Klang, Host-Rate-Konvertierung, zuverlässiger Shutdown, Mehrfachinstanzisolierung, DAW-Recall und Studio-Pro-Praxistest.
 
 ## Unveränderliche Versionsregeln
 
