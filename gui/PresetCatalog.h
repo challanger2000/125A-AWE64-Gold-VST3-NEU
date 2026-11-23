@@ -34,6 +34,13 @@ public:
             entries_.push_back({0u,static_cast<uint8_t>(i),
                  "MIDI-PROGRAMM "+std::to_string(i),false});
     }
+    // The original Creative DEMO allocates one physical patch bank (0).
+    // Expose only addressable SF2 bank-0 presets until other banks are proven.
+    // Never pad a sparse external SoundFont with default GM entries.
+    void KeepMidiBankZero() {
+        entries_.erase(std::remove_if(entries_.begin(),entries_.end(),
+            [](const PresetEntry& e){return e.bank!=0;}),entries_.end());
+    }
     const PresetEntry* Find(uint16_t bank,uint8_t program) const noexcept {
         for(const auto& p:entries_) if(p.bank==bank&&p.program==program)return &p;
         return nullptr;

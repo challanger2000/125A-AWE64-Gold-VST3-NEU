@@ -121,8 +121,6 @@ void PresetBrowserView::ChooseSf2() {
             L"125A AWE64 Gold",MB_OK|MB_ICONERROR);
         return;
     }
-    MessageBoxW(dialog.hwndOwner,L"SoundFont vorgemerkt. Wird bei der naechsten Plugin-Aktivierung geladen.",
-        L"125A AWE64 Gold",MB_OK|MB_ICONINFORMATION);
     lastStatus_.clear();SyncSf2Status();
 #endif
 }
@@ -137,6 +135,26 @@ void PresetBrowserView::ChooseSf2() {
   string(REPLACE [=[L"im laufenden Windows-95-Gast ist noch nicht implementiert."]=]
       [=[L"waehrend des DOS-Gastbetriebs ist noch nicht implementiert."]=]
       AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  # ROM button restores the original ROM-backed GM bank via the same
+  # non-RT guest restart, without changing the approved faceplate.
+  string(FIND "${AWE64_GUI_SRC}" "void PresetBrowserView::ChooseRom() {" AWE64_ROM_BEGIN)
+  string(FIND "${AWE64_GUI_SRC}" "void PresetBrowserView::valueChanged(" AWE64_ROM_END)
+  if(AWE64_ROM_BEGIN LESS 0 OR AWE64_ROM_END LESS AWE64_ROM_BEGIN)
+    message(FATAL_ERROR "Approved ROM dialog anchors missing")
+  endif()
+  string(SUBSTRING "${AWE64_GUI_SRC}" 0 ${AWE64_ROM_BEGIN} AWE64_GUI_BEFORE)
+  string(SUBSTRING "${AWE64_GUI_SRC}" ${AWE64_ROM_END} -1 AWE64_GUI_AFTER)
+  set(AWE64_ROM_DIALOG [=[
+void PresetBrowserView::ChooseRom() {
+#if defined(_WIN32)
+    if(!romLoadRequest_||!romLoadRequest_(std::string{}))
+        MessageBoxW(GetForegroundWindow(),L"Originale ROM-Bank konnte nicht gestartet werden.",
+            L"125A AWE64 Gold",MB_OK|MB_ICONERROR);
+    lastStatus_.clear();SyncSf2Status();
+#endif
+}
+]=])
+  set(AWE64_GUI_SRC "${AWE64_GUI_BEFORE}${AWE64_ROM_DIALOG}${AWE64_GUI_AFTER}")
   set(AWE64_GUI_COMPAT_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/PresetBrowserViewSdkCompat.cpp")
   file(WRITE "${AWE64_GUI_COMPAT_SOURCE}" "${AWE64_GUI_SRC}")
 

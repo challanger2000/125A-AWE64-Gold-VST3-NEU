@@ -186,6 +186,7 @@ int main(int argc,char** argv) {
     MinimalHostApplication host;
     if(component->initialize(&host)!=S::kResultOk)
         return fail("VST3 initialize() failed");
+    std::vector<std::uint8_t> externalState;
     if(originalMode) {
         if(const char* path=std::getenv("AWE64_TEST_EXTERNAL_SF2")) {
             const std::string source(path);
@@ -210,6 +211,13 @@ int main(int argc,char** argv) {
                outgoing.getSize()!=static_cast<S::TSize>(bytes.size())||
                std::memcmp(outgoing.getData(),bytes.data(),bytes.size())!=0)
                 return fail("External SF2 real IComponent state did not roundtrip");
+            externalState=bytes;
+            // Start with ROM, then switch to the external bank while the
+            // same component remains active. Both go through actual state.
+            auto defaultBytes=bytes;defaultBytes.resize(11);defaultBytes[4]=1;
+            S::MemoryStream defaultState(defaultBytes.data(),defaultBytes.size());
+            if(component->setState(&defaultState)!=S::kResultOk)
+                return fail("ROM state reset before live bank change failed");
             std::cout<<"REAL_VST3_EXTERNAL_SF2_STATE_ROUNDTRIP_PASS\n";
         }
     }
@@ -278,6 +286,26 @@ int main(int argc,char** argv) {
     // validated short public synthetic DOS test. Preserve the latter.
     const unsigned maxBlocks=originalMode ?
         std::min(static_cast<unsigned>(originalSeconds*1000/12),endOriginalBlock) : 600u;
+    if(!externalState.empty()){
+        // Allow the initial original Creative guest to settle before
+        // exercising stop/join/unload/restart inside the same component.
+        const auto begin=std::chrono::steady_clock::now();
+        for(unsigned i=0;i<800;++i){
+            midiEvents.setEnabled(false);
+            if(processor->process(data)!=S::kResultOk)return fail("Pre-switch original runtime failed");
+            std::this_thread::sleep_until(begin+std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>((i+1)*512.0/44100.0)));
+        }
+        S::MemoryStream switched(externalState.data(),externalState.size());
+        if(component->setState(&switched)!=S::kResultOk)
+            return fail("Active external SF2 guest restart failed");
+        S::MemoryStream saved;
+        if(component->getState(&saved)!=S::kResultOk||
+           saved.getSize()!=static_cast<S::TSize>(externalState.size())||
+           std::memcmp(saved.getData(),externalState.data(),externalState.size())!=0)
+            return fail("Active external SF2 state did not roundtrip");
+        std::cout<<"REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS\n";
+    }
     const auto measurementStart=std::chrono::steady_clock::now();
     for(unsigned block=0;block<maxBlocks;++block){
         // Synthetic path retains its short silence check. Original path

@@ -33,7 +33,7 @@ on:
   workflow_dispatch:
 concurrency:
   group: awe64-dosbox-runtime-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read

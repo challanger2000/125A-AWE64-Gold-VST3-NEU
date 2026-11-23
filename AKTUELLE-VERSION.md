@@ -9,6 +9,13 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Aktiver SF2-/ROM-Wechsel und echte sparse Presetliste
+
+- Transport 45287430562 und Version 45287430420 PASS; Windows-Originalgate 45287430560 läuft noch. Neuer Lauf darf die ausstehende Originalprüfung nicht abbrechen (CI-Warteschlange statt Abbruch).
+- SF2-/ROM-Knopf und State-Wechsel starten denselben originalen Creative-DOS-Gast im selben VST3 neu. Kein externer Prozess, keine DSP-Nachbildung. Lifecycle-Mutex ausschließlich blockierend außerhalb des Audiothreads; process() liefert beim nicht blockierenden try_lock-Ausfall Stille. Vorherige Bank bei synchronem Startfehler erneut versuchen. Originalgrafik byte-identisch; kompiliertes Kompatibilitätsdialog-Verhalten ersetzt. Wiederholter Gaststart im selben Prozess ausdrücklich **noch nicht nachgewiesen**, möglicher Blocker: globaler DOSBox-/SDL-Zustand.
+- Bank-0-Presets aus tatsächlichem phdr, keine Auffüllung externer SF2. Höhere Bänke nicht freigegeben. Browser erhält getrennten Snapshot über UI-Revision, nicht vom Audiothread. Alte Presetnummern ohne vorhandenen Eintrag werden auf ersten vorhandenen Eintrag gesetzt. Kein Anspruch auf vollständige Treiber-Banksemantik.
+- Der Windows-Originaltest lädt nun zuerst den ROM-Gast und wechselt über die echte IComponent-State-Schnittstelle bei aktivem Plugin zur externen GM-Referenz; danach vollständiges Note/Ruhe/Release-Gate. Dieser neue Test steht aus. Keine Besitzerdateien publizieren, kein Release, nur main.
+
 ## 24.11.2026 — SF2-Prüfskript korrigiert
 
 - Windows 45287143543 und Transport 45287143763 brachen vor dem Klangtest wegen eines fehlerhaften PowerShell-Regex-Einfügevorgangs ab. Doppelt eingefügten Skriptabschluss entfernt; Trace-Filter wieder korrekt. Keine Änderung an Plugin, DSP oder Originaltreiber. Externer SF2-Recall-/Klangtest weiterhin offen.

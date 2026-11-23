@@ -77,6 +77,7 @@ tresult PLUGIN_API DosBoxVst3Shell::initialize(FUnknown* context) {
         }
     }
     originalMidiCatalog_.SetOriginalCreativeMidiNumbers();
+    startedCatalog_=originalMidiCatalog_;
     return kResultOk;
 }
 std::string DosBoxVst3Shell::requestedSoundFont() {
@@ -97,50 +98,91 @@ bool DosBoxVst3Shell::requestSoundFont(const std::string& path) {
             AWE125::PresetCatalog candidate;std::string error;
             if(!guest::readExternalSf2(std::filesystem::u8path(path),bytes,adapted) ||
                !candidate.LoadSoundFont(path,error))return false;
-            // SDK demo loads one SF2 into physical bank 0. Do not falsely
-            // expose higher banks before their driver semantics are tested.
-            if(std::none_of(candidate.Entries().begin(),candidate.Entries().end(),
-                            [](const auto& e){return e.bank==0;}))return false;
+            candidate.KeepMidiBankZero();
+            if(candidate.Entries().empty())return false;
         }
-        std::lock_guard<std::mutex> lock(selectionMutex_);
-        requestedBank_=path;
+        std::lock_guard<std::mutex> lifecycle(runtimeMutex_);
+        const auto previous=requestedSoundFont();
+        if(previous==path && (!runtime_||!runtime_->finished()))return true;
+        if(runtime_) {
+            // Exactly one DOSBox instance. Restart the unmodified guest with
+            // the new bank. Never call DOSBox on the real-time callback.
+            stopRuntimeLocked();
+            if(!startRuntimeLocked(path)) {
+                (void)startRuntimeLocked(previous);
+                return false;
+            }
+        }
+        {
+            std::lock_guard<std::mutex> lock(selectionMutex_);
+            requestedBank_=path;
+        }
         return true;
     } catch (...) {return false;}
 }
-tresult PLUGIN_API DosBoxVst3Shell::setActive(TBool state) {
-    if(state) {
-        if(runtime_)return kResultOk;
-        // Host activation is non-RT: check the authentic private Creative
-        // executable, private ROM, valid SF2 and compiled DOSBox-X DLL.
-        // Never substitute a synthetic renderer or silently ignore assets.
-        try {
-            auto engine=std::make_unique<integration::DosBoxRuntimeHost>();
-            const auto ownBinary=engine->pluginBinaryPath();
-            const auto selected=requestedSoundFont();
-            if(ownBinary.empty() || !engine->begin(
-                ownBinary,integration::DosBoxRuntimeHost::privateAssetsDir(ownBinary),selected)) {
-                guestStatus_.store(-1,std::memory_order_release);
-                return kResultFalse;
-            }
-            runtime_=std::move(engine);
-            {
-                std::lock_guard<std::mutex> lock(selectionMutex_);
-                startedBank_=selected;
-            }
-            guestStatus_.store(1,std::memory_order_release);
-            initialProgramSent_=false;
-            absoluteSamplePosition_=0;
-        } catch (...) {
-            guestStatus_.store(-1,std::memory_order_release);
-            return kResultFalse;
-        }
-        return SingleComponentEffect::setActive(true);
+std::uint64_t DosBoxVst3Shell::refreshBrowserCatalog() {
+    // Only the UI thread writes originalMidiCatalog_. The audio thread never
+    // reads it. Activation publishes a separate immutable-by-lock snapshot.
+    std::lock_guard<std::mutex> lock(selectionMutex_);
+    const auto revision=catalogRevision_.load(std::memory_order_relaxed);
+    if(revision!=displayedRevision_) {
+        originalMidiCatalog_=startedCatalog_;
+        displayedRevision_=revision;
     }
+    return revision;
+}
+void DosBoxVst3Shell::stopRuntimeLocked() noexcept {
     if(runtime_) {
         runtime_->stop();
         runtime_.reset();
     }
     guestStatus_.store(0,std::memory_order_release);
+}
+bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected) {
+    try {
+        auto engine=std::make_unique<integration::DosBoxRuntimeHost>();
+        const auto ownBinary=engine->pluginBinaryPath();
+        const auto privateDir=integration::DosBoxRuntimeHost::privateAssetsDir(ownBinary);
+        const auto source=selected.empty()?(privateDir/"SYNTHGM.SF2"):std::filesystem::u8path(selected);
+        const auto utf8=source.u8string();
+        const std::string path(reinterpret_cast<const char*>(utf8.data()),utf8.size());
+        AWE125::PresetCatalog candidate;std::string error;
+        if(candidate.LoadSoundFont(path,error))candidate.KeepMidiBankZero();
+        else if(selected.empty())candidate.SetOriginalCreativeMidiNumbers(); // synthetic fixture only
+        if(candidate.Entries().empty()||ownBinary.empty()||!engine->begin(ownBinary,privateDir,selected)) {
+            guestStatus_.store(-1,std::memory_order_release);
+            return false;
+        }
+        runtime_=std::move(engine);
+        if(!candidate.Find(0,program_.load(std::memory_order_acquire))) {
+            const auto program=candidate.Entries().front().program;
+            (void)setParamNormalized(kProgram,static_cast<double>(program)/127.);
+        }
+        (void)setParamNormalized(kBank,0.);
+        {
+            std::lock_guard<std::mutex> lock(selectionMutex_);
+            startedBank_=selected;
+            startedCatalog_=std::move(candidate);
+            catalogRevision_.fetch_add(1,std::memory_order_release);
+        }
+        guestStatus_.store(1,std::memory_order_release);
+        initialProgramSent_=false;
+        absoluteSamplePosition_=0;
+        return true;
+    } catch (...) {
+        stopRuntimeLocked();
+        guestStatus_.store(-1,std::memory_order_release);
+        return false;
+    }
+}
+tresult PLUGIN_API DosBoxVst3Shell::setActive(TBool state) {
+    std::lock_guard<std::mutex> lifecycle(runtimeMutex_);
+    if(state) {
+        if(runtime_)return kResultOk;
+        if(!startRuntimeLocked(requestedSoundFont()))return kResultFalse;
+        return SingleComponentEffect::setActive(true);
+    }
+    stopRuntimeLocked();
     return SingleComponentEffect::setActive(false);
 }
 tresult PLUGIN_API DosBoxVst3Shell::canProcessSampleSize(int32 size) {
@@ -156,7 +198,18 @@ tresult PLUGIN_API DosBoxVst3Shell::setupProcessing(ProcessSetup& setup) {
 tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     // No DOSBox/Creative emulator on the DAW realtime callback.
     // Only bounded SPSC MIDI enqueue and actual original mixer PCM dequeue.
-    if(!runtime_)return kResultFalse;
+    std::unique_lock<std::mutex> lifecycle(runtimeMutex_,std::try_to_lock);
+    if(!lifecycle.owns_lock()||!runtime_) {
+        // During a non-RT guest restart the DAW receives bounded silence.
+        if(data.outputs&&data.numOutputs>0&&data.outputs[0].channelBuffers32) {
+            auto& out=data.outputs[0];
+            for(int32 ch=0;ch<out.numChannels;++ch)
+                if(out.channelBuffers32[ch]&&data.numSamples>0)
+                    std::fill_n(out.channelBuffers32[ch],data.numSamples,0.f);
+            out.silenceFlags=out.numChannels>=2?3:1;
+        }
+        return kResultOk;
+    }
     auto& engine=*runtime_;
     if(engine.finished()) {
         guestStatus_.store(-2,std::memory_order_release);
@@ -332,6 +385,7 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
     VSTGUI::UTF8StringPtr name,const VSTGUI::UIAttributes&,
     const VSTGUI::IUIDescription*,VSTGUI::VST3Editor*) {
     if(!name||std::strcmp(name,"P007P165Panel")!=0)return nullptr;
+    (void)refreshBrowserCatalog();
     return new AWE125::PresetBrowserView({0,0,1000,708},this,
         originalMidiCatalog_,unusedFmCatalog_,std::string{},
         [this](){
@@ -350,10 +404,10 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
                    s==1 ? std::string("ORIGINAL DOSBOX-X STARTET") :
                            std::string("AWE64 GOLD | KEIN AUDIO-GAST");
         },
-        [](const std::string&){return false;},
+        [this](const std::string&){return requestSoundFont({});},
         [this](const std::string& path){return requestSoundFont(path);},
         [this](){return requestedSoundFont();},
-        [](){return std::uint64_t{1};},
+        [this](){return refreshBrowserCatalog();},
         [](std::uint16_t bank){return bank==0;});
 }
 IPlugView* PLUGIN_API DosBoxVst3Shell::createView(FIDString name) {

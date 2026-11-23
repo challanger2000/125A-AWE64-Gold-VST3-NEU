@@ -29,7 +29,15 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::atomic<std::uint8_t> program_{0};
     std::atomic<std::uint8_t> bank_{0};
     std::atomic<float> master_{1.f};
+    // Lifecycle changes on the host/editor thread. The audio callback uses
+    // try_lock, never waits for the emulator or a disk operation.
+    std::mutex runtimeMutex_;
     std::mutex selectionMutex_;
+    AWE125::PresetCatalog startedCatalog_{};
+    std::uint64_t displayedRevision_=0;
+    bool startRuntimeLocked(const std::string&);
+    std::uint64_t refreshBrowserCatalog();
+    void stopRuntimeLocked() noexcept;
     std::string requestedBank_;
     std::string startedBank_;
     std::atomic<std::uint64_t> catalogRevision_{1};
