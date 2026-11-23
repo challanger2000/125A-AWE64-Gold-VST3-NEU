@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Schützendes VST3-Host-Gate: PowerShell-`$Host`-Variable ersetzt und DLL-Buildcache eingerichtet
+
+- [Windows 45195522027](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45195522027): originale DOSBox-X-AWE32-Windows-DLL und eigentlicher VST3-Host samt eigenem Hosttest-C++ **erfolgreich kompiliert**; originale EMU8000-I/O-, MPU-UART- und Nicht-Stille-PC-Speaker-Tests PASS. Das neue VST3-`process()`-Audio-Gate **FAIL ohne Testdurchführung**, da `$host` in PowerShell schreibgeschütztes `$Host` referenziert.
+- **Quellfix:** Workflow verwendet `$hostTestExe` statt `$host`. Neue plattformübergreifende Regex-Negativregression unterbindet diese PowerShell-Fehlerklasse.
+- **CI-Beschleunigung:** GitHub Actions speichert die **aus Original-GPL-DOSBox-X-Quellen compilierte, IP-freie DLL** unter einem Hash des exakten Quellpatchskripts und des gepinnten Originalcommits. Cache-Speicherung erfolgt sofort nach erfolgreicher DLL-Kompilierung, auch wenn ein nachgelagerter Hosttest fehlschlägt. Niemals privates AWE-ROM, Creative-DOS-Binary oder SF2 im öffentlichen Cache.
+- Neuer Lauf noch ausstehend; Original-Creative-Sound und echte VST3-Host-PCM noch nicht nachgewiesen. `0.0.0-dev`.
+
+
 ## 23.11.2026 — Compilerbefunde beim neuen Steinberg-VST3-Hosttest behoben; Originaldaten privat bereitstellbar
 
 - [Windows-Integrationslauf 45193354491](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45193354491) **FAIL**: original DOSBox-X/EMU8000/MPU/PC-Speaker-PCM weiterhin **PASS**, aber der neu hinzugefügte VST3-Testhost kompiliert nicht wegen irrtümlichem `Steinberg::TChar` (korrekt `Steinberg::Vst::TChar`) und Windows-`min/max`-Makrokollision. Beide Quellfehler im Testhost korrigiert, Original-Emu-Kern und Produkt-DSP bleiben unverändert.

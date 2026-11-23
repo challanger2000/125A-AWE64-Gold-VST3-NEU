@@ -31,6 +31,18 @@ class SyntheticDosExeTests(unittest.TestCase):
         self.assertEqual(code[-5:], bytes((0xb8, 0, 0x4c, 0xcd, 0x21)))
         self.assertNotIn(b"Creative", binary)
 
+    def test_ci_script_does_not_overwrite_powershell_builtin_host_variable(self):
+        import re
+        workflow = (Path(__file__).resolve().parents[1] /
+                    ".github" / "workflows" / "windows-dosbox-runtime.yml"
+                    ).read_text(encoding="utf-8")
+        # PowerShell $Host is a READ-ONLY automatic variable, including
+        # lower-case $host. The prior Windows run failed BEFORE VST3 testing.
+        self.assertIsNone(re.search(r"\$host\s*=", workflow, re.IGNORECASE))
+        self.assertIn("--exe $hostTestExe --plugin $plugin", workflow)
+        self.assertIn("actions/cache/restore@v4", workflow)
+        self.assertIn("actions/cache/save@v4", workflow)
+
     def test_stage_fixture_rejects_existing_owner_data(self):
         with tempfile.TemporaryDirectory() as work:
             bundle = Path(work) / "AWE64GoldDOSBoxDev.vst3"

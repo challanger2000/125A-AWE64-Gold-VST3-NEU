@@ -70,13 +70,26 @@ jobs:
           $parseErrors = $null
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/Run-Private-Creative-AWE-Test.ps1').Path,[ref]$t,[ref]$parseErrors) | Out-Null
           if ($parseErrors.Count -gt 0) { throw ('Private staging PowerShell syntax error: ' + ($parseErrors | Out-String)) }
+      - name: Restore compiled OPEN-SOURCE DOSBox-X SDL2 DLL cache (NO owner ROM/SF2/Creative)
+        id: original-dosbox-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll
+          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('integration/patch_dosbox_runtime.py') }}
       - name: Build in-process x64 DOSBox-X-AWE32 DLL
+        if: steps.original-dosbox-cache.outputs.cache-hit != 'true'
         shell: pwsh
         working-directory: third_party/dosbox-x-AWE32
         run: |
           msbuild vs/dosbox-x.sln -t:dosbox-x:Rebuild '-p:Configuration=Release SDL2' -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m:4
           if ($LASTEXITCODE -ne 0) { throw "DOSBox runtime DLL compilation failed" }
           if (-not (Test-Path 'bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll')) { throw "Runtime DLL not found" }
+      - name: Save compiled OPEN-SOURCE DOSBox-X SDL2 DLL after successful build
+        if: steps.original-dosbox-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll
+          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('integration/patch_dosbox_runtime.py') }}
       - name: Assert real DLL exports exist
         shell: pwsh
         run: |
@@ -157,9 +170,9 @@ jobs:
         run: |
           $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3'
           $plugin=Join-Path $bundle 'Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3'
-          $host='build-vst3/Release/awe64_vst3_host_pcm_smoke.exe'
+          $hostTestExe='build-vst3/Release/awe64_vst3_host_pcm_smoke.exe'
           python tests/MakeSyntheticDemoExe.py --bundle $bundle
           if ($LASTEXITCODE -ne 0) { throw 'Safe synthetic test DOS EXE staging failed' }
-          python tests/WindowsRunVst3HostPcmSmoke.py --exe $host --plugin $plugin
+          python tests/WindowsRunVst3HostPcmSmoke.py --exe $hostTestExe --plugin $plugin
           if ($LASTEXITCODE -ne 0) { throw 'VST3 process() failed to deliver original mixer audio' }
-      # Source-only test; no public runtime binaries or private ROM/SF2 uploaded.
+      # No public release artifact or private ROM/SF2/Creative bytes uploaded. DOSBox DLL cache is source-only-generated.

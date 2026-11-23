@@ -29,6 +29,11 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 - Original-MPU401-MIDI-Anbindung, PCM-Bridge, verstecktes DOSBox-SDL-Fenster und internes audiofreies SDL-Backend sind implementiert; Windows-Integrations- und I/O-Tests wurden tatsächlich bestanden ([vollständige Windows-Integration 45175109078](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45175109078)); **der echte Creative-DOS-/ROM-/SF2-Klangtest ist weiterhin offen**.
 - **Noch KEIN fertiges Instrument:** Creative-DOS-Programm mit den echten privaten Originaldaten innerhalb des VST3, echter AWE-Sound, State/Host/Studio-Pro-Abnahme stehen weiterhin aus.
 
+## Stand der neuen VST3-Hostprüfung
+
+- Der echte Windows-x64-VST3-Bundle-Build und das separate Steinberg-VST3-Host-`process()`-Testprogramm **kompilieren**. Im aktuellen Lauf 45195522027 wurde der tatsächliche Hostaufruf jedoch durch den schreibgeschützten PowerShell-Variablennamen `$Host` verhindert. Das neue Skript nutzt `$hostTestExe`; eine Negativregression schützt davor. Das erneute Windows-Testergebnis muss noch tatsächlich abgewartet werden.
+- Originales ROM, `DEMO.EXE` und `SYNTHGM.SF2` lassen sich mit `tools/Run-Private-Creative-AWE-Test.ps1` ausschließlich lokal auf dem Besitzer-PC verifizieren und in ein bereits gebautes Entwicklungsbundle übernehmen. **Kein privater Originalklangtest wurde in diesem Chat bereits ausgeführt.**
+
 ## Fortsetzung – ausschließlich dieser Pfad
 
 1. Neuesten Actions-Lauf zur originalen DOSBox-X-In-Process-Laufzeit und den echten DOS-UART-MIDI-Tests prüfen und etwaige Fehler direkt korrigieren.

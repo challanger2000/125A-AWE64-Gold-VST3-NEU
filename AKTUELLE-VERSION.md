@@ -36,6 +36,14 @@ Die neue private Windows-Prüfung enthält zusätzlich überprüfte Original-Git
 
 Die synthetischen Tests dieses privaten Originalklang-Testers sind jetzt in den Linux-/Windows-Transportworkflow eingebunden. Ein echter Original-Creative-Klangnachweis ist davon strikt getrennt.
 
+## Windows-VST3-Host-Praxisgate: PowerShell-Automatikfehler nach Original-Build behoben
+
+- [Windows-Integrationslauf 45195522027](../../actions/runs/45195522027) **FAIL NACH erfolgreich gebauten echten VST3-Plugin und C++-Hosttestprogramm**; der Gate-Schritt erreichte den tatsächlichen Instrumenten-`process()`-Aufruf **noch nicht**. Ursache war die Zuweisung `$host='...'` in GitHub Actions: PowerShells **`$Host` ist eine schreibgeschützte automatische Variable** (case-insensitive). Deshalb endete der Workflow unmittelbar beim Vorbereiten des Testaufrufs.
+- Auf `$hostTestExe` umgestellt und Regression in `test_synthetic_dos_exe.py` eingebaut, die `$host =` künftig unter Linux und Windows abweist.
+- Um die wiederholten vollständigen 6-Minuten-Builds des unveränderten Quellkerns zu vermeiden, nutzt GitHub Actions jetzt `actions/cache/restore@v4`/`actions/cache/save@v4` **ausschließlich für die aus öffentlichem DOSBox-X-Quellcode erzeugte interne DLL**. Cache-Schlüssel bindet gepinnten Submodulstand und tatsächlich verwendetes Quellpatchskript ein; keine ROMs, Creative-Programme oder SF2 werden gecacht. Der neue Cache darf nur nach ausgeführtem Lauf als funktionierend gemeldet werden.
+- Im genannten Windows-Lauf: originaler EMU8000-`AWEUTIL /S`-Registertest, Original-MIDI-Gast, eigener PC-Speaker-Mixer/PCM-Test und tatsächlicher Windows-x64-VST3-Host-/Runtime-Build **alle PASS**. Die Linux-/Windows-Datenfrei-Tests sind bereits [45195522141](../../actions/runs/45195522141) PASS.
+- **Originale Creative-`DEMO.EXE` mit Besitzer-ROM und `SYNTHGM.SF2` bleibt PRIVAT und UNGETESTET im aktuellen VST3**. Kein Release, Entwicklungskennung `0.0.0-dev`.
+
 ## Windows-VST3-Hosttest: echte Compilerfehler diagnostiziert, korregiert – CI-Gegenprüfung ausstehend
 
 - **[Windows-Original-AWE-Build 45193354491](../../actions/runs/45193354491): FAIL** in neuem *eigenem* Testhost `WindowsVst3HostPcmSmoke.cpp`, **nicht** in originaler DOSBox-X-AWE32-Hardware: Microsoft Visual C++ meldete `Steinberg::TChar` als nicht existent sowie `std::max`-Parserfehler durch `windows.h`-Makros `min/max`. Die vorangehenden originalen DOSBox-X-DLL-, EMU8000-, MIDI- und PC-Speaker-PCM-Prüfungen im selben Windows-Lauf waren alle PASS.
