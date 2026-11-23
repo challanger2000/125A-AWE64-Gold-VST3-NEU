@@ -18,6 +18,8 @@
 - **Originales DOSBox-X:** letzter veröffentlichter Stand `2026.10.01` (02.10.2026); offizieller `master` hat bis zum 21.11.2026 weitere Änderungen. **Dieser Basisstand ist neuer als der AWE32-Fork, enthält aber nicht automatisch die Fork-AWE32-Erweiterungen.**
 - **Entscheidung:** Den erprobten, letzten AWE32-Fork-Stand behalten; kein ungetestetes Upstream-Rebase in das einzige Produkt. Spätere gezielte DOSBox-X-Fixes nur bei konkretem Bedarf, Review und Sound-/Realtime-Regression.
 
+**ROM/SBK/SF2-Fundort:** [Private Testdateien – exakte Namen und Bibliotheksort](docs/TEST-ASSET-LOCATION.md). Vor einer erneuten Upload-Anfrage dort nachsehen.
+
 ## Einziger nächster technischer Pfad
 
 - Git-Submodul checkout und reproduzierbarer Windows-x64-VST3-Build mit internem DOSBox-X-Kern.
