@@ -1,6 +1,7 @@
 #include "DosBoxVst3Shell.hpp"
 #include "CreativeMidiBankSelect.hpp"
 #include "CreativeMidiControllers.hpp"
+#include "ExternalSoundFont.hpp"
 #include "PresetBrowserView.h"
 #include "pluginterfaces/base/ustring.h"
 #include "pluginterfaces/base/ibstream.h"
@@ -78,6 +79,34 @@ tresult PLUGIN_API DosBoxVst3Shell::initialize(FUnknown* context) {
     originalMidiCatalog_.SetOriginalCreativeMidiNumbers();
     return kResultOk;
 }
+std::string DosBoxVst3Shell::requestedSoundFont() {
+    std::lock_guard<std::mutex> lock(selectionMutex_);
+    return requestedBank_;
+}
+std::string DosBoxVst3Shell::soundFontStatus() {
+    std::lock_guard<std::mutex> lock(selectionMutex_);
+    if(requestedBank_!=startedBank_)
+        return "SF2 vorgemerkt: beim naechsten Aktivieren laden.";
+    return {};
+}
+bool DosBoxVst3Shell::requestSoundFont(const std::string& path) {
+    try {
+        if(path.size()>32768 || path.find('\0')!=std::string::npos)return false;
+        if(!path.empty()) {
+            std::vector<std::uint8_t> bytes;bool adapted=false;
+            AWE125::PresetCatalog candidate;std::string error;
+            if(!guest::readExternalSf2(std::filesystem::u8path(path),bytes,adapted) ||
+               !candidate.LoadSoundFont(path,error))return false;
+            // SDK demo loads one SF2 into physical bank 0. Do not falsely
+            // expose higher banks before their driver semantics are tested.
+            if(std::none_of(candidate.Entries().begin(),candidate.Entries().end(),
+                            [](const auto& e){return e.bank==0;}))return false;
+        }
+        std::lock_guard<std::mutex> lock(selectionMutex_);
+        requestedBank_=path;
+        return true;
+    } catch (...) {return false;}
+}
 tresult PLUGIN_API DosBoxVst3Shell::setActive(TBool state) {
     if(state) {
         if(runtime_)return kResultOk;
@@ -87,12 +116,17 @@ tresult PLUGIN_API DosBoxVst3Shell::setActive(TBool state) {
         try {
             auto engine=std::make_unique<integration::DosBoxRuntimeHost>();
             const auto ownBinary=engine->pluginBinaryPath();
+            const auto selected=requestedSoundFont();
             if(ownBinary.empty() || !engine->begin(
-                ownBinary,integration::DosBoxRuntimeHost::privateAssetsDir(ownBinary))) {
+                ownBinary,integration::DosBoxRuntimeHost::privateAssetsDir(ownBinary),selected)) {
                 guestStatus_.store(-1,std::memory_order_release);
                 return kResultFalse;
             }
             runtime_=std::move(engine);
+            {
+                std::lock_guard<std::mutex> lock(selectionMutex_);
+                startedBank_=selected;
+            }
             guestStatus_.store(1,std::memory_order_release);
             initialProgramSent_=false;
             absoluteSamplePosition_=0;
@@ -244,7 +278,8 @@ tresult PLUGIN_API DosBoxVst3Shell::getState(IBStream* stream) {
     if(!stream)return kInvalidArgument;
     std::array<std::uint8_t,kStateLength> image{};
     for(unsigned i=0;i<4;i++)image[i]=kSignature[i];
-    image[4]=1; // format version 1
+    const auto selected=requestedSoundFont();
+    image[4]=selected.empty()?1:2; // v2 adds length-prefixed UTF-8 source path
     image[5]=bank_.load(std::memory_order_acquire);
     image[6]=program_.load(std::memory_order_acquire);
     const auto level=static_cast<std::uint32_t>(std::lround(
@@ -253,8 +288,14 @@ tresult PLUGIN_API DosBoxVst3Shell::getState(IBStream* stream) {
     image[8]=static_cast<std::uint8_t>((level>>8)&255u);
     image[9]=0x5a; image[10]=0xa5;
     int32 written=0;
-    return stream->write(image.data(),static_cast<int32>(image.size()),&written)==kResultOk
-        &&written==static_cast<int32>(image.size())?kResultOk:kResultFalse;
+    if(stream->write(image.data(),static_cast<int32>(image.size()),&written)!=kResultOk ||
+       written!=static_cast<int32>(image.size()))return kResultFalse;
+    if(selected.empty())return kResultOk;
+    const auto n=static_cast<std::uint32_t>(selected.size());
+    std::array<std::uint8_t,4> length{std::uint8_t(n),std::uint8_t(n>>8),std::uint8_t(n>>16),std::uint8_t(n>>24)};
+    if(stream->write(length.data(),4,&written)!=kResultOk||written!=4)return kResultFalse;
+    return stream->write(const_cast<char*>(selected.data()),static_cast<int32>(n),&written)==kResultOk &&
+           written==static_cast<int32>(n)?kResultOk:kResultFalse;
 }
 tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
     if(!stream)return kInvalidArgument;
@@ -263,10 +304,22 @@ tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
     if(stream->read(image.data(),static_cast<int32>(image.size()),&read)!=kResultOk||
        read!=static_cast<int32>(image.size())||
        !std::equal(kSignature.begin(),kSignature.end(),image.begin())||
-       image[4]!=1||image[9]!=0x5a||image[10]!=0xa5||
+       (image[4]!=1&&image[4]!=2)||image[9]!=0x5a||image[10]!=0xa5||
        image[5]>127||image[6]>127)return kResultFalse;
     const unsigned volume=image[7]|(static_cast<unsigned>(image[8])<<8);
     if(volume>10000)return kResultFalse;
+    std::string selected;
+    if(image[4]==2){
+        std::array<std::uint8_t,4> length{};
+        if(stream->read(length.data(),4,&read)!=kResultOk||read!=4)return kResultFalse;
+        const auto n=std::uint32_t(length[0])|(std::uint32_t(length[1])<<8)|
+                     (std::uint32_t(length[2])<<16)|(std::uint32_t(length[3])<<24);
+        if(n==0||n>32768)return kResultFalse;
+        selected.resize(n);
+        if(stream->read(selected.data(),static_cast<int32>(n),&read)!=kResultOk||
+           read!=static_cast<int32>(n))return kResultFalse;
+    }
+    if(!requestSoundFont(selected))return kResultFalse;
     (void)setParamNormalized(kBank,static_cast<double>(image[5])/127.);
     (void)setParamNormalized(kProgram,static_cast<double>(image[6])/127.);
     (void)setParamNormalized(kMaster,static_cast<double>(volume)/10000.);
@@ -282,6 +335,8 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
     return new AWE125::PresetBrowserView({0,0,1000,708},this,
         originalMidiCatalog_,unusedFmCatalog_,std::string{},
         [this](){
+            const auto selection=soundFontStatus();
+            if(!selection.empty())return selection;
             const int s=guestStatus_.load(std::memory_order_acquire);
             return s==2 ? std::string("DOSBOX-X: EMULATOR AKTIV, CREATIVE-STATUS UNGEPRUEFT") :
                    s==1 ? std::string("DOSBOX-X: ORIGINALER CREATIVE-DOS-GAST STARTET") :
@@ -296,8 +351,8 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
                            std::string("AWE64 GOLD | KEIN AUDIO-GAST");
         },
         [](const std::string&){return false;},
-        [](const std::string&){return false;},
-        [](){return std::string{};},
+        [this](const std::string& path){return requestSoundFont(path);},
+        [this](){return requestedSoundFont();},
         [](){return std::uint64_t{1};},
         [](std::uint16_t bank){return bank==0;});
 }

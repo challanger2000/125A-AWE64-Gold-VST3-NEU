@@ -10,6 +10,7 @@
 #endif
 #include <windows.h>
 #include "DosBoxHostAdapter.hpp"
+#include "ExternalSoundFont.hpp"
 #include "AWE64_DOSBOX_ABI.h"
 #include <atomic>
 #include <cstdint>
@@ -40,6 +41,7 @@ class DosBoxRuntimeHost final {
     std::atomic<bool> finished_{false};
     std::atomic<int> guestExitCode_{-1};
     bool owns_=false;
+    std::filesystem::path stagedDirectory_;
 
     static bool isUsableFile(const std::filesystem::path& p,
                              std::uintmax_t expectedSize=0) noexcept {
@@ -96,7 +98,8 @@ public:
     }
 
     bool begin(const std::filesystem::path& binary,
-               const std::filesystem::path& privateDir) {
+               const std::filesystem::path& privateDir,
+               const std::string& externalBank={}) {
         if(module_ || worker_.joinable())return false;
         // Real original owner material ONLY. Do not start a fake engine.
         const auto rom=privateDir/"awe32.raw";
@@ -125,6 +128,28 @@ public:
             stop();return false;
         }
         try {
+            std::string guestBank="SYNTHGM.SF2";
+            if(!externalBank.empty()) {
+                std::vector<std::uint8_t> bytes;
+                bool adapted=false;
+                if(!awe64::guest::readExternalSf2(std::filesystem::u8path(externalBank),bytes,adapted)) {
+                    stop();return false;
+                }
+                // Unique disposable directory, outside the installed bundle.
+                wchar_t root[MAX_PATH+1]{}, name[MAX_PATH+1]{};
+                const DWORD n=GetTempPathW(MAX_PATH,root);
+                if(!n||n>=MAX_PATH||!GetTempFileNameW(root,L"AWE",0,name)){
+                    stop();return false;
+                }
+                if(!DeleteFileW(name)||!CreateDirectoryW(name,nullptr)){
+                    stop();return false;
+                }
+                stagedDirectory_=std::filesystem::path(name);
+                if(!awe64::guest::writeExternalSf2(stagedDirectory_/"BANK.SF2",bytes)){
+                    stop();return false;
+                }
+                guestBank="D:\\BANK.SF2";
+            }
             queues_=std::make_unique<rt::RealtimeQueues>();
             adapter_=std::make_unique<DosBoxHostAdapter>(*queues_);
             // Original DOSBox-X sblaster.cpp forces SBT_NONE if opt_silent.
@@ -154,6 +179,10 @@ public:
             argvStorage_.push_back("mount c \""+utf8(privateDir)+"\"");
             argvStorage_.push_back("-c");
             argvStorage_.push_back("c:");
+            if(!stagedDirectory_.empty()) {
+                argvStorage_.push_back("-c");
+                argvStorage_.push_back("mount d \""+utf8(stagedDirectory_)+"\"");
+            }
             argvStorage_.push_back("-c");
             // Private diagnostic of the UNMODIFIED Creative DOS program.
             // Redirection is disabled for the normal product/positive CI.
@@ -174,9 +203,10 @@ public:
                     }
                     bootLog=requested;
                 }
-                argvStorage_.push_back("DEMO.EXE /SBK:SYNTHGM.SF2 > "+bootLog);
+                argvStorage_.push_back("DEMO.EXE /SBK:"+guestBank+" > "+bootLog);
             } else {
-                argvStorage_.push_back("DEMO.EXE /SBK:SYNTHGM.SF2");
+                if(externalBank.empty())argvStorage_.push_back("DEMO.EXE /SBK:SYNTHGM.SF2");
+                else argvStorage_.push_back("DEMO.EXE /SBK:"+guestBank);
             }
             // Two output destinations: original MPU-401 guest input and
             // original DOSBox audio mixer. Do NOT register BEE0 MIDI consumer.
@@ -209,6 +239,10 @@ public:
         registerMidi_=nullptr;registerPCM_=nullptr;
         startGuest_=nullptr;requestStop_=nullptr;
         argvStorage_.clear();
+        if(!stagedDirectory_.empty()) {
+            std::error_code ec;std::filesystem::remove_all(stagedDirectory_,ec);
+            stagedDirectory_.clear();
+        }
         running_.store(false,std::memory_order_release);
         if(owns_) {
             ownership_.store(false,std::memory_order_release);

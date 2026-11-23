@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Externe SF2-Startauswahl und Projektpfad
+
+- [Windows 45281711814](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45281711814), [Transporttests 45281711812](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45281711812), [Version 45281711986](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45281711986): SUCCESS auf d4bf7111; Mapping und Original-GM-Pfad bestanden.
+- Externe SF2-Auswahl über vorhandenen P165-SF2-Knopf im generierten SDK-Kompatibilitätsquelltext; Original-GUI-Blob und Grafik unverändert. Auswahl wird validiert und beim nächsten Aktivieren über die originale Creative-DEMO geladen (DOS-Pfad D:\\BANK.SF2, private temporäre Kopie, Quellbank nie überschrieben, SF2 2.01 nur Versionsheader angepasst). Keine Behauptung eines laufenden Bankwechsels. DBXD-State v2 speichert UTF-8-Pfad; v1 bleibt lesbar. Fehlende/inkompatible Bank wird abgelehnt, nicht still ersetzt. Katalog bleibt vorerst MIDI-Nummern, keine falschen Presetnamen/ROM-Mischung; aktive Live-Auswahl, vollständige Banksemantik und tatsächlicher RAM-Sample-Klang noch offen.
+- Neue Implementierung nicht Windows-abgenommen. Originaler EMU8000 und Treiber unverändert, kein Release, nur main.
+
 ## 23.11.2026 — Original-GM-Klangvergleich PASS; VST3-MIDI-Controller angebunden
 
 - **[Windows 45280056019](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45280056019) SUCCESS.** Direkter DOSBox-Mixer und VST3 (gleiche SHA-verifizierte Originaldateien, CC0/PC0/C4 Vel100): gehaltene Note RMS 0,008382091 vs 0,008381980, Ruhe 0,000100778 vs 0,000118569, Release 0,000309144 vs 0,000300079. 90 aktive Notenblöcke, keine Near-Full-Scale-Frames während Note. Direkter Mixer bereits beim Start Peak 1,0; kein DSP-Eingriff begründet. 12.904 EMU8000-Writes, Original-Gate und Negativkontrolle PASS. Keine samplegenaue oder allgemeine Banktreue behauptet.

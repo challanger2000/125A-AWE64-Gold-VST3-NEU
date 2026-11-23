@@ -10,6 +10,8 @@
 #include <memory>
 #include <atomic>
 #include <cstdint>
+#include <mutex>
+#include <string>
 
 namespace awe64 {
 class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
@@ -27,6 +29,13 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::atomic<std::uint8_t> program_{0};
     std::atomic<std::uint8_t> bank_{0};
     std::atomic<float> master_{1.f};
+    std::mutex selectionMutex_;
+    std::string requestedBank_;
+    std::string startedBank_;
+    std::atomic<std::uint64_t> catalogRevision_{1};
+    bool requestSoundFont(const std::string&);
+    std::string requestedSoundFont();
+    std::string soundFontStatus();
 public:
     ~DosBoxVst3Shell() override = default;
     static Steinberg::FUnknown* createInstance(void*) {

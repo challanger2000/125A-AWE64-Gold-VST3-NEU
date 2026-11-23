@@ -91,12 +91,43 @@ if(AWE64_BUILD_VST3_DEV)
   if(AWE64_OLD_W95 EQUAL -1 OR AWE64_OLD_86BOX EQUAL -1)
     message(FATAL_ERROR "Original P165 Win95/86Box dialog anchors not found")
   endif()
-  string(REPLACE [=[L"Das originale Creative-Windows-95-SoundFont-Laden ist in der "]=]
-      [=[L"Das SF2-Laden ist in dieser DOSBox-X-Version derzeit "]=]
-      AWE64_GUI_SRC "${AWE64_GUI_SRC}")
-  string(REPLACE [=[L"P007-Gaststeuerung noch nicht angebunden. Die Auswahl wird "]=]
-      [=[L"nicht an die originale Creative-DOS-Laufzeit angebunden. Es wird "]=]
-      AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  # Only replace the original nonfunctional dialog body, not P165 graphics.
+  string(FIND "${AWE64_GUI_SRC}" "void PresetBrowserView::ChooseSf2() {" AWE64_SF2_BEGIN)
+  string(FIND "${AWE64_GUI_SRC}" "void PresetBrowserView::ChooseRom() {" AWE64_SF2_END)
+  if(AWE64_SF2_BEGIN LESS 0 OR AWE64_SF2_END LESS AWE64_SF2_BEGIN)
+    message(FATAL_ERROR "Approved SF2 dialog anchors missing")
+  endif()
+  string(SUBSTRING "${AWE64_GUI_SRC}" 0 ${AWE64_SF2_BEGIN} AWE64_GUI_BEFORE)
+  string(SUBSTRING "${AWE64_GUI_SRC}" ${AWE64_SF2_END} -1 AWE64_GUI_AFTER)
+  set(AWE64_SF2_DIALOG [=[
+void PresetBrowserView::ChooseSf2() {
+#if defined(_WIN32)
+    wchar_t filename[32768]{};
+    OPENFILENAMEW dialog{};
+    dialog.lStructSize=sizeof(dialog);
+    dialog.hwndOwner=GetForegroundWindow();
+    dialog.lpstrFilter=L"SoundFont (*.sf2)\0*.sf2\0\0";
+    dialog.lpstrFile=filename;
+    dialog.nMaxFile=32768;
+    dialog.Flags=OFN_FILEMUSTEXIST|OFN_PATHMUSTEXIST|OFN_NOCHANGEDIR;
+    if(!GetOpenFileNameW(&dialog))return;
+    const int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,filename,-1,nullptr,0,nullptr,nullptr);
+    if(n<=1)return;
+    std::string path(static_cast<size_t>(n), '\0');
+    if(!WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,filename,-1,path.data(),n,nullptr,nullptr))return;
+    path.pop_back();
+    if(!sf2LoadRequest_||!sf2LoadRequest_(path)) {
+        MessageBoxW(dialog.hwndOwner,L"SoundFont ungueltig oder vom Creative-DOS-Format nicht unterstuetzt.",
+            L"125A AWE64 Gold",MB_OK|MB_ICONERROR);
+        return;
+    }
+    MessageBoxW(dialog.hwndOwner,L"SoundFont vorgemerkt. Wird bei der naechsten Plugin-Aktivierung geladen.",
+        L"125A AWE64 Gold",MB_OK|MB_ICONINFORMATION);
+    lastStatus_.clear();SyncSf2Status();
+#endif
+}
+]=])
+  set(AWE64_GUI_SRC "${AWE64_GUI_BEFORE}${AWE64_SF2_DIALOG}${AWE64_GUI_AFTER}")
   string(REPLACE [=[L"Das originale AWE-ROM liegt bereits im privaten VST3 und wird "]=]
       [=[L"Das AWE-Wave-ROM muss im privaten VST3-Ordner liegen. "]=]
       AWE64_GUI_SRC "${AWE64_GUI_SRC}")
