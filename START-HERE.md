@@ -11,6 +11,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **Submodul:** `third_party/dosbox-x-AWE32` auf `f3a95b9f19a7f9863295e6481f271cf04733c635` gepinnt. **Einziger Branch:** `main`.
 
+## Neue private Creative-Startdiagnose: Originalfehler statt bloßer Stille
+
+Im **nur lokalen Original-Creative-Klangtest** werden die tatsächlichen DOS-Fehler von Creative-`DEMO.EXE` (AWE32-Detect, Initialisierung, MPU401, SF2-Load) jetzt in einer **pro Lauf eigenen privaten DOS-8.3-Logdatei** abgefangen. Die originale EXE und der EMU8000-Kern bleiben unverändert; die öffentlichen synthetischen VST3-Tests führen weiterhin den unveränderten DOS-Testgast aus. Eine kleine datenfreie Linux-/Windows-Regression testet Fehler-/Zeitablauf. **Bis zu echten CI-Ergebnissen nicht als bestanden bezeichnen; der erste Original-Creative-Sound bleibt weiterhin OFFEN.**
+
 ## Neue echte Windows-VST3-Klang-Negativkontrolle (Stand 23.11.2026)
 
 Zur positiven synthetischen MIDI-zu-PCM-Prüfung gibt es jetzt eine **echte Windows-VST3-Negativkontrolle**: Das identische öffentliche DOS-Testprogramm darf im privaten Creative-only-Modus **keinen hörbaren PC-Speaker- oder OPL-Ton** mehr erzeugen. Der native Steinberg-Host muss `nonzero=0` am echten VST3-PCM-Ausgang bestätigen; andere Fehler zählen nicht als Erfolg. **[Windows-Integrationslauf 45260688380](../../actions/runs/45260688380) vollständig PASS:** Positivtest 63.488 Float32-Stereoframes, 1.011 nicht-stumm, 8 NoteOn; identischer synthetischer Gast im Creative-only-Modus **exakt 0 nicht-stumme Frames**, eigenständiger Negativkontroll-PASS. [Linux/Windows 45260688317](../../actions/runs/45260688317) PASS. **Original-Creative-ROM-/SF2-Klang steht weiter aus**, `0.0.0-dev`.

@@ -80,9 +80,18 @@ try {
     }
     $pluginBinary = Join-Path $native 'AWE64GoldDOSBoxDev.vst3'
     $traceFile = Join-Path $temporary 'original_creative_vst3_emu8000.trace'
+    # Unique Windows/DOS-compatible 8.3 filename, scoped to this test run.
+    # It captures original Creative "ERROR:" messages (detect/init/SF2)
+    # from the headless DOS shell, never a test-generated guessed diagnosis.
+    $bootFile = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
+    $bootPath = Join-Path $privateDir $bootFile
+    if (Test-Path -LiteralPath $bootPath) {
+        throw 'Refusing stale original Creative DOS boot diagnostic log.'
+    }
     $previousTrace = [Environment]::GetEnvironmentVariable('EMU8K_TRACE', 'Process')
     $previousSdl = [Environment]::GetEnvironmentVariable('SDL_AUDIODRIVER', 'Process')
     $previousOriginal = [Environment]::GetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', 'Process')
+    $previousBootLog = [Environment]::GetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', 'Process')
     try {
         # Private acceptance: only the Creative/EMU8000 original hardware
         # may supply sound to the VST3. The runtime disables PC-speaker/OPL.
@@ -90,15 +99,30 @@ try {
         [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $traceFile, 'Process')
         [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', 'dummy', 'Process')
         [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', '1', 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $bootFile, 'Process')
         & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
         if ($LASTEXITCODE -ne 0) {
             throw 'Real VST3 process() did not produce MIDI-triggered Creative PCM.'
         }
     } finally {
         # Restore original Windows environment even after timeouts/crashes.
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $previousBootLog, 'Process')
         [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', $previousOriginal, 'Process')
         [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
         [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
+    }
+    # Existing original Creative DOS diagnostics may be empty while the
+    # interactive demo runs (redirected stdout buffering). The log must
+    # at least exist, and explicit startup errors are always fatal.
+    if (-not (Test-Path -PathType Leaf $bootPath)) {
+        throw 'Original Creative DEMO.EXE startup log was never created.'
+    }
+    $bootText = [System.IO.File]::ReadAllText($bootPath)
+    if ($bootText.ToUpperInvariant().Contains('ERROR:')) {
+        # Give the actual original Creative diagnostics, not a generic
+        # timeout or a guessed SoundFont/chip failure.
+        throw ('Original Creative DOS startup failed: ' +
+               $bootText.Substring(0, [Math]::Min(4000, $bootText.Length)))
     }
     if (-not (Test-Path -PathType Leaf $traceFile)) {
         throw 'No original EMU8000 register trace during actual VST3 host playback.'

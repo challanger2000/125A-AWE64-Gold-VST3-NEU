@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Original-Creative-DOS-Fehlerursachen werden im privaten echten VST3 sichtbar
+
+- Original-Programmquelle `DOS/DEMO/DEMO.C` erneut kontrolliert: Hardware-Detect, Chip-Init, MPU-401-Init und SF2-Request/-Preset-Fehler erzeugen ursprüngliche DOS-`ERROR:`-Meldungen. Für private Windows-Testläufe bisher unsichtbar.
+- **Ohne Creative-Treiber- oder EMU8000-Änderung** leitet `DosBoxRuntimeHost.hpp` nur im ausdrücklich privaten `AWE64_ORIGINAL_CREATIVE_ONLY=1`-Modus die originale DOS-Textausgabe von `DEMO.EXE` in eine strikt validierte eigene 8.3-Logdatei. `Run-Private-Creative-AWE-Test.ps1` verwendet einen pro Lauf neu erzeugten Namen und stellt geänderte Umgebungsvariablen zurück.
+- `WindowsRunVst3HostPcmSmoke.py` meldet erkannte authentische Creative-`ERROR:`-Zeilen bereits während des isolierten Windows-VST3-Hostlaufs und bricht bei echten DOS-Startfehlern gezielt ab, ohne falsch einen Klangerfolg zu melden. Stale oder nie angelegte Logdateien sind FAIL.
+- Neue `tests/test_private_boot_diagnostic.py` prüft diese Fehlererkennung mit rein synthetischen Python-Prozessen und Texten unter Linux und Windows. Die öffentlichen POSITIV-/NEGATIV-VST3-Audiotests und die originale P165-GUI sind konzeptionell unverändert. **Neuer CI-Abschluss noch ausstehend. Original-Creative-Klang weiterhin ungetestet**, `0.0.0-dev`.
+
+
 ## 23.11.2026 — Echte Windows-VST3-Negativkontrolle: POSITIV und NEGATIV bestanden
 
 - Der bestehende echte Windows-VST3-MIDI→DOSBox-X→Mixer→PCM-Positivtest wird um eine **direkt folgende echte Negativkontrolle** ergänzt. Bei unveränderter synthetischer NoteOn-DOS-`DEMO.EXE` und Null-ROM muss der explizite private `AWE64_ORIGINAL_CREATIVE_ONLY=1`-Modus **PC-Speaker und OPL ausschalten** und das reale VST3-`process()` genau **0 nicht-stumme Frames** liefern.

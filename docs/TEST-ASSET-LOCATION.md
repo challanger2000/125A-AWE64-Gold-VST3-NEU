@@ -76,3 +76,7 @@ powershell -File tools/Build-And-Test-Private-AWE64.ps1 -Rom "C:\Private\awe32.r
 ```
 
 Voraussetzungen: lokales Windows x64, Visual Studio 2022 mit MSBuild/C++, CMake, Python 3, Git und Netzwerkzugriff für den öffentlichen Steinberg-SDK- und Creative-Archiv-Checkout. Dieser Schritt **läuft nicht automatisch in GitHub Actions** und wurde hier **nicht** ausgeführt. Nur nach nachgewiesener ursprünglicher Creative-EMU8000-Klangausgabe kann ein solcher privater Test als PASS markiert werden; Studio Pro, GUI, Recall und Release bleiben getrennte spätere Gates.
+
+## Private Original-Creative-Startdiagnose (nur Besitzer-Windows, 23.11.2026)
+
+Der private Launcher `tools/Run-Private-Creative-AWE-Test.ps1` erzeugt für jeden echten `--original`-VST3-Hostlauf den einzigartigen DOS-8.3-Dateinamen `Bxxxxxxx.LOG` (sieben zufällige Hexziffern, Großschreibung) im **bereits lokal vorhandenen** `AWE64GoldDOSBoxDev.vst3/Contents/Resources/PRIVATE/`-Verzeichnis. `DEMO.EXE` schreibt seine eigenen originalen DOS-Startfehler über die DOS-Shell-Umleitung in diese Textdatei. Der Controller liest ausschließlich diese Diagnose und beendet den Kindprozess bei `ERROR:` direkt, statt nach schweigender SoundFont-Initialisierung eine Klangbehauptung zu treffen. Die Datei **bleibt auf dem Besitzerrechner**, wird nicht auf öffentliche GitHub-Actions-Runner und nicht ins Repo hochgeladen. Bei fehlender Logdatei oder vorbestehendem Namen ist die private Testabnahme ungültig; der normale Produktstart besitzt diese Redirection **nicht**.

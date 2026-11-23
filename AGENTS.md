@@ -6,6 +6,8 @@
 
 **Private Originalklang-Prüfregel vom 23.11.2026:** Das echte VST3-`--original`-Klang-Gate benötigt `AWE64_ORIGINAL_CREATIVE_ONLY=1` und `SDL_AUDIODRIVER=dummy`, vom privaten Besitzer-PowerShell-Starter gesetzt und anschließend wiederhergestellt. Nur dann deaktiviert `DosBoxRuntimeHost.hpp` PC-Speaker und OPL, sodass sie keinen falschen AWE-PCM-PASS auslösen. Normaler DOSBox-Produktstart und synthetischer VST3-PCM-Test bleiben unverändert. Öffentlich weiterhin keine privaten ROM/SF2/DEMO-Daten. **Kein Original-Creative-Klang-PASS behaupten**, bis ein echter Besitzer-Windows-Lauf vollständig stattgefunden hat.
 
+**Private Original-Creative-DOS-Bootdiagnose (23.11.2026, neue CI noch offen):** Das Original `DEMO.EXE` liefert Hardware-, MPU- und SoundFont-Fehler über DOS stdout. Der VST3-Originalmodus schreibt diese **ausschließlich lokal** in den per `AWE64_CREATIVE_BOOT_LOG=B[0-9A-F]{7}.LOG` validierten pro-Lauf-DOS-8.3-Diagnosepfad innerhalb der `Resources/PRIVATE`. Der private Windows-Python-Testcontroller bricht bei originalen `ERROR:`-Meldungen frühzeitig ab und weist fehlende/alte Logs zurück. Normales VST3 und synthetisches öffentliches Testprogramm behalten `DEMO.EXE /SBK:SYNTHGM.SF2` ohne Logumleitung. **Private originale Soundbank-/ROM-Klangabnahme weiter OFFEN.**
+
 ## Einzige festgelegte Architektur
 - **Ein einziges Windows-x64-VST3-Instrument**, das die **DOSBox-X-AWE32-Emulation intern** betreibt. Kein separat gestartetes DOSBox-Programm.
 - Fixierte Grundlage `turican0/dosbox-x-AWE32`, `masterAWE32`, Commit `f3a95b9f19a7f9863295e6481f271cf04733c635` als Git-Submodul `third_party/dosbox-x-AWE32`. Upstream-Upgrades nur bei belegtem Bedarf und bestandenen Regressionen.

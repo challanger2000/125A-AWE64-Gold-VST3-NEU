@@ -155,7 +155,29 @@ public:
             argvStorage_.push_back("-c");
             argvStorage_.push_back("c:");
             argvStorage_.push_back("-c");
-            argvStorage_.push_back("DEMO.EXE /SBK:SYNTHGM.SF2");
+            // Private diagnostic of the UNMODIFIED Creative DOS program.
+            // Redirection is disabled for the normal product/positive CI.
+            // A per-run, validated DOS 8.3 log prevents stale results or
+            // overwriting files in the owner's private VST3 directory.
+            if(creativeOnly && std::strcmp(creativeOnly,"1")==0) {
+                std::string bootLog="AWEBOOT.LOG"; // synthetic CI fallback
+                if(const char* requested=std::getenv("AWE64_CREATIVE_BOOT_LOG")) {
+                    if(std::strlen(requested)!=12 || requested[0]!='B' ||
+                       requested[8]!='.' || std::strcmp(requested+9,"LOG")!=0) {
+                        stop();return false;
+                    }
+                    for(std::size_t k=1;k<8;k++) {
+                        const char c=requested[k];
+                        if(!((c>='0'&&c<='9')||(c>='A'&&c<='F'))) {
+                            stop();return false;
+                        }
+                    }
+                    bootLog=requested;
+                }
+                argvStorage_.push_back("DEMO.EXE /SBK:SYNTHGM.SF2 > "+bootLog);
+            } else {
+                argvStorage_.push_back("DEMO.EXE /SBK:SYNTHGM.SF2");
+            }
             // Two output destinations: original MPU-401 guest input and
             // original DOSBox audio mixer. Do NOT register BEE0 MIDI consumer.
             registerMidi_(adapter_.get(),&DosBoxHostAdapter::pullMidi);

@@ -38,6 +38,8 @@ jobs:
         run: python -m unittest discover -s tools -p test_private_vst3.py -v
       - name: Verify private Creative audio gate using ONLY generated fake data
         run: python -m unittest discover -s tests -p test_private_creative_guest.py -v
+      - name: Probe private Creative-DOS startup error diagnosis with GENERATED children only
+        run: python -m unittest discover -s tests -p test_private_boot_diagnostic.py -v
       - name: Verify local-only original-AWE64 Windows build script privacy contract
         run: python -m unittest discover -s tests -p test_private_build_runner.py -v
       - name: Parse private Windows PowerShell scripts without executing owner files

@@ -5,9 +5,60 @@ Only synthetic (non-Creative) DOS fixtures. No proprietary AWE ROM or private
 owner assets are ever uploaded to the public GitHub Actions worker.
 """
 import argparse
+import os
 from pathlib import Path
+import re
 import subprocess
 import sys
+import time
+
+
+def run_private_creative_host(command: list[str], plugin: Path, seconds: int):
+    """Monitor Creative's own DOS error output, without publishing assets.
+
+    The original unmodified DOS program prints explicit errors for missing
+    AWE32 hardware, failed initialization and SoundFont load. Without DOS
+    stdout redirection all three failures look like unhelpful VST3 silence.
+    A per-run unique 8.3 log, set only by the private PowerShell launcher,
+    also prevents accepting a stale success or a previous test's errors.
+    """
+    name = os.environ.get("AWE64_CREATIVE_BOOT_LOG", "")
+    if not re.fullmatch(r"B[0-9A-F]{7}\.LOG", name):
+        raise RuntimeError("Private Creative test requires a fresh 8.3 DOS boot logfile")
+    log = plugin.resolve(strict=True).parent.parent / "Resources" / "PRIVATE" / name
+    if log.exists():
+        raise RuntimeError("Private Creative boot diagnostic already exists; refusing stale log")
+    deadline = time.monotonic() + seconds + 30
+    process = subprocess.Popen(command, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, text=True, errors="replace")
+    try:
+        while process.poll() is None and time.monotonic() < deadline:
+            if log.is_file():
+                # DOS stdout is buffered; errors normally flush as DEMO.EXE
+                # exits. Never rely on a non-error startup banner for PASS.
+                diagnostic = log.read_bytes()[:32768].decode("cp437", errors="replace")
+                errors = [line.strip() for line in diagnostic.splitlines()
+                          if line.lstrip().upper().startswith("ERROR:")]
+                if errors:
+                    raise RuntimeError("Original Creative DOS startup failure: " +
+                                       "; ".join(errors)[:1800])
+            time.sleep(.2)
+        if process.poll() is None:
+            raise TimeoutError("Real Creative-DOS VST3 host exceeded private test timeout")
+        stdout, stderr = process.communicate(timeout=8)
+        if not log.is_file():
+            raise RuntimeError("Creative DEMO.EXE never created its DOS stdout boot log")
+        final_text = log.read_bytes()[:32768].decode("cp437", errors="replace")
+        failures = [line.strip() for line in final_text.splitlines()
+                    if line.lstrip().upper().startswith("ERROR:")]
+        if failures:
+            raise RuntimeError("Original Creative DOS startup failure: " +
+                               "; ".join(failures)[:1800])
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate(timeout=8)
 
 
 def run_native_host(exe: Path, vst3: Path, original: bool = False,
@@ -17,8 +68,12 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
     command = [str(exe.resolve(strict=True)), str(vst3.resolve(strict=True))]
     if original:
         command.extend(["--original", str(seconds)])
-    proc = subprocess.run(command, timeout=(seconds+30 if original else 40),
-                          text=True, capture_output=True, check=False)
+    if original:
+        proc = run_private_creative_host(command, vst3, seconds)
+    else:
+        # Never change the already proven PUBLIC synthetic DOS host path.
+        proc = subprocess.run(command, timeout=40, text=True,
+                              capture_output=True, check=False)
     print(proc.stdout[-5000:], end="")
     print(proc.stderr[-5000:], end="", file=sys.stderr)
     expected = ("PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED" if original
