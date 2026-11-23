@@ -2,6 +2,9 @@
 
 **Gültig ab 23.11.2026.**
 
+**Aktuelle Prüfentscheidung 23.11.2026 (hat Vorrang vor früheren rein synthetischen CI-Regeln):** Der Nutzer verlangt Fortsetzung des P30-Forschungswegs. Ausschließlich die unabhängig öffentlich auffindbaren, hashverifizierten Archiv-Referenzdateien dürfen temporär im isolierten Windows-Archivtest verwendet werden. Keine privaten Nutzerdateien in CI, kein Upload von Creative-/ROM-/SF2-Bytes, Audio, Traces, Logs oder befüllten Bundles; kein Release. Der alte synthetische Positiv-/Negativtest bleibt getrennt. Ein Original-Archivtest-PASS ist kein Besitzer-/DAW-/Hardwaretreue-PASS. Der neue Lauf ist noch nicht abgeschlossen.
+
+
 Diese Dateien liegen in der **privaten ChatGPT-Dateibibliothek des Projektinhabers**, nicht im GitHub-Repository und nicht in den GitHub-Actions-Runnern. Vor erneuter Bitte um Upload **zuerst die Dateibibliothek gezielt nach dem exakten Dateinamen durchsuchen**. Bei programmatischer Verwendung die gefundene Bibliotheksdatei mit der Files-Funktion materialisieren.
 
 | Zweck | Exakter Bibliotheksdateiname | Erwartete Dateigröße |

@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Original-Creative-Archivmaterial im echten Windows-VST3: Forschungsprüfung nach P30
+
+- Nutzerentscheidung: den früheren P30-Prüfweg weiterverwenden, statt die Originalklangprüfung an den Besitzer zu delegieren. P30 hat originales DEMO/SF2-Laden gezeigt, P31 dokumentierte weiterhin stumme bzw. ungültige Notenversuche. Keine Klangfreigabe aus diesen Befunden ableiten.
+- Windows-CI führt nach den synthetischen Positiv-/Negativkontrollen einen **isolierten Archiv-Referenztest** mit bereits öffentlich auffindbaren Referenzdateien durch. ROM-Quelle ist der festgeschriebene libretro-pcem-Commit `e07923e902dcedcf65a502fb3f14e75b9ded5271`, ROM-Größe und SHA-256 müssen exakt dem bisherigen Referenzwert entsprechen. Der unveränderte bestehende Originaltest verifiziert Creative-EXE/SF2 und prüft die echte VST3-PCM-Ausgabe plus EMU8000-Trace und separaten DLL-Lauf. Keine privaten Benutzerdateien, keine Veröffentlichung von ROM, EXE, SF2, Audio, Trace oder befülltem Bundle. Temporäre Forschungsdateien werden gelöscht. Diese ausdrücklich abgegrenzte Ausnahme ersetzt die frühere Beschränkung auf rein synthetische CI nur für die öffentlich auffindbaren Archivreferenzen.
+- Vorangegangene Windows-Paketvorbereitung [45265939318](../../actions/runs/45265939318) und Versionsprüfung [45265939138](../../actions/runs/45265939138) erfolgreich. **Neuer Original-Archivtest noch nicht abgeschlossen; kein Klang-PASS**, keine Studio-Pro-Abnahme, `0.0.0-dev`, nur `main`. P165 und EMU8000 unverändert.
+
 ## 23.11.2026 — Vorbereitete Windows-Testpaketierung ohne private Originaldaten
 
 - Der bestehende Windows-Integrationsworkflow bereitet das tatsächlich kompilierte VST3, den nativen Steinberg-Testhost, die beiden privaten Python-Prüfer und den lokalen PowerShell-Launcher **vor** dem Einbringen synthetischer DOS-Testdateien in einem separaten Verzeichnis vor. Ein expliziter Dateicheck verweigert ROM/SF2/SBK/DEMO.EXE/PRIVATE-Inhalte. Der CMD-Starter verwendet den lokalen Besitzer-ROM und den vorgebauten Testhost, ohne erneuten C++-Build.

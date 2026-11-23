@@ -209,6 +209,32 @@ jobs:
           # Real Windows VST3 must respond with silence and no fake PASS.
           python tests/WindowsVst3CreativeOnlyNegative.py --exe $hostTestExe --plugin $plugin
           if ($LASTEXITCODE -ne 0) { throw 'Private-only original-Creative anti-spoof negative control FAILED' }
+      - name: Original Creative archival-reference research in actual Windows VST3 (no private owner files)
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          # P30 research method: independently obtain already-public archival
+          # reference inputs in ephemeral runner storage. Never upload bytes,
+          # PCM, traces, logs or a bundle containing them. No owner files.
+          $stage=Join-Path $env:RUNNER_TEMP 'AWE64-private-test-preparation'
+          $research=Join-Path $env:RUNNER_TEMP 'AWE64-archival-reference'
+          New-Item -ItemType Directory -Path $research -ErrorAction Stop | Out-Null
+          try {
+            # Use a disposable COPY; the clean development bundle stays clean.
+            Copy-Item -LiteralPath (Join-Path $stage 'AWE64GoldDOSBoxDev.vst3') -Destination $research -Recurse -ErrorAction Stop
+            $rom=Join-Path $research 'awe32.raw'
+            Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/libretro/libretro-pcem/e07923e902dcedcf65a502fb3f14e75b9ded5271/awe32.raw' -OutFile $rom
+            $expected='4e143b94f758734f594ded78f4e5115635975c16fa37fabeae0baa4938ca710e'
+            if ((Get-Item $rom).Length -ne 1048576 -or (Get-FileHash -Algorithm SHA256 -LiteralPath $rom).Hash.ToLowerInvariant() -ne $expected) { throw 'Public archival ROM does not match verified reference; no substitute' }
+            $bundle=Join-Path $research 'AWE64GoldDOSBoxDev.vst3'
+            $hostTestExe=Join-Path $stage 'awe64_vst3_host_pcm_smoke.exe'
+            # Reuse the existing gate without changing its hashes or thresholds.
+            & powershell.exe -NoProfile -NonInteractive -File (Join-Path $stage 'tools/Run-Private-Creative-AWE-Test.ps1') -Bundle $bundle -Rom $rom -HostExe $hostTestExe -Seconds 60
+            if ($LASTEXITCODE -ne 0) { throw 'Authentic archival Creative/VST3 research gate FAILED' }
+            Write-Host 'ARCHIVAL_REFERENCE_CREATIVE_VST3_RESEARCH_PASS; NOT_OWNER_DAW_OR_RELEASE'
+          } finally {
+            Remove-Item -LiteralPath $research -Recurse -Force -ErrorAction SilentlyContinue
+          }
       # The source repo is public. Never publish the developer binaries until
       # distribution permissions are cleared. A private-repo runner can
       # deliver the prebuilt asset-free package after BOTH existing gates.
