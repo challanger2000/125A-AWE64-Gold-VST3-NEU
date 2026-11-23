@@ -15,6 +15,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **[Windows 45205416871](../../actions/runs/45205416871) SUCCESS:** Neu erweiterter Windows-VST3-Testhost mit privatem Creative-`--original`-Modus tatsächlich kompiliert, weiterhin echter synthetischer MIDI-zu-PCM-VST3-Rundweg bestanden (979 nicht-stumme Stereo-Frames, 7 NoteOn). [Linux/Windows 45205416646](../../actions/runs/45205416646) PASS. **Original-ROM/Creative-`DEMO.EXE`/echte `SYNTHGM.SF2` wurden dabei nicht ausgeführt.** Privater Originalklang weiterhin nicht abgenommen; `0.0.0-dev`.
 
+## Reproduzierbare Original-Creative-Klangabnahme lokal vorbereitet (noch KEIN PASS)
+
+`tools/Build-And-Test-Private-AWE64.ps1` führt auf dem Besitzer-Windows-PC den gesamten gepinnten DOSBox-X-/VST3-Build und danach das echte, private Creative-DOS-Klanggate aus. Es hält **das originale Submodul sauber**, kompiliert in `PRIVATE/working-upstream` und gibt keine Originaldateien weiter. Benötigt originale ROM-Datei, Windows x64 mit Visual Studio 2022/CMake/Python/Git und Zugriff auf den öffentlichen Steinberg-SDK-/Creative-Quellcode. **In dieser Sitzung nur die Quell-/Syntaxprüfungen, keine echte Originaldatei-Audioausführung.**
+
 ## Privater Creative-Klangtest: OPL/PC-Speaker ausgeschlossen (Stand 23.11.2026)
 
 Im **privaten Original-Creative-DOSBox-DLL-Test** sind PC-Speaker und OPL ausgeschaltet; nur echte EMU8000-I/O-Portschreibzugriffe (mindestens 16 auf 2 Ports) zählen. Der synthetische öffentliche VST3-Audiotransport wird dadurch **nicht** verändert. Die echte Creative-`DEMO.EXE`/`SYNTHGM.SF2`/Besitzer-ROM-Klangabnahme **steht weiter aus**.

@@ -66,3 +66,13 @@ powershell -File tools/Run-Private-Creative-AWE-Test.ps1 -Bundle "build-vst3/VST
 ```
 
 Kein Originalbestandteil wird durch diese Skripte ins öffentliche GitHub eingecheckt oder per Actions ausgeführt. Die private Windows-Ausführung **steht noch aus**; das Vorhandensein der Prüfschnittstelle bedeutet **keinen** Klang-PASS.
+
+## Ein einzelner lokaler privater Windows-Build-und-Klangprüfaufruf
+
+Neu: `tools/Build-And-Test-Private-AWE64.ps1` baut auf Windows x64 die gepinnte DOSBox-X-AWE32-SDL2-DLL aus einem **gitignorierten privaten Arbeitscheckout** und das echte P165-Windows-VST3 mit Steinberg SDK 3.7.12. Danach führt es automatisch den privaten Original-Creative-`DEMO.EXE`-/`SYNTHGM.SF2`-/Besitzer-ROM-Test durch, einschließlich echter MIDI/PCM/EMU8000-Portprüfungen. Kein Kopieren in einen öffentlichen GitHub-Runner, Originaldateien bleiben nur im lokalen gitignorierten `build-vst3`-/`PRIVATE`-Bereich und kurzzeitig im lokalen Windows-`TEMP` (mit anschließender Bereinigung), keine zusätzlichen Branches.
+
+```powershell
+powershell -File tools/Build-And-Test-Private-AWE64.ps1 -Rom "C:\Private\awe32.raw" -Seconds 60
+```
+
+Voraussetzungen: lokales Windows x64, Visual Studio 2022 mit MSBuild/C++, CMake, Python 3, Git und Netzwerkzugriff für den öffentlichen Steinberg-SDK- und Creative-Archiv-Checkout. Dieser Schritt **läuft nicht automatisch in GitHub Actions** und wurde hier **nicht** ausgeführt. Nur nach nachgewiesener ursprünglicher Creative-EMU8000-Klangausgabe kann ein solcher privater Test als PASS markiert werden; Studio Pro, GUI, Recall und Release bleiben getrennte spätere Gates.
