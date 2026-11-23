@@ -1,0 +1,4 @@
+[submodule "third_party/dosbox-x-AWE32"]
+	path = third_party/dosbox-x-AWE32
+	url = https://github.com/turican0/dosbox-x-AWE32.git
+	branch = masterAWE32

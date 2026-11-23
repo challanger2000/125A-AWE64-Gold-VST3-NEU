@@ -1,0 +1,22 @@
+# Build- und lokale Testdaten
+/build/
+/out/
+/dist/
+*.user
+*.suo
+*.pdb
+*.obj
+*.ilk
+*.log
+*.bak
+.vs/
+# Proprietäre Creative-Daten nur lokal verwenden
+awe32.raw
+*.sbk
+*.sf2
+*.img
+*.vhd
+*.vhdx
+*.iso
+/PRIVATE/
+/private-assets/
