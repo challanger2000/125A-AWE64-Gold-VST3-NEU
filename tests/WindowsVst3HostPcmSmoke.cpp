@@ -137,6 +137,10 @@ static int fail(const std::string& reason) {
 
 int main(int argc,char** argv) {
     std::cout<<std::unitbuf;std::cerr<<std::unitbuf;
+    const char* ramHzEnv=std::getenv("AWE64_TEST_RAM_TONE_HZ");
+    const double ramHz=ramHzEnv?std::atof(ramHzEnv):0.;
+    if(ramHzEnv&&ramHz!=441.&&ramHz!=735.)return fail("Invalid RAM fixture frequency");
+    const unsigned fixtureProgram=ramHz==735.?17u:0u;
     const bool originalMode=(argc==4 && std::strcmp(argv[2],"--original")==0);
     const bool exclusionMode=(argc==3 && std::strcmp(argv[2],"--negative")==0);
     const int originalSeconds=originalMode ? std::atoi(argv[3]) : 0;
@@ -192,9 +196,9 @@ int main(int argc,char** argv) {
         if(const char* path=std::getenv("AWE64_TEST_EXTERNAL_SF2")) {
             const std::string source(path);
             if(source.empty()||source.size()>32768)return fail("External test path invalid");
-            auto makeState=[](const std::string& selected) {
+            auto makeState=[fixtureProgram](const std::string& selected) {
                 const auto n=static_cast<std::uint32_t>(selected.size());
-                std::vector<std::uint8_t> bytes{'D','B','X','D',2,0,0,0x10,0x27,0x5a,0xa5,
+                std::vector<std::uint8_t> bytes{'D','B','X','D',2,0,static_cast<std::uint8_t>(fixtureProgram),0x10,0x27,0x5a,0xa5,
                     std::uint8_t(n),std::uint8_t(n>>8),std::uint8_t(n>>16),std::uint8_t(n>>24)};
                 bytes.insert(bytes.end(),selected.begin(),selected.end());
                 return bytes;
@@ -215,7 +219,7 @@ int main(int argc,char** argv) {
             externalState=bytes;
             // Start with ROM, then switch to the external bank while the
             // same component remains active. Both go through actual state.
-            auto defaultBytes=bytes;defaultBytes.resize(11);defaultBytes[4]=1;
+            auto defaultBytes=bytes;defaultBytes.resize(11);defaultBytes[4]=1;defaultBytes[6]=0;
             S::MemoryStream defaultState(defaultBytes.data(),defaultBytes.size());
             if(component->setState(&defaultState)!=S::kResultOk)
                 return fail("ROM state reset before live bank change failed");
@@ -272,6 +276,8 @@ int main(int argc,char** argv) {
     std::uint64_t nonzero=0,frames=0;
     float peak=0.;
     double idleEnergy=0., noteEnergy=0., releaseEnergy=0.;
+    double expectedTonePower=0., otherTonePower=0.;
+    std::uint64_t toneBlocks=0;
     std::uint64_t idleFrames=0,noteFrames=0,releaseFrames=0,activeNoteBlocks=0,nearFullScale=0;
     constexpr unsigned warmupBlocks=800, idleBlocks=80, heldBlocks=100, tailBlocks=250;
     constexpr unsigned startNoteBlock=warmupBlocks+idleBlocks;
@@ -324,8 +330,18 @@ int main(int argc,char** argv) {
             return fail("Actual VST3 process() returned failure");
         called=true;
         double blockEnergy=0.;
+        double er=0.,ei=0.,orr=0.,oi=0.;
+        const bool measureTone=ramHz>0.&&block>=startNoteBlock+20&&block<stopNoteBlock-10;
         for(std::size_t i=0;i<l.size();++i) {
             const float v=std::max(std::abs(l[i]),std::abs(r[i]));
+            if(measureTone) {
+                constexpr double pi=3.14159265358979323846;
+                const double x=0.5*(l[i]+r[i]);
+                const double a=2.*pi*ramHz*i/44100.;
+                const double b=2.*pi*(ramHz==735.?441.:735.)*i/44100.;
+                er+=x*std::cos(a);ei+=x*std::sin(a);
+                orr+=x*std::cos(b);oi+=x*std::sin(b);
+            }
             if(!std::isfinite(v)||v>1.01f)
                 return fail("Actual VST3 audio contained non-finite or clipped signal");
             if(!originalMode && block<15 && v>0.001f)
@@ -341,6 +357,7 @@ int main(int argc,char** argv) {
         }
         if(originalMode && block>=startNoteBlock && block<stopNoteBlock &&
            blockEnergy/l.size()>0.000001)++activeNoteBlocks;
+        if(measureTone){expectedTonePower+=er*er+ei*ei;otherTonePower+=orr*orr+oi*oi;++toneBlocks;}
         frames+=l.size();
         if(!originalMode && !exclusionMode && peak>minimumPeak&&nonzero>=512)break;
         if(originalMode) {
@@ -375,6 +392,13 @@ int main(int argc,char** argv) {
         std::cout<<"ORIGINAL_IDLE_RMS="<<idleRms<<"\nORIGINAL_HELD_NOTE_RMS="<<noteRms<<"\nORIGINAL_RELEASE_RMS="<<releaseRms<<"\nORIGINAL_ACTIVE_NOTE_BLOCKS="<<activeNoteBlocks<<"\nORIGINAL_HELD_NEAR_FULL_SCALE_FRAMES="<<nearFullScale<<"\n";
         if(noteRms<0.001 || noteRms<idleRms*4. || activeNoteBlocks<8)
             return fail("Original sustained MIDI note did not clearly exceed settled idle audio");
+    }
+    if(ramHz>0.) {
+        std::cout<<"RAM_EXPECTED_HZ="<<ramHz<<" RAM_EXPECTED_POWER="<<expectedTonePower
+                 <<" RAM_OTHER_POWER="<<otherTonePower<<" RAM_TONE_BLOCKS="<<toneBlocks<<"\n";
+        if(toneBlocks<20||expectedTonePower<0.01||expectedTonePower<otherTonePower*8.)
+            return fail("RAM fixture spectral signature missing or incorrect program played");
+        std::cout<<"REAL_VST3_RAM_SAMPLE_SPECTRAL_PASS\n";
     }
     if(!called||peak<=minimumPeak||nonzero<512)
         return fail("Real VST3 host process() emitted only silence; peak="+

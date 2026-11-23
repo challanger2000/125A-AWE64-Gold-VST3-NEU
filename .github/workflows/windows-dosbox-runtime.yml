@@ -18,6 +18,7 @@ on:
       - 'tests/CreativeMidiBankSelectTest.cpp'
       - 'tests/WindowsRunVst3HostPcmSmoke.py'
       - 'tests/WindowsPrivateCreativeGuestSmoke.py'
+      - 'tests/MakeRamSampleSf2.py'
       - 'tools/Run-Private-Creative-AWE-Test.ps1'
       - 'tests/WindowsVst3CreativeOnlyNegative.py'
       - 'tests/test_synthetic_dos_exe.py'
@@ -181,7 +182,7 @@ jobs:
           New-Item -ItemType Directory -Path (Join-Path $stage 'tools'),(Join-Path $stage 'tests') -ErrorAction Stop | Out-Null
           Copy-Item -LiteralPath 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe' -Destination $stage -ErrorAction Stop
           Copy-Item -LiteralPath 'tools/Run-Private-Creative-AWE-Test.ps1' -Destination (Join-Path $stage 'tools') -ErrorAction Stop
-          Copy-Item -LiteralPath 'tests/WindowsRunVst3HostPcmSmoke.py','tests/WindowsPrivateCreativeGuestSmoke.py' -Destination (Join-Path $stage 'tests') -ErrorAction Stop
+          Copy-Item -LiteralPath 'tests/WindowsRunVst3HostPcmSmoke.py','tests/WindowsPrivateCreativeGuestSmoke.py','tests/MakeRamSampleSf2.py' -Destination (Join-Path $stage 'tests') -ErrorAction Stop
           Copy-Item -LiteralPath 'third_party/dosbox-x-AWE32/COPYING' -Destination (Join-Path $stage 'DOSBox-X-COPYING.txt') -ErrorAction Stop
           Copy-Item -LiteralPath 'docs/PROVENANCE.md' -Destination $stage -ErrorAction Stop
           Copy-Item -LiteralPath 'tools/Run-Prebuilt-Private-Test.cmd' -Destination $stage -ErrorAction Stop

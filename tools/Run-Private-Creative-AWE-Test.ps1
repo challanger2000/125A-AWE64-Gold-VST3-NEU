@@ -177,6 +177,37 @@ try {
         [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
         [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
     }
+    # Newly generated PCM, not ROM-derived. Verify two sparse program IDs
+    # by distinct audible frequencies, not merely nonzero output.
+    $ramFixture = Join-Path $temporary '125A RAM probe.sf2'
+    & python (Join-Path $root 'tests/MakeRamSampleSf2.py') --output $ramFixture
+    if ($LASTEXITCODE -ne 0) { throw 'RAM fixture creation failed.' }
+    $ramHash = (Get-FileHash -Algorithm SHA256 $ramFixture).Hash
+    $previousRamHz = [Environment]::GetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ','Process')
+    try {
+        foreach ($hz in @('441','735')) {
+            $ramBoot = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
+            $ramTrace = Join-Path $temporary ("ram_" + $hz + ".trace")
+            [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', $ramFixture, 'Process')
+            [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ', $hz, 'Process')
+            [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $ramTrace, 'Process')
+            [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', 'dummy', 'Process')
+            [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', '1', 'Process')
+            [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $ramBoot, 'Process')
+            & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
+            if ($LASTEXITCODE -ne 0) { throw ("RAM sample spectral gate failed: " + $hz) }
+            if (-not (Test-Path -PathType Leaf $ramTrace)) { throw 'RAM sample EMU8000 trace absent.' }
+            if ((Get-FileHash -Algorithm SHA256 $ramFixture).Hash -ne $ramHash) { throw 'RAM fixture modified.' }
+            Write-Host "RAM_SAMPLE_PROGRAM_SPECTRAL_PASS; HZ=$hz; SOURCE_UNCHANGED"
+        }
+    } finally {
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ', $previousRamHz, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', $previousExternal, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $previousBootLog, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', $previousOriginal, 'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
+    }
     # Independent secondary original-Creative test in an isolated DLL child.
     & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds
     if ($LASTEXITCODE -ne 0) { throw 'Private Creative ROM/SF2/DEMO DLL-level PCM gate FAILED.' }

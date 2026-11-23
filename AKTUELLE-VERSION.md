@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Original-SF2-Wechsel PASS; separate RAM-Sample-/Preset-Klangprüfung
+
+- **[Windows 45290310337](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45290310337) vollständig SUCCESS** auf 0f7588a1; Transport 45290310165 und Version 45290310749 PASS. Tatsächliches IComponent-State-Roundtrip, aktiver Originalgast-Neustart, externe GM-Referenzbank, NoteOn/Off, Held-RMS 0,00828747 (ROM-GM 0,00837682), EMU8000-Writes 12903, Quelle unverändert. Vorheriger Timeout nach Umstellung auf temporäre Ausgabespools behoben. Kein bloßer synthetischer PASS.
+- Jetzt zusätzliche selbst erzeugte SF2-2.00 mit zwei RAM-Sinus-Samples und exakt zwei Presets (0/17), keine ROM-Samples und keine fremden Audiodaten. Nativer Original-VST3-Test muss je Programm die passende 441/735-Hz-Signatur deutlich über der anderen Frequenz messen, zusätzlich zu den bisherigen Note/Ruhe/Release-Gates. Fixture nur temporär erzeugt, SHA unverändert. Originaler Creative-Lader und EMU8000 bleiben unverändert. Neue RAM-Prüfung noch nicht bestätigt. Keine Freigabe.
+
 ## 24.11.2026 — Aktiver SF2-Test: Timeout mit sicherer Log-Erfassung untersuchen
 
 - Windows 45288976627: Build, synthetische Positiv-/Negativkontrollen und musikalischer Original-GM-Test erreicht (Held Note RMS 0,00795573). Separater aktiver SF2-/Recall-Test nach 90 s Timeout; Ursache nicht nachgewiesen. Transport/Version PASS.
