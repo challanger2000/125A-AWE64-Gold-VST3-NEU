@@ -15,7 +15,7 @@
 | DOSBox-X/AWE32 | **Als Quell-Submodul eingebunden, noch nicht im VST3 ausgeführt** | `turican0/dosbox-x-AWE32`, `masterAWE32`, `f3a95b9f19a7f9863295e6481f271cf04733c635` |
 | Creative-DOS-Treiber | **Integrationsnachweis im neuen Plugin ausstehend** | Originale Creative-DOS-Software ist Ziel, keine rekonstruierte Ersatztreiberlogik |
 | ROM, SYNTHGM.SBK, SF2 | **Private Testdaten in ChatGPT-Dateibibliothek auffindbar** | [TEST-ASSET-LOCATION.md](docs/TEST-ASSET-LOCATION.md); keine öffentlichen Binärdaten |
-| Windows-x64-VST3 | **Noch nicht gebaut** | Kein freigegebener Installer, kein bestandener Hosttest |
+| Echtzeit-Audio-/MIDI-Transport | **SPSC-Queue-Quellcode implementiert; lokaler Linux-C++20-Test PASS** (Thread, Overflow, Underrun, Mehrfachinstanz), Windows-GitHub-CI noch ausstehend | `src/RealtimeQueues.hpp`, `tests/RealtimeQueuesTest.cpp` |\n| Windows-x64-VST3 | **Noch nicht gebaut** | Kein freigegebener Installer, kein bestandener Hosttest |
 | MIDI/Audioklang/Projekt-Recall | **Noch nicht nachgewiesen** | Tests erst nach Runtime-Einbindung |
 | Fender Studio Pro | **Nicht geprüft** | Praxis-Abnahme erst am Ende |
 
@@ -30,4 +30,4 @@
 
 ## Letzte dokumentierte Änderung
 
-**23.11.2026:** Versionsverwaltung eingeführt; Stand der GUI-Übernahme, gepinnte DOSBox-X-Basis und fehlender VST3-Integrationsnachweis festgehalten. **Keine neue Audiolaufzeit implementiert.**
+**23.11.2026:** Erste Audio-/MIDI-Transportkomponente (pro Instanz getrennte, begrenzte SPSC-Ringe) implementiert; lokaler C++20-Test inklusive tatsächlicher Thread-Kommunikation bestanden; GitHub-Windows-Test zum Commit ausstehend. **Noch keine integrierte DOSBox-Laufzeit, Creative-DOS-Software oder VST3-Audiofunktion.**

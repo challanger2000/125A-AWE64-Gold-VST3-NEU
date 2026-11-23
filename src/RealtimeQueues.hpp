@@ -1,0 +1,108 @@
+#pragma once
+// Single-producer/single-consumer bridge for an in-process DOSBox worker.
+// No synthesizer, original driver or VST3 runtime is implemented by this file.
+#include <array>
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <type_traits>
+
+namespace awe64::rt {
+
+template <typename T, std::size_t Capacity>
+class SpscQueue final {
+    static_assert(Capacity >= 2 && (Capacity & (Capacity - 1)) == 0,
+                  "Capacity must be a power of two >= 2");
+    static_assert(std::is_trivially_copyable_v<T>, "Payload must be trivial");
+    std::array<T, Capacity> data_{};
+    alignas(64) std::atomic<std::uint64_t> read_{0};
+    alignas(64) std::atomic<std::uint64_t> written_{0};
+public:
+    SpscQueue() noexcept = default;
+    SpscQueue(const SpscQueue&) = delete;
+    SpscQueue& operator=(const SpscQueue&) = delete;
+    static constexpr std::size_t capacity() noexcept { return Capacity; }
+
+    [[nodiscard]] bool tryPush(const T& item) noexcept {
+        const auto w = written_.load(std::memory_order_relaxed);
+        const auto r = read_.load(std::memory_order_acquire);
+        if (w - r >= Capacity) return false;
+        data_[static_cast<std::size_t>(w) & (Capacity - 1)] = item;
+        written_.store(w + 1, std::memory_order_release);
+        return true;
+    }
+    [[nodiscard]] bool tryPop(T& item) noexcept {
+        const auto r = read_.load(std::memory_order_relaxed);
+        const auto w = written_.load(std::memory_order_acquire);
+        if (w == r) return false;
+        item = data_[static_cast<std::size_t>(r) & (Capacity - 1)];
+        read_.store(r + 1, std::memory_order_release);
+        return true;
+    }
+    [[nodiscard]] std::size_t sizeApprox() const noexcept {
+        const auto r = read_.load(std::memory_order_acquire);
+        const auto w = written_.load(std::memory_order_acquire);
+        return static_cast<std::size_t>(w - r);
+    }
+};
+
+struct StereoFrame final { float left; float right; };
+struct MidiEvent final {
+    std::uint64_t absoluteHostSample;
+    std::uint8_t status;
+    std::uint8_t data1;
+    std::uint8_t data2;
+    std::uint8_t size;
+};
+
+// Audio producer: DOSBox worker; consumer: VST3 audio thread.
+// MIDI producer: VST3 audio thread; consumer: DOSBox worker.
+// All queues are per instance and never share mutable state.
+// Host-rate resampling and guest scheduling are NOT yet implemented.
+class RealtimeQueues final {
+    SpscQueue<StereoFrame, 32768> audio_{};
+    SpscQueue<MidiEvent, 4096> midi_{};
+    std::atomic<std::uint64_t> audioDrops_{0};
+    std::atomic<std::uint64_t> midiDrops_{0};
+    std::atomic<std::uint64_t> audioUnderruns_{0};
+public:
+    bool pushAudio(const StereoFrame& frame) noexcept {
+        if (audio_.tryPush(frame)) return true;
+        audioDrops_.fetch_add(1, std::memory_order_relaxed);
+        return false;
+    }
+    bool pushMidi(const MidiEvent& event) noexcept {
+        if (midi_.tryPush(event)) return true;
+        midiDrops_.fetch_add(1, std::memory_order_relaxed);
+        return false;
+    }
+    bool popMidi(MidiEvent& event) noexcept { return midi_.tryPop(event); }
+    std::size_t readAudio(float* left, float* right, std::size_t frames) noexcept {
+        if (!left || !right) return 0;
+        std::size_t available = 0;
+        StereoFrame frame{};
+        for (std::size_t i = 0; i < frames; ++i) {
+            if (audio_.tryPop(frame)) {
+                left[i] = frame.left;
+                right[i] = frame.right;
+                ++available;
+            } else {
+                left[i] = 0.f;
+                right[i] = 0.f;
+            }
+        }
+        if (available != frames)
+            audioUnderruns_.fetch_add(frames - available, std::memory_order_relaxed);
+        return available;
+    }
+    std::uint64_t audioDrops() const noexcept {
+        return audioDrops_.load(std::memory_order_relaxed);
+    }
+    std::uint64_t midiDrops() const noexcept {
+        return midiDrops_.load(std::memory_order_relaxed);
+    }
+    std::uint64_t audioUnderruns() const noexcept {
+        return audioUnderruns_.load(std::memory_order_relaxed);
+    }
+};
+} // namespace awe64::rt
