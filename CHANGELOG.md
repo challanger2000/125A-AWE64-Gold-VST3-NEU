@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Private Test-Bundle-Paketierung Linux/Windows geprüft
+
+- **GitHub Actions [45110560473](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45110560473): SUCCESS** – originale Windows- und Linux-Transporttests einschließlich der neuen privaten VST3-Paketierungsregression mit ausschließlich erzeugten **Fake-Originaldateien** durchgelaufen. Keine echten Creative-ROMs, Original-`DEMO.EXE`, SoundFonts oder herunterladbaren Lizenzdateien im GitHub-Runner.
+- Der private Assemblierer prüft Hashes und exakt drei Originaldateinamen (ROM, DOS-Guest, ROM-GM-`SYNTHGM.SF2`), bewahrt P165-Artwork und schreibt ausschließlich in gitignoriertes `PRIVATE/`. Keine Aussage über echten Creative-DOS-AWE-Sound im finalen Plugin.
+
 ## 23.11.2026 — Private Ein-Bundle-Paketierung mit Originaldatei-Integritätsprüfung vorbereitet
 
 - `tools/prepare_private_vst3.py` sichert die geforderte **Ein-VST3-Installation**: originaler Windows-VST3-Host, originale DOSBox-X-AWE32-DLL, unveränderte P165-Frontplatte und die später lokal benötigten Creative-Dateien zusammen in einem einzigen privaten `.vst3`-Bundle.
