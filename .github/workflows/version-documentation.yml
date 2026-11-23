@@ -1,0 +1,46 @@
+name: Version and changelog consistency
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  versioning:
+    name: Require current version on code changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          submodules: false
+      - name: Check mandatory version documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f AKTUELLE-VERSION.md
+          test -f CHANGELOG.md
+          test -f START-HERE.md
+          test -f gui/PresetBrowserView.cpp
+          test -f .gitmodules
+          if ! git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            echo "Single-commit history, metadata exists."
+            exit 0
+          fi
+          changed="$(git diff --name-only HEAD^ HEAD)"
+          echo "Changed files:"
+          printf '%s\n' "$changed"
+          if printf '%s\n' "$changed" | grep -Eq '^(src/|gui/|third_party/|CMakeLists\\.txt$|cmake/|\\.gitmodules$)'; then
+            if ! printf '%s\n' "$changed" | grep -Fxq 'AKTUELLE-VERSION.md'; then
+              echo "::error::Technical changes require an AKTUELLE-VERSION.md update in the same commit"
+              exit 1
+            fi
+            if ! printf '%s\n' "$changed" | grep -Fxq 'CHANGELOG.md'; then
+              echo "::error::Technical changes require a CHANGELOG.md entry in the same commit"
+              exit 1
+            fi
+          fi
+          echo "Version documentation is consistent with the commit."

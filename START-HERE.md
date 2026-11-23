@@ -1,5 +1,8 @@
 # START HERE — verbindlicher Projektstand
 
+**Maßgeblicher aktueller Versions- und Prüfstand:** [AKTUELLE-VERSION.md](AKTUELLE-VERSION.md). Änderungen chronologisch in [CHANGELOG.md](CHANGELOG.md). Bei jeder technischen Änderung beides im selben Commit aktualisieren.
+
+
 **Datum:** 2026-11-23  
 **Ziel:** Ein *einziges* Windows-x64-VST3 mit intern eingebettetem DOSBox-X-AWE32 und **originaler Creative-DOS-Software**.  
 **Branch:** ausschließlich `main`. **Keine parallelen Engines oder Entwicklungszweige.**

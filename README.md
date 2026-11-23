@@ -32,4 +32,4 @@ src/                     Künftiger gemeinsamer VST3-/DOSBox-Adapter
 5. **Studio-Pro-Praxistest erst am Ende**, nach den automatisierten Tests.
 6. GPL- und Creative-Rechte vor einer Weitergabe klären. DOSBox-X/EMU8000-Quellcode unterliegt GPL-Pflichten.
 
-**Wichtige Dokumente:** [START-HERE.md](START-HERE.md), [Quellen und Herkunft](docs/PROVENANCE.md).
+**Immer zuerst den aktuellen Stand prüfen:** [AKTUELLE-VERSION.md](AKTUELLE-VERSION.md), [CHANGELOG.md](CHANGELOG.md), [START-HERE.md](START-HERE.md), [Quellen und Herkunft](docs/PROVENANCE.md).
