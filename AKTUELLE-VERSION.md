@@ -29,15 +29,20 @@ Ein einziges Windows-VST3-Paket mit Original-P165-GUI, originalem DOSBox-X-AWE32
 | Original-DOSBox-X-main im Windows-Prozess ausgeführt | **PASS**; DOS-Shell-Befehl `exit` und Rückkehr zum Windows-Testhost, z. B. [Actions 45105475614](../../actions/runs/45105475614) |
 | Original-DOSBox-X-Hintergrundthread beendet/gejoint | **PASS** im isolierten DOSBox-Worker-Test, [Actions 45105974571](../../actions/runs/45105974571) |
 | Windows-x64-VST3-Bundle mit P165-GUI **und** Original-DOSBox-X-DLL | **PASS**; beide Binärdateien im selben `.vst3/Contents/x86_64-win/`-Ordner, [Actions 45105475614](../../actions/runs/45105475614) |
+| Original-DOSBox-X x64 SDL2 + internes CRT-DLL-Linking | **PASS** in [Actions 45109673741](../../actions/runs/45109673741), nach Beseitigung des SDL2-Doppelteinstiegs |
+| Originaler emulierter 16-Bit-MPU-401-UART und echte Host-MIDI-Daten | **PASS** in [Actions 45109673741](../../actions/runs/45109673741): echtes DOS-COM-Programm liest am realen emulierten 330h/331h I/O die vom Host eingespeisten Bytes `90 3C 64` aus und schreibt sie als DOS-Datei `MIDI.BIN` |
+| Interner SDL2-Dummy-Audiotreiber ohne weitere Windows-Soundkarte | **PASS** in [Actions 45109673741](../../actions/runs/45109673741): interner Audio-Driver `dummy` |
+| Tatsächlicher Stereo-PCM-Rückkanal vom Original-DOSBox-X-Mixer zum Host | **PASS** in [Actions 45109673741](../../actions/runs/45109673741): **1024 originale Mixer-PCM-Frames** an real registrierten Windows-C-Callback; **kein Creative-Klangnachweis**, testweise darf Stille enthalten sein |
+| Reproduzierbarer VST3-Bundle-Build nach SDL2-Korrektur | **PASS** in [Actions 45109673741](../../actions/runs/45109673741): P165-GUI, Original-DOSBox-X-SDL2-DLL und Windows-VST3-Host in demselben Bundle |
 | Authentische Original-Creative-DOS-SF2LIB-Bankladen | Historischer **privater P30-DOSBox-Versuch** belegte SF2-2.00-Bankladen. **Noch nicht innerhalb des neuen VST3 nachgewiesen** |
 
 ## Implementiert, aber noch nicht endgültig nachgewiesen
 
 | Bereich | Stand |
 | --- | --- |
-| Original-DOSBox-X-SDL-Fenster unsichtbar | Quellpatch `SDL_WINDOW_HIDDEN`, VST3-Start `-nogui -nomenu`; aktualisierter Windows-Regressionstest ausstehend |
+| Original-DOSBox-X-SDL-Fenster unsichtbar | Quellpatch `SDL_WINDOW_HIDDEN`, VST3-Start `-nogui -nomenu`; Windows-SDL2-DLL/Bundletest PASS, **kein grafischer Studio-Pro-Praxistest** |
 | Kein zusätzlicher Windows-Audioausgang | Windows-Lauf 45107364211 FAIL: Standard-Release baute SDL1 ohne internes SDL2-Dummy-Audiogerät. Projekt jetzt auf **`Release SDL2|x64`** korrigiert. Erster SDL2-Kompilierlauf 45108048294 **FAIL** (Statusfunktion wurde vor der SDL2-Gerätevariable deklariert), Reihenfolge im Quellpatch korrigiert; neuer Windows-Nachweis noch ausstehend |
-| Exakte Host-MIDI-Bytes bis zum 16-Bit-DOS-Programm | Eigenes `MPUPROBE.COM` prüft UART-Portstatus/ACK und schreibt empfangene Original-MIDI-Bytes in eine DOS-Datei. **Windows-Hardwaretest ausstehend** |
+| Exakte Host-MIDI-Bytes bis zum 16-Bit-DOS-Programm | **PASS in Windows-Lauf 45109673741:** eigenständiges `MPUPROBE.COM` schaltet den Original-MPU401 in UART, liest `90 3C 64` über Hardwareports 331h/330h und beweist die Daten per `MIDI.BIN`. **Noch kein originales Creative-DEMO/ROM-/SF2-Instrument.** |
 | Originale Creative-Standardbank im Gast | `DEMO.EXE /SBK:SYNTHGM.SF2` korrekt nach Original-C-Quellcode; echte private Dateien beim neuen VST3-Start noch nicht nachgewiesen |
 | VST3-Host-Activate/Deactivation | Code vorhanden, aber keine abgeschlossene DAW-/Creative-DOS-Laufzeitabnahme; fehlende private Dateien führen zu bewusstem Aktivierungsfehler |
 | SF2-2.01-Kompatibilitätsvorstufe | Ein-Byte-`ifil`-2.01→2.00 nur in **privater Kopie**, Unit-Tests PASS; **noch nicht** live an die DOSBox-Gastbankauswahl angeschlossen |

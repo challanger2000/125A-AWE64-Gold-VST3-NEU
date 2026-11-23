@@ -1,5 +1,14 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Original-DOSBox-X-SDL2, 16-Bit-MIDI-Hardware, Stereo-PCM und vollständiges VST3-Bundle: Windows-PASS
+
+- **GitHub Actions [45109673741](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45109673741) – gesamter integrierter Windows-Lauf SUCCESS.** Originaler gepinnter DOSBox-X-AWE32-Fork als **Windows x64 SDL2-DLL** gebaut, verlinkt und zur Laufzeit innerhalb des Windows-Testprozesses geladen. Originales DOSBox-`main()` führte echte DOS-Kommandos aus und kehrte mit Exitcode 0 zum Host zurück.
+- **In-Process-Audioisolierung PASS:** wirklicher interner `SDL`-Audiotreiber `dummy` bestätigt, keine zweite Windows-Hardwareausgabe. Ein **echter DOSBox-X-Mixer-PCM-Callback** lieferte **1024 Stereo-PCM-Frames** an die Windows-Hostfunktion, kein generierter Fake-Klang. Das emulierte DOSBox-Workerprogramm wurde per `AWE64_RequestStop` beendet und der Host-Thread ordnungsgemäß gejoint.
+- **Unabhängiger Original-MPU-401-Hardwarepfad PASS:** Ein selbständiges 16-Bit-`MPUPROBE.COM` schaltete den Original-MPU über Port 331h in UART, las exakt `90 3C 64` aus Port 330h (vom echten Hostcallback über den gepinnten Original-MPU401-Emulator eingespeist) und schrieb die erhaltenen Bytes in eine DOS-Datei `MIDI.BIN`. Der Windows-Prozesstest verglich die drei echten empfangenen Bytes erfolgreich.
+- **Windows-VST3-Bundle erfolgreich:** P165-Original-GUI und Windows-x64-Steinberg-VST3-Host mit dem kompilierten originalen DOSBox-X-AWE32-Kern als **interne DLL innerhalb desselben `.vst3`-Bundles** gebaut. Es wird keine externe DOSBox-EXE benötigt.
+- **KEINE** künstliche Klangabnahme: CI arbeitet ausschließlich mit proprietärdatenfreien DOS-Programmen; **Original-Creative-DEMO.EXE + echtes ROM + SYNTHGM.SF2 und hörbarer/vergleichbarer AWE-Sound im echten Windows-VST3 wurden nicht nachgewiesen.** Version bleibt `0.0.0-dev`, keine Release-Freigabe.
+- Die älteren Windows-SDL1/SDL2/CRT-, CMake-Bracket- und MPU-401-Startmodus-Fehler sind bei diesem Windows-Erfolgsnachweis nicht mehr vorhanden.
+
 ## 23.11.2026 — SDL_STATIC_LIB-Originalquellpatch gegen Doppelanwendung absichern
 
 - CI 45109467871, Linux-/Quellcheck **FAIL**: Die Funktion `patch_sdl2_static()` ließ sich ein zweites Mal auf dieselbe SDL.c anwenden, weil der ursprüngliche `#if`-Anchor trotz eingefügtem Define weiterhin vorhanden war.
