@@ -16,6 +16,10 @@ class CreativePrivateHarnessTest(unittest.TestCase):
         self.assertIn("midi mpu401=intelligent", cmd)
         self.assertIn("sblaster sbtype=sbawe", cmd)
         self.assertIn("sblaster awe32ram=28672", cmd)
+        self.assertIn("speaker pcspeaker=false", cmd)
+        self.assertIn("sblaster oplmode=none", cmd)
+        self.assertNotIn("speaker pcspeaker=true", cmd)
+        self.assertNotIn("sblaster oplmode=auto", cmd)
         self.assertNotIn("-silent", cmd)
         self.assertIn("-nogui", cmd)
         self.assertIn("-nomenu", cmd)
@@ -54,8 +58,13 @@ class CreativePrivateHarnessTest(unittest.TestCase):
     def test_trace_detects_writes_and_excludes_reads(self):
         with tempfile.TemporaryDirectory() as t:
             trace = Path(t) / "emu.trace"
-            trace.write_text("R 123 620 0001\n123 620 0001\n124 A20 0400\n")
-            self.assertEqual(module.inspect_trace(trace), 2)
+            trace.write_text(
+                "R 123 620 0001\n"
+                "123 620 0001\n124 A20 0400\n"
+                "125 330 0001\n126 388 0001\n"  # MPU/OPL: NOT EMU8000
+                "127 E20 FFFF\n128 620 00FF\n")
+            self.assertEqual(module.inspect_trace(trace), (4, 3))
+            self.assertEqual(module.inspect_trace(Path(t) / "absent"), (0, 0))
 
 
 if __name__ == "__main__":

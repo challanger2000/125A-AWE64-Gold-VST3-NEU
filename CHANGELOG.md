@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Original-Creative-Klangtest gegen PC-Speaker-/OPL-Falschtreffer abgesichert
+
+- Im privaten echten Creative-DOSBox-DLL-Klangtest werden jetzt **PC-Speaker und OPL explizit deaktiviert**, während `sblaster sbtype=sbawe` und der Original-EMU8000-Kern weiter aktiv sind. So ist hörbares DOSBox-Mixer-PCM nicht mehr durch andere emulierte Hardwaretöne erklärbar. Keine Änderung an Produktstart, öffentlich-synthetischem PC-Speaker-Test oder originalem Chipcode.
+- `EMU8K_TRACE` zählt nur noch echte Original-EMU8000-I/O-Writes auf 620h/622h/A20h/A22h/E20h/E22h, fordert **mindestens 16 Writes auf wenigstens 2 Ports** und weist gewöhnliche MIDI-/OPL-/sonstige Register sowie Reads zurück.
+- Neue datenfreie Python-Regressionsfälle für die Stummschaltungen und Trace-Negativkontrollen. **Keine private Originaldaten-Audioabnahme behauptet; erst ausgeführter Besitzer-Windows-Test zählt**, `0.0.0-dev`.
+
+
 ## 23.11.2026 — Windows-VST3-Build und neuer privater Original-Creative-Testmodus: CI bestanden
 
 - **[45205416871](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45205416871): Windows-Original-DOSBox-X-DLL und tatsächliche Steinberg-VST3-Audio-Host-EXE mit neuem owner-only `--original`-Modus **erfolgreich kompiliert**. Öffentlicher synthetischer NoteOn→MPU401→DOS-Hardware→Original-Mixer→VST3-PCM-Test weiterhin PASS (60.928 Float32-Stereoframes, 979 nicht-stumme, Peak 0,304871, 7 NoteOn). Original-EMU8000-`AWEUTIL`, MPU und Windows-CI-Stop ebenfalls PASS.

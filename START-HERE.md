@@ -15,6 +15,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **[Windows 45205416871](../../actions/runs/45205416871) SUCCESS:** Neu erweiterter Windows-VST3-Testhost mit privatem Creative-`--original`-Modus tatsächlich kompiliert, weiterhin echter synthetischer MIDI-zu-PCM-VST3-Rundweg bestanden (979 nicht-stumme Stereo-Frames, 7 NoteOn). [Linux/Windows 45205416646](../../actions/runs/45205416646) PASS. **Original-ROM/Creative-`DEMO.EXE`/echte `SYNTHGM.SF2` wurden dabei nicht ausgeführt.** Privater Originalklang weiterhin nicht abgenommen; `0.0.0-dev`.
 
+## Privater Creative-Klangtest: OPL/PC-Speaker ausgeschlossen (Stand 23.11.2026)
+
+Im **privaten Original-Creative-DOSBox-DLL-Test** sind PC-Speaker und OPL ausgeschaltet; nur echte EMU8000-I/O-Portschreibzugriffe (mindestens 16 auf 2 Ports) zählen. Der synthetische öffentliche VST3-Audiotransport wird dadurch **nicht** verändert. Die echte Creative-`DEMO.EXE`/`SYNTHGM.SF2`/Besitzer-ROM-Klangabnahme **steht weiter aus**.
+
 ## Privater Original-Creative-VST3-Klangtest jetzt ausführbar vorbereitet (noch kein PASS)
 
 Der reale VST3-Host besitzt jetzt einen separaten privaten `--original`-Modus für das **echte** Creative-`DEMO.EXE`, authentische `SYNTHGM.SF2` und `awe32.raw`. Der Besitzer-Windows-Launcher `tools/Run-Private-Creative-AWE-Test.ps1` fordert SHA-verifizierte Originaldaten, echten MIDI-NoteOn/NoteOff, originale EMU8000-Registerwrites und hörbare Stereo-PCM-Frames **aus dem tatsächlichen VST3**. Öffentliche CI bleibt vollständig datenfrei. **Dieser Original-Creative-Test wurde noch nicht durchgeführt und ist NICHT abgenommen.** Alle vorherigen synthetischen VST3-Transporttests bleiben davon getrennt.

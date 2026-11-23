@@ -70,6 +70,11 @@ def guest_arguments(assets: Path):
     return [
         "AWE64DOSBoxRuntime", "-noconfig", "-nogui", "-nomenu",
         "-set", "sblaster sbtype=sbawe",
+        # This is a HARD original-EMU8000 sound test. Exclude other DOSBox
+        # hardware voices so that mixer PCM cannot originate from an
+        # independent PC-speaker or OPL emulation channel.
+        "-set", "speaker pcspeaker=false",
+        "-set", "sblaster oplmode=none",
         "-set", "sblaster awe32ram=28672",
         "-set", "sblaster awe32rom=" + str(assets / "awe32.raw"),
         "-set", "midi mpu401=intelligent",
@@ -86,13 +91,30 @@ def probe_midi_sequence():
             bytes((0x90, 60, 112)))
 
 
-def inspect_trace(trace: Path) -> int:
-    # Original upstream EMU8000 trace format: <frame> <hexport> <hexvalue>.
-    # Exclude reads (which begin with 'R ') and require real register writes.
+EMU8000_PORTS = frozenset((0x620, 0x622, 0xA20, 0xA22, 0xE20, 0xE22))
+EMU8000_TRACE_WORD = re.compile(r"^\d+ ([0-9A-Fa-f]{3,4}) [0-9A-Fa-f]{4}$")
+
+
+def inspect_trace(trace: Path) -> tuple[int, int]:
+    """Return original EMU8000 register writes and distinct active ports.
+
+    Original upstream format is '<frame> <hex-port> <hex-value>'. Read
+    records begin with 'R ' and cannot count. Ignore all non-EMU ports:
+    ordinary DOS mixer/MPU/PIT/OPL traffic is NOT an AWE32 sound proof.
+    """
     if not trace.is_file():
-        return 0
-    return sum(bool(re.match(r"^\d+ [0-9A-Fa-f]{3,4} [0-9A-Fa-f]{4}$", line))
-               for line in trace.read_text(encoding="utf-8", errors="replace").splitlines())
+        return 0, 0
+    writes = 0
+    ports: set[int] = set()
+    with trace.open("r", encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            match = EMU8000_TRACE_WORD.fullmatch(raw.strip())
+            if match:
+                port = int(match.group(1), 16)
+                if port in EMU8000_PORTS:
+                    writes += 1
+                    ports.add(port)
+    return writes, len(ports)
 
 
 def run_child(bundle: Path, seconds: float):
@@ -201,9 +223,11 @@ def run_child(bundle: Path, seconds: float):
                 raise RuntimeError("DOSBox mixer failed internal SDL2 dummy-only isolation")
             if guest_result != [0]:
                 raise RuntimeError("DOSBox/Creative guest failed to exit normally: " + repr(guest_result))
-            writes = inspect_trace(trace)
-            if writes == 0:
-                raise RuntimeError("No actual original EMU8000 register writes in private trace")
+            writes, used_ports = inspect_trace(trace)
+            if writes < 16 or used_ports < 2:
+                raise RuntimeError(
+                    f"Insufficient authentic EMU8000 traffic after Creative boot: "
+                    f"{writes} writes across {used_ports} actual EMU8000 ports")
             if midi_pulled[0] < 3:
                 raise RuntimeError("Original emulated MPU-401 did not consume bank/program/note")
             if pcm_frames[0] == 0:
@@ -212,6 +236,8 @@ def run_child(bundle: Path, seconds: float):
                 raise RuntimeError("Creative + original ROM/SF2 produced no detectable note PCM")
             print("PRIVATE_CREATIVE_DOS_AWE_PCM_PASS")
             print("Original EMU8000 register writes:", writes)
+            print("Distinct original EMU8000 I/O ports:", used_ports)
+            print("PC speaker and OPL were disabled during this original-sound probe")
             print("Original mixer stereo PCM frames:", pcm_frames[0])
             print("Observed note-on PCM peak (16-bit):", peak_after_midi[0])
             print("MPU-401 MIDI packets delivered:", midi_pulled[0])
