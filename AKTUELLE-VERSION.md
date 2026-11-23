@@ -27,7 +27,7 @@
 
 - Implementiert: Quellpatch in `integration/patch_dosbox_runtime.py` mit echten emulierten Host-MIDI-I/O-Ports, PCM-Abgriff am originalen DOSBox-X-Mixer und exportiertem Emulator-Einstiegspunkt für eine interne Windows-x64-DLL.
 - Implementiert: `integration/DosBoxHostAdapter.hpp`, welcher die vorhandenen SPSC-/Creative-DOS-Brücken mit den C ABI-Aufrufen verbindet. Originaler EMU8000-Code und Creative-Synthesizerlogik unverändert.
-- **Nicht nachgewiesen:** DLL-Kompilierung des gepinnten DOSBox-X-Forks. CI `windows-dosbox-runtime.yml` wird beim Commit gestartet; Ausgang erst anhand Actions-Log beurteilen.
+- **Erster Original-Quellpatch-Prüflauf FEHLGESCHLAGEN:** Das originale Visual-Studio-Projekt hat ein UTF-8-BOM; Patchwerkzeug korrigiert, um Original-BOM und Zeilenenden beizubehalten. Windows-DLL-Kompilierung noch ohne positiven Nachweis.
 - **Nicht implementiert/abgenommen:** echte Gastlaufzeit im VST3, Original-Creative-DOS-Binary, ROM/SBK/SF2-Klang, Host-Rate-Konvertierung, zuverlässiger Shutdown, Mehrfachinstanzisolierung, DAW-Recall und Studio-Pro-Praxistest.
 
 ## Unveränderliche Versionsregeln

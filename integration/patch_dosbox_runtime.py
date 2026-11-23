@@ -129,12 +129,12 @@ def main():
     for filename,fn in PATCHES.items():
         path=root/filename
         raw=path.read_bytes()
-        if raw.startswith(b'\xef\xbb\xbf'): raise ValueError('Unexpected BOM: '+filename)
+        bom=b'\xef\xbb\xbf' if raw.startswith(b'\xef\xbb\xbf') else b''
         end='\r\n' if b'\r\n' in raw else '\n'
-        original=raw.decode('utf-8').replace('\r\n','\n')
+        original=raw[len(bom):].decode('utf-8').replace('\r\n','\n')
         changed=fn(original)
         if changed==original:raise ValueError('No change: '+filename)
-        writes[path]=changed.replace('\n',end).encode('utf-8')
+        writes[path]=bom+changed.replace('\n',end).encode('utf-8')
     # Validate ALL anchors before changing ANY checkout file.
     for path,data in writes.items():
         path.write_bytes(data)
