@@ -24,6 +24,16 @@ int main(){
  CHECK(l[2]==.5f&&r[2]==-.5f);
  CHECK(l[4]==0.f&&r[4]==0.f);
  CHECK(a.audioUnderruns()==1);
+ CHECK(a.pushMidi({700,0xB1,64,127,3}));
+ CHECK(a.pushMidi({701,0xC1,73,0,2}));
+ unsigned char packet[3]{};
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&pa,packet,3)==3);
+ CHECK(packet[0]==0xB1 && packet[1]==64 && packet[2]==127);
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&pa,packet,3)==2);
+ CHECK(packet[0]==0xC1 && packet[1]==73);
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&pa,packet,3)==0);
+ CHECK(integration::DosBoxHostAdapter::pullMidi(nullptr,packet,3)==0);
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&pa,packet,2)==0);
  float lb[1]{},rb[1]{};
  CHECK(b.readAudio(lb,rb,1)==0);
  CHECK(integration::DosBoxHostAdapter::readPort(nullptr,0xBEE0)==0xffu);

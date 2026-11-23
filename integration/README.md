@@ -7,6 +7,12 @@ The pinned upstream DOSBox-X-AWE32 source remains unchanged in Git. The Python s
 - Tap the original DOSBox-X stereo mixer PCM output after its unchanged EMU8000 synthesis. Host callback only queues float samples.
 - Compile the original Release x64 DOSBox-X source as an internal Windows DLL; never spawn a standalone EXE.
 
-The host ABI bridge in DosBoxHostAdapter.hpp connects per-instance SPSC queues and the Creative DOS mailbox to these C exports without inserting any sound engine.
+The **preferred and simpler original-driver route** uses the original DOSBox-X MPU-401 UART at ports 330h/331h. The unmodified original Creative DOS DEMO.EXE polls these ports and dispatches incoming MIDI to Creative's own SF2LIB functions. No recompiled 16-bit Creative executable or bespoke patched guest program is needed for this route.
+
+The host registers a C callback AWE64_HostRegisterMidi. The emulation thread pumps complete 2/3-byte MIDI messages into the *original* MPU401 queue when the guest polls its UART status. A preexisting MIDI device on the physical Windows host is not required. No Sysex or sample-exact scheduling is yet implemented.
+
+The old BEE0/BEF0 guest mailbox remains in source solely as a non-default experimental fallback; never register both consumers against one SPSC MIDI queue.
+
+DosBoxHostAdapter.hpp now exports pullMidi, host PCM and the non-default experimental port mailbox callbacks. Only pullMidi is intended for the production path.
 
 Current limitations: the DLL Windows CI build may still fail; VST3 loading, DOSBox guest boot, original Creative binary, private ROM/SBK/SF2, playback, headless SDL, clean shutdown, resampling, multi-instance isolation and DAW recall remain unproven. Original DOSBox-X uses global emulator state, so more than one active runtime is unsafe until resolved. No releases or downloaded runtime artifacts are permitted from this test.

@@ -20,6 +20,17 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('reinterpret_cast<const int16_t*>(stream)',r)
         self.assertIn('awe64_pcm_receiver.load',r)
         with self.assertRaises(ValueError):patch.patch_mixer(r)
+    def test_real_creative_unchanged_mpu401_input(self):
+        s='#include <assert.h>\nextern bool enable_slave_pic;\n' + (
+          'static void ClrQueue(void) {\n'
+          'static Bitu MPU401_ReadStatus(Bitu port,Bitu iolen) {\n'
+          'if (!MIDI_Available()) return;')
+        r=patch.patch_mpu(s)
+        self.assertIn('AWE64_HostRegisterMidi(',r)
+        self.assertIn('AWE64_PumpGuestMidi()',r)
+        self.assertIn('MPU401_QUEUE-3',r)
+        self.assertIn('if(mpu.mode!=M_UART)return;',r)
+        with self.assertRaises(ValueError):patch.patch_mpu(r)
     def test_guest_entry(self):
         s='int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {}'
         r=patch.patch_main(s)

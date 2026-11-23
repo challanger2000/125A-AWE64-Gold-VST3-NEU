@@ -60,4 +60,19 @@ jobs:
             if (-not $exports.Contains($symbol)) { throw "Missing native runtime export $symbol" }
           }
           Write-Host 'Compiled original DOSBox-X-AWE32 DLL; no Creative DOS guest boot or PCM proved'
+      - name: Load actual original DOSBox-X DLL in the same Windows process
+        shell: pwsh
+        run: |
+          @'
+          import ctypes,os,pathlib
+          path=pathlib.Path('third_party/dosbox-x-AWE32/bin/x64/Release/AWE64DOSBoxRuntime.dll').resolve()
+          with os.add_dll_directory(str(path.parent)):
+              dll=ctypes.WinDLL(str(path))
+              names=('AWE64_StartGuest','AWE64_HostRegisterIO','AWE64_HostRegisterPCM','AWE64_HostRegisterMidi')
+              for name in names: assert getattr(dll,name,None) is not None, name
+              dll.AWE64_HostRegisterMidi.argtypes=(ctypes.c_void_p,ctypes.c_void_p)
+              dll.AWE64_HostRegisterMidi.restype=None
+              dll.AWE64_HostRegisterMidi(None,None)
+          print('Real Windows DLL loaded and MPU-401 host callback export callable; no DOS guest started')
+          '@ | python -
       # Source-only test; no public runtime binaries or private ROM/SF2 uploaded.

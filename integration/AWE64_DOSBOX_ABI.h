@@ -15,6 +15,8 @@ typedef void (AWE64_CALL *AWE64_WritePortFn)(void*,unsigned short,unsigned char)
 typedef void (AWE64_CALL *AWE64_PcmFn)(void*,const int16_t*,unsigned int);
 typedef void (AWE64_CALL *AWE64_RegisterIOFn)(void*,AWE64_ReadPortFn,AWE64_WritePortFn);
 typedef void (AWE64_CALL *AWE64_RegisterPCMFn)(void*,AWE64_PcmFn);
+typedef unsigned int (AWE64_CALL *AWE64_PullMidiFn)(void*,unsigned char*,unsigned int);
+typedef void (AWE64_CALL *AWE64_RegisterMidiFn)(void*,AWE64_PullMidiFn);
 typedef int (AWE64_CALL *AWE64_StartGuestFn)(int,char**);
 #ifdef __cplusplus
 }

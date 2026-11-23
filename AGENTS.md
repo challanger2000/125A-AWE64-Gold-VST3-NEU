@@ -6,6 +6,7 @@
 - **Ein einziges Windows-x64-VST3-Instrument**, das die **DOSBox-X-AWE32-Emulation intern** betreibt. Kein separat gestartetes DOSBox-Programm.
 - Fixierte Grundlage `turican0/dosbox-x-AWE32`, `masterAWE32`, Commit `f3a95b9f19a7f9863295e6481f271cf04733c635` als Git-Submodul `third_party/dosbox-x-AWE32`. Upstream-Upgrades nur bei belegtem Bedarf und bestandenen Regressionen.
 - **Originale Creative-DOS-Software** zur Ansteuerung der emulierten EMU8000-Hardware verwenden; keinen nachgebauten Creative-Treiber oder nativen SF2-Player als stillschweigenden Ersatz.
+- **Primäre MIDI-Architektur ab 23.11.2026:** DAS ORIGINALE Creative-DOS-DEMO.EXE liest UART-Port 330h/331h. Deshalb MIDI vom VST3 in die **originale MPU-401-Eingangsqueue der gepinnten DOSBox-X** einspeisen (AWE64_HostRegisterMidi). Den älteren BEE0/BEF0-Patch eines DOS-Gastprogramms nur als nicht gleichzeitig aktives, experimentelles Fallback behandeln. Nicht beide auf denselben SPSC-MIDI-Consumer schalten.
 - Keine 86Box-PC-VM, kein Windows-95-Gast, keine native P009-AWE32Emu-Ersatz-Engine. Der im DOSBox-X-Fork enthaltene 86Box-abgeleitete **EMU8000-Chipcode** gehört ausdrücklich zur erlaubten Grundlage.
 - **Originale P165/P007Z-Hardware-GUI** in `gui/` erhalten: 1000×708-Frontplatte, originale Hardware-Reglergrafiken, nachträglich abgedunkelte Reglergruppen `CColor(7,11,16,186)` (73 %). Kein neues Design.
 

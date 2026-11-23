@@ -84,6 +84,63 @@ def patch_mixer(s):
 }
 
 std::string mixerinfo() {''')
+MPU_BRIDGE = r'''
+#ifdef AWE64_VST3_RUNTIME
+// Host -> guest through the ORIGINAL MPU-401 UART FIFO at 330h/331h.
+// The original, UNMODIFIED Creative DEMO.EXE polls those ports and calls
+// Creative's genuine awe32NoteOn/Off/Controller/ProgramChange functions.
+using Awe64PullMidi = unsigned int (__cdecl *)(void*,unsigned char*,unsigned int);
+static std::atomic<void*> awe64_mpu_ctx{nullptr};
+static std::atomic<Awe64PullMidi> awe64_mpu_pull{nullptr};
+extern "C" __declspec(dllexport) void __cdecl AWE64_HostRegisterMidi(
+    void* p,Awe64PullMidi fn) noexcept {
+    awe64_mpu_pull.store(nullptr,std::memory_order_release);
+    awe64_mpu_ctx.store(p,std::memory_order_release);
+    awe64_mpu_pull.store(fn,std::memory_order_release);
+}
+#endif
+'''
+def patch_mpu(s):
+    if 'AWE64_HostRegisterMidi(' in s:raise ValueError('MPU already patched')
+    s=once(s,'#include <assert.h>',
+           '#include <assert.h>\n#ifdef AWE64_VST3_RUNTIME\n#include <atomic>\n#endif')
+    s=once(s,'extern bool enable_slave_pic;',
+           MPU_BRIDGE+'\nextern bool enable_slave_pic;')
+    anchor='static void ClrQueue(void) {'
+    pump='''#ifdef AWE64_VST3_RUNTIME
+static void AWE64_PumpGuestMidi() {
+    if(mpu.mode!=M_UART)return;
+    auto pull=awe64_mpu_pull.load(std::memory_order_acquire);
+    if(!pull)return;
+    // The original UART FIFO holds 32 bytes. Queue complete messages only.
+    for(unsigned n=0;n<8 && mpu.queue_used<=MPU401_QUEUE-3;++n) {
+        unsigned char buf[3]{};
+        unsigned len=pull(awe64_mpu_ctx.load(std::memory_order_acquire),buf,3);
+        if(len==0)break;
+        const unsigned type=buf[0]&0xf0u;
+        if(buf[0]<0x80u || buf[0]>=0xf0u ||
+           len!=((type==0xc0u || type==0xd0u)?2u:3u))continue;
+        for(unsigned i=0;i<len;++i)QueueByte(buf[i]);
+    }
+}
+#endif
+
+'''
+    s=once(s,anchor,pump+anchor)
+    anchor='static Bitu MPU401_ReadStatus(Bitu port,Bitu iolen) {'
+    s=once(s,anchor,anchor+'''
+#ifdef AWE64_VST3_RUNTIME
+    AWE64_PumpGuestMidi();
+#endif''')
+    anchor='if (!MIDI_Available()) return;'
+    s=once(s,anchor,'''#ifndef AWE64_VST3_RUNTIME
+        if (!MIDI_Available()) return;
+#else
+        // The embedded DOSBox guest has a virtual UART even when the host
+        // system has no physical MIDI device.
+#endif''')
+    return s
+
 def patch_main(s):
     a='int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {'
     if s.count(a)!=1 or 'AWE64_StartGuest(' in s:
@@ -118,6 +175,7 @@ def patch_project(s):
 PATCHES={
     'src/hardware/emu8000.cpp':patch_emu,
     'src/hardware/mixer.cpp':patch_mixer,
+    'src/hardware/mpu401.cpp':patch_mpu,
     'src/gui/sdlmain.cpp':patch_main,
     'vs/dosbox-x.vcxproj':patch_project
 }
