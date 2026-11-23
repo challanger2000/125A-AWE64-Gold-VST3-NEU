@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 23.11.2026 — Tatsächlichen Original-Creative-VST3-Klangtest gegen PC-Speaker-/OPL-Falschtöne abgesichert
+
+- **Bisherige Lücke beseitigt:** PC-Speaker und OPL waren nur beim separaten ursprünglichen DOSBox-DLL-Soundcheck stumm; der `--original`-VST3-Hostcheck konnte alternative DOSBox-Klangquellen noch nicht ausschließen. Im VST3-DOSBox-Boot werden jetzt **nur im privaten `AWE64_ORIGINAL_CREATIVE_ONLY=1`-Abnahmemodus** beide deaktiviert; öffentlicher MIDI→PC-Speaker→VST3-Test und normaler Produktstart bleiben im Klangpfad unverändert.
+- Der private native Steinberg-Host lehnt Originaltestbetrieb ohne den expliziten Creative-only-Modus und `SDL_AUDIODRIVER=dummy` ab. Der Besitzer-PowerShell-Starter setzt und restauriert beide Umgebungsvariablen zusammen mit dem Original-EMU8K-Trace-Protokoll.
+- Zusätzlicher Linux-/Windows-Unit-Contract für die unterschiedlichen Klangquellen und den unmöglich gemachten stillen Rückfall. Echte `DEMO.EXE`/`SYNTHGM.SF2`/`awe32.raw`-Wiedergabe noch nicht privat ausgeführt, daher weiterhin `0.0.0-dev`, kein Release. Neue CI-Ergebnisse noch ausstehend.
+
+
 ## 23.11.2026 — Original-Creative-Privat-Build: Linux-/Windows-Syntax- und Quellvertrag vollständig bestanden
 
 - [GitHub-Actions 45215251617](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45215251617) **SUCCESS** (Ubuntu + Windows): Vollständige bestehende Audio-/MIDI-C++-Suite, neue datenfreie Private-Builder-Sicherheitsregression und echte Windows-PowerShell-**AST-Syntaxprüfung** für `Build-And-Test-Private-AWE64.ps1` sowie `Run-Private-Creative-AWE-Test.ps1` erfolgreich.

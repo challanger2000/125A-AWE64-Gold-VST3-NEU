@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 23.11.2026 — Falsche Creative-Klang-PASS-Möglichkeit im echten VST3-Test geschlossen
+
+- **Produkt-VST3 geändert, originaler Chip NICHT:** `src/DosBoxRuntimeHost.hpp` aktiviert `speaker pcspeaker=false` und `sblaster oplmode=none` jetzt **auch im tatsächlich geladenen VST3**, aber ausschließlich bei bewusst gesetztem privaten Prüfmodus `AWE64_ORIGINAL_CREATIVE_ONLY=1`. PC-Speaker und OPL dürfen beim echten Creative-EMU8000-Klangnachweis nicht als falsche Tonquelle durchgehen. Im **normalen Produkt und öffentlichen synthetischen VST3-Audiotest bleiben diese Geräteinstellungen unverändert**, damit dessen PC-Speaker-MIDI-Rundweg weiter funktionieren kann.
+- **Schutz im echten Steinberg-Host:** `WindowsVst3HostPcmSmoke.cpp --original` verweigert die Ausführung, solange `AWE64_ORIGINAL_CREATIVE_ONLY=1` und `SDL_AUDIODRIVER=dummy` nicht beide bestätigt wurden. `tools/Run-Private-Creative-AWE-Test.ps1` setzt diese beiden Prozessvariablen nur für die authentische VST3-Klangprobe, stellt sie selbst bei Fehlern wieder her und führt danach den unabhängigen Original-DLL-Test aus.
+- **Datenfreie Regression** `tests/test_synthetic_dos_exe.py` kontrolliert den Unterschied zwischen Original-Creative- und öffentlichem PC-Speaker-Prüfmodus sowie die Environment-Gates. Öffentlich werden weiterhin keine ROM-/SF2-/Creative-Bytes getestet oder veröffentlicht. Bis zur tatsächlichen neuen Windows-CI-Abnahme sind alle hier neu hinzugefügten Gateprüfungen **noch offen**. Echte originale AWE-SoundFont-Klangausgabe im VST3 wurde **noch nicht nachgewiesen**; `0.0.0-dev`, keine Releasefreigabe.
+
 ## Korrektur vom 23.11.2026 – Creative-DOS-Bankwahl (neuer Quellstand)
 
 - **Implementiert:** Der VST3-Host sendet Bankwahl jetzt als MIDI **CC 0 (Bank Select MSB) mit dem echten Bankwert** an die unveränderte Creative-DOS-Runtime, statt bisher stets CC 0=0 und CC 32=Bank. Quelle: originales Creative `DOS/DEMO/DEMO.C`, dessen Tastatursteuerung Bankwahl ausdrücklich mit `awe32Controller(15, 0, k)` ausführt.

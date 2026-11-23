@@ -81,13 +81,23 @@ try {
     $pluginBinary = Join-Path $native 'AWE64GoldDOSBoxDev.vst3'
     $traceFile = Join-Path $temporary 'original_creative_vst3_emu8000.trace'
     $previousTrace = [Environment]::GetEnvironmentVariable('EMU8K_TRACE', 'Process')
+    $previousSdl = [Environment]::GetEnvironmentVariable('SDL_AUDIODRIVER', 'Process')
+    $previousOriginal = [Environment]::GetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', 'Process')
     try {
+        # Private acceptance: only the Creative/EMU8000 original hardware
+        # may supply sound to the VST3. The runtime disables PC-speaker/OPL.
+        # SDL2 dummy avoids stealing the physical sound device from the DAW.
         [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $traceFile, 'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', 'dummy', 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', '1', 'Process')
         & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
         if ($LASTEXITCODE -ne 0) {
             throw 'Real VST3 process() did not produce MIDI-triggered Creative PCM.'
         }
     } finally {
+        # Restore original Windows environment even after timeouts/crashes.
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', $previousOriginal, 'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
         [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
     }
     if (-not (Test-Path -PathType Leaf $traceFile)) {

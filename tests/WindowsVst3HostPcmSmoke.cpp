@@ -139,6 +139,16 @@ int main(int argc,char** argv) {
         return fail("usage: WindowsVst3HostPcmSmoke.exe Plugin.vst3 [--original 15..120]");
     // Private mode runs exclusively on the owner's Windows computer after
     // the launcher verifies the original Creative EXE/SF2/ROM hashes.
+    // Refuse a "Creative AWE sound" PASS if the guest could have produced
+    // sound through PC speaker, OPL or a real SDL2 output device.
+    if(originalMode) {
+        const char* originalOnly=std::getenv("AWE64_ORIGINAL_CREATIVE_ONLY");
+        if(!originalOnly || std::strcmp(originalOnly,"1")!=0)
+            return fail("Private Creative mode requires AWE64_ORIGINAL_CREATIVE_ONLY=1");
+        const char* sdl=std::getenv("SDL_AUDIODRIVER");
+        if(!sdl || std::strcmp(sdl,"dummy")!=0)
+            return fail("Private Creative mode requires isolated SDL_AUDIODRIVER=dummy");
+    }
 
     std::string filename=argv[1];
     HMODULE module=LoadLibraryExA(filename.c_str(),nullptr,

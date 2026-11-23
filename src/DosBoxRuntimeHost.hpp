@@ -13,6 +13,8 @@
 #include "AWE64_DOSBOX_ABI.h"
 #include <atomic>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -135,10 +137,25 @@ public:
                 "-set", "sblaster awe32rom="+utf8(rom),
                 "-set", "midi mpu401=intelligent",
                 "-set", "mixer rate=44100",
-                "-c", "mount c \""+utf8(privateDir)+"\"",
-                "-c", "c:",
-                "-c", "DEMO.EXE /SBK:SYNTHGM.SF2",
             };
+            // In the PRIVATE, SHA-verified original-Creative acceptance only,
+            // switch OFF other emulated sound generators. Otherwise a guest
+            // PC-speaker/OPL tone could falsely pass as AWE/EMU8000 audio.
+            // The normal VST3 configuration remains unchanged; crucially
+            // the public MIDI->PC-speaker->VST3 roundtrip still tests sound.
+            const char* creativeOnly=std::getenv("AWE64_ORIGINAL_CREATIVE_ONLY");
+            if(creativeOnly && std::strcmp(creativeOnly,"1")==0) {
+                argvStorage_.push_back("-set");
+                argvStorage_.push_back("speaker pcspeaker=false");
+                argvStorage_.push_back("-set");
+                argvStorage_.push_back("sblaster oplmode=none");
+            }
+            argvStorage_.push_back("-c");
+            argvStorage_.push_back("mount c \""+utf8(privateDir)+"\"");
+            argvStorage_.push_back("-c");
+            argvStorage_.push_back("c:");
+            argvStorage_.push_back("-c");
+            argvStorage_.push_back("DEMO.EXE /SBK:SYNTHGM.SF2");
             // Two output destinations: original MPU-401 guest input and
             // original DOSBox audio mixer. Do NOT register BEE0 MIDI consumer.
             registerMidi_(adapter_.get(),&DosBoxHostAdapter::pullMidi);

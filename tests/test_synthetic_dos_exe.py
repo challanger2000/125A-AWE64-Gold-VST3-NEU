@@ -77,6 +77,43 @@ class SyntheticDosExeTests(unittest.TestCase):
         self.assertNotIn("--original --seconds", public)
         self.assertNotIn("Run-Private-Creative-AWE-Test.ps1 -Bundle", public)
 
+    def test_real_creative_only_mode_excludes_pc_speaker_and_opl_in_vst3(self):
+        root = Path(__file__).resolve().parents[1]
+        runtime = (root / "src" / "DosBoxRuntimeHost.hpp").read_text(
+            encoding="utf-8")
+        native = (root / "tests" / "WindowsVst3HostPcmSmoke.cpp").read_text(
+            encoding="utf-8")
+        private = (root / "tools" / "Run-Private-Creative-AWE-Test.ps1").read_text(
+            encoding="utf-8")
+        public = (root / ".github" / "workflows" /
+                  "windows-dosbox-runtime.yml").read_text(encoding="utf-8")
+        # Synthetic public MIDI->PC-speaker->VST3 audio fixture must
+        # continue working; disabled outputs appear only after the explicit
+        # owner-only variable gate, not in normal DOSBox command arguments.
+        initial = runtime.split("argvStorage_={", 1)[1].split("};", 1)[0]
+        self.assertNotIn("speaker pcspeaker=false", initial)
+        self.assertNotIn("sblaster oplmode=none", initial)
+        self.assertIn('std::getenv("AWE64_ORIGINAL_CREATIVE_ONLY")', runtime)
+        self.assertIn('std::strcmp(creativeOnly,"1")==0', runtime)
+        self.assertIn('argvStorage_.push_back("speaker pcspeaker=false")', runtime)
+        self.assertIn('argvStorage_.push_back("sblaster oplmode=none")', runtime)
+        # No native owner-mode PCM proof without both alternate DOS audio
+        # generators blocked, plus the isolated dummy SDL2 output.
+        self.assertIn('std::getenv("AWE64_ORIGINAL_CREATIVE_ONLY")', native)
+        self.assertIn('std::getenv("SDL_AUDIODRIVER")', native)
+        self.assertIn('std::strcmp(sdl,"dummy")!=0', native)
+        self.assertIn('std::strcmp(originalOnly,"1")!=0', native)
+        for key, value in (("AWE64_ORIGINAL_CREATIVE_ONLY", "1"),
+                           ("SDL_AUDIODRIVER", "dummy")):
+            self.assertIn(
+                f"[Environment]::SetEnvironmentVariable('{key}', '{value}', 'Process')",
+                private)
+        self.assertIn("finally {", private)
+        self.assertIn("$previousOriginal", private)
+        self.assertIn("$previousSdl", private)
+        # GitHub public CI still uses only synthetic DOS-PC-speaker audio.
+        self.assertNotIn("AWE64_ORIGINAL_CREATIVE_ONLY", public)
+
     def test_stage_fixture_rejects_existing_owner_data(self):
         with tempfile.TemporaryDirectory() as work:
             bundle = Path(work) / "AWE64GoldDOSBoxDev.vst3"

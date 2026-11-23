@@ -2,6 +2,8 @@
 
 **Vor JEDER Änderung:** Lies `AKTUELLE-VERSION.md`, `START-HERE.md`, `CHANGELOG.md`, `docs/PROVENANCE.md` und `docs/TEST-ASSET-LOCATION.md`. Prüfe dann `main` HEAD, den Git-Status und tatsächlich vorhandene Testnachweise. Ältere Chat-Aussagen sind kein Ersatz für Quellcode und reale Build-/Klangtests.
 
+**Private Originalklang-Prüfregel vom 23.11.2026:** Das echte VST3-`--original`-Klang-Gate benötigt `AWE64_ORIGINAL_CREATIVE_ONLY=1` und `SDL_AUDIODRIVER=dummy`, vom privaten Besitzer-PowerShell-Starter gesetzt und anschließend wiederhergestellt. Nur dann deaktiviert `DosBoxRuntimeHost.hpp` PC-Speaker und OPL, sodass sie keinen falschen AWE-PCM-PASS auslösen. Normaler DOSBox-Produktstart und synthetischer VST3-PCM-Test bleiben unverändert. Öffentlich weiterhin keine privaten ROM/SF2/DEMO-Daten. **Kein Original-Creative-Klang-PASS behaupten**, bis ein echter Besitzer-Windows-Lauf vollständig stattgefunden hat.
+
 ## Einzige festgelegte Architektur
 - **Ein einziges Windows-x64-VST3-Instrument**, das die **DOSBox-X-AWE32-Emulation intern** betreibt. Kein separat gestartetes DOSBox-Programm.
 - Fixierte Grundlage `turican0/dosbox-x-AWE32`, `masterAWE32`, Commit `f3a95b9f19a7f9863295e6481f271cf04733c635` als Git-Submodul `third_party/dosbox-x-AWE32`. Upstream-Upgrades nur bei belegtem Bedarf und bestandenen Regressionen.

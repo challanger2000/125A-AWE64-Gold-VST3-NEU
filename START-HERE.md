@@ -11,6 +11,10 @@ Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + original
 
 **Submodul:** `third_party/dosbox-x-AWE32` auf `f3a95b9f19a7f9863295e6481f271cf04733c635` gepinnt. **Einziger Branch:** `main`.
 
+## Neue Original-Creative-VST3-Klangprüfung: Alternativtonquellen im Test deaktiviert
+
+Im **privaten** Original-Creative-VST3-Hosttest werden jetzt auch im tatsächlichen VST3-Gast PC-Speaker und OPL abgeschaltet (`AWE64_ORIGINAL_CREATIVE_ONLY=1`); der Testhost verlangt außerdem `SDL_AUDIODRIVER=dummy`. Öffentliche MIDI-/Audio-Synthetic-Gates bleiben unverändert. Quelländerung und neue Regression sind implementiert, **neuer CI-Lauf noch zu bestätigen**; echter Besitzer-Creative-ROM/SF2-Klangtest weiterhin nicht ausgeführt. `0.0.0-dev`, nur `main`.
+
 ## Aktuell neu bestätigter Windows-Release-Build (23.11.2026)
 
 **[Windows 45205416871](../../actions/runs/45205416871) SUCCESS:** Neu erweiterter Windows-VST3-Testhost mit privatem Creative-`--original`-Modus tatsächlich kompiliert, weiterhin echter synthetischer MIDI-zu-PCM-VST3-Rundweg bestanden (979 nicht-stumme Stereo-Frames, 7 NoteOn). [Linux/Windows 45205416646](../../actions/runs/45205416646) PASS. **Original-ROM/Creative-`DEMO.EXE`/echte `SYNTHGM.SF2` wurden dabei nicht ausgeführt.** Privater Originalklang weiterhin nicht abgenommen; `0.0.0-dev`.
