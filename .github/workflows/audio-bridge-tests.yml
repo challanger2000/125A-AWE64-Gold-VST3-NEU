@@ -58,6 +58,8 @@ jobs:
         run: python -m unittest discover -s tests -p test_speaker_probe.py -v
       - name: Verify independent DOS MZ EXE test fixture and no-owner-overwrite safeguards
         run: python -m unittest discover -s tests -p test_synthetic_dos_exe.py -v
+      - name: Validate generated SF2 RIFF and RAM preset structure
+        run: python -m unittest discover -s tests -p test_ram_sample_sf2.py -v
       - name: Configure
         run: cmake -S . -B build -DBUILD_TESTING=ON
       - name: Compile

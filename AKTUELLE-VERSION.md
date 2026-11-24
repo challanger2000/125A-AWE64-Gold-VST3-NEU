@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Eigenes RAM-Test-SoundFont korrigiert und unabhängig validiert
+
+- Lokale unabhängige Prüfung mit libfluidsynth.so.3: Vorheriges selbst erzeugtes SF2 wurde wegen ungerader INAM-Chunklänge (21 Byte statt 22) vom strengen Parser zurückgewiesen. Fehler im Testmaterial bestätigt; keine Änderung der Originalemulation oder des Originaltreibers.
+- Korrektur: NUL-Ausrichtung innerhalb der INAM-Länge; Dateigröße unverändert 15972 Byte. Korrigierte SF2 lokal erfolgreich geladen, Programm 0 und 17 jeweils eine Sekunde bei MIDI 60/100 gerendert, RMS 0,01864656 / 0,01864633; richtige Frequenz gegenüber jeweils anderer mit Leistungsverhältnis >479000. Dies prüft ausschließlich die Gültigkeit des eigenen Testmaterials, **kein** Original-Creative-Klangnachweis.
+- Struktureller Regressionstest für gerade Chunklängen, SF2 2.00, zwei RAM-Sampletypen, korrekte sparse Programme. Windows-Direktvergleich und natives Original-VST3-Gate weiterhin zwingend.
+
 ## 24.11.2026 — RAM-Fehler isolieren, Original-Effektprüfung unabhängig ausführen
 
 - Windows 45292853463: Original-ROM-GM und externer ROM-GM-Bankwechsel erneut nachgewiesen (Held-RMS 0,00845848 bzw. 0,00839579). Erste selbst erzeugte RAM-SF2 (441 Hz) dagegen **FAIL**, Held-RMS 0,0000127707, 0 aktive Notenblöcke. Keine Gleichsetzung von ROM-Bankwechsel mit RAM-Klang.

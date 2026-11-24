@@ -54,7 +54,7 @@ def build():
     pcm = struct.pack("<" + "h" * len(samples), *samples)
     info = list_chunk(b"INFO", chunk(b"ifil", struct.pack("<HH", 2, 0)),
                       chunk(b"isng", b"EMU8000\0"),
-                      chunk(b"INAM", b"125A RAM sample test\0"))
+                      chunk(b"INAM", b"125A RAM sample test\0\0"))
     sdta = list_chunk(b"sdta", chunk(b"smpl", pcm))
     pdta = list_chunk(
         b"pdta",
