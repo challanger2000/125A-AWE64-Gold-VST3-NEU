@@ -1,5 +1,11 @@
 # AGENTS.md — verbindliche Anweisung für Codex und folgende Chats
 
+## 24.11.2026 — Exakte Cheezoids-Revision bestanden; Performance-Abnahme
+
+- Windows 45310753140: Autorbank SHA-256 exakt identisch zur hochgeladenen 652206-Byte-Datei. Alle 128 Programme im echten VST3 gegen direkten originalen Creative-DOSBox-Pfad gemessen. Original und VST3 kurze Abklingverläufe identisch [10,22,28,47,49,73,75,77], verlorenes Sustain [], Pegelfensterabweichungen >20 dB []. `CHEEZ_ALL_128_ENVELOPE_COMPARISON_PASS`. Der frühere Mehrheits-Bleep reproduziert sich in diesem Test nicht. Keine Behauptung bitidentischer Hardware oder subjektiver Klangabnahme.
+- RAM-Frequenzgates 441/735 Hz (44,1/48 kHz) und Effekt-Register erneut PASS. Drei absolute Send-Hosttests liefen nicht an: SDL_AUDIODRIVER fehlte im neuen Schleifen-Setup; korrigiert, früher Hostfehler vor Bootlog wird nun ausgegeben. Register-Gates bleiben unverändert verbindlich.
+- Nutzerziele: zusätzliche tatsächlich wahrgenommene Plugin-Latenz höchstens 20 ms, CPU in Studio Pro auf i9-11900K höchstens 10 %, stabile Polyphonie, Originalklang unverändert. Erst messen, dann bei Bedarf optimieren. Nativer Benchmark ohne Trace-I/O: 128 Samples bei 44,1/48 kHz, 12 wiederholte NoteOn-PCM-Onsets (Median/p95/Max, p95-Gate 20 ms), Prozess-CPU aus Windows GetProcessTimes inklusive Emulatorworker als Ein-Kern-Äquivalent und Anteil aller logischen CPUs, Callback-Fristüberschreitungen und Host-Wakeup-Jitter getrennt, fünf Sekunden 32 verschiedene gehaltene MIDI-Noten als Lasttest (keine unbelegte 32-Stimmen-Zusage), stumme Blöcke während gehaltenem Ton als Aussetzerindikator. CPU des CI-Rechners ist NICHT CPU des i9-11900K oder Studio-Pro-Performanceanzeige. Test neu implementiert, Windows-Messwerte noch offen. Kein Eingriff in EMU8000-Kern.
+
 ## 24.11.2026 — Echter VST3-Recall-/SF2-Ladepfad als separates Windows-Gate
 
 - [Windows 45284478927](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478927), [Transport 45284478906](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478906), [Version 45284478902](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45284478902) SUCCESS auf 17bb039b. Bisheriger GM-Originalpfad bleibt funktionsfähig; dieser Lauf hat noch keine externe Bank geladen.

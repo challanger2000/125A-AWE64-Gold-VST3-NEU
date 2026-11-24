@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Exakte Cheezoids-Revision bestanden; Performance-Abnahme
+
+- Windows 45310753140: Autorbank SHA-256 exakt identisch zur hochgeladenen 652206-Byte-Datei. Alle 128 Programme im echten VST3 gegen direkten originalen Creative-DOSBox-Pfad gemessen. Original und VST3 kurze Abklingverläufe identisch [10,22,28,47,49,73,75,77], verlorenes Sustain [], Pegelfensterabweichungen >20 dB []. `CHEEZ_ALL_128_ENVELOPE_COMPARISON_PASS`. Der frühere Mehrheits-Bleep reproduziert sich in diesem Test nicht. Keine Behauptung bitidentischer Hardware oder subjektiver Klangabnahme.
+- RAM-Frequenzgates 441/735 Hz (44,1/48 kHz) und Effekt-Register erneut PASS. Drei absolute Send-Hosttests liefen nicht an: SDL_AUDIODRIVER fehlte im neuen Schleifen-Setup; korrigiert, früher Hostfehler vor Bootlog wird nun ausgegeben. Register-Gates bleiben unverändert verbindlich.
+- Nutzerziele: zusätzliche tatsächlich wahrgenommene Plugin-Latenz höchstens 20 ms, CPU in Studio Pro auf i9-11900K höchstens 10 %, stabile Polyphonie, Originalklang unverändert. Erst messen, dann bei Bedarf optimieren. Nativer Benchmark ohne Trace-I/O: 128 Samples bei 44,1/48 kHz, 12 wiederholte NoteOn-PCM-Onsets (Median/p95/Max, p95-Gate 20 ms), Prozess-CPU aus Windows GetProcessTimes inklusive Emulatorworker als Ein-Kern-Äquivalent und Anteil aller logischen CPUs, Callback-Fristüberschreitungen und Host-Wakeup-Jitter getrennt, fünf Sekunden 32 verschiedene gehaltene MIDI-Noten als Lasttest (keine unbelegte 32-Stimmen-Zusage), stumme Blöcke während gehaltenem Ton als Aussetzerindikator. CPU des CI-Rechners ist NICHT CPU des i9-11900K oder Studio-Pro-Performanceanzeige. Test neu implementiert, Windows-Messwerte noch offen. Kein Eingriff in EMU8000-Kern.
+
 ## 24.11.2026 — Exakt erneut hochgeladene Cheezoids-Problemrevision festgeschrieben
 
 - Besitzerdatei `Cheezoids.sf2`, 652206 Bytes, SHA-256 `5adad4b3b95a33ef64ae06dd1627038140435b395d183aab622efcb4c920359b`. SF2 2.01, alle 128 Bank-0-Programme, 160 Samples, 1275 Instrumentzonen mit SampleMode 1 (kontinuierlicher Loop). Originalbytes nicht verändern/hochladen. Die öffentliche Autorenbank ist **nur dann** ein Ersatz für diesen konkreten Test, wenn ihr SHA-256 exakt übereinstimmt.

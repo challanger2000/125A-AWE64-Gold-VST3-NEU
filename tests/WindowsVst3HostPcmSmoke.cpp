@@ -73,6 +73,8 @@ class MidiNoteHostEvents final : public V::IEventList {
     V::Event note_{};
     bool enabled_{false};
     bool noteOff_{false};
+    unsigned count_=1, firstPitch_=60;
+    float velocity_=100.f/127.f;
 public:
     MidiNoteHostEvents() {
         note_.busIndex=0;
@@ -84,6 +86,9 @@ public:
         note_.noteOn.tuning=0.f;
         note_.noteOn.length=0;
         note_.noteOn.noteId=-1;
+    }
+    void setChord(unsigned count,unsigned first,float velocity) noexcept {
+        count_=count;firstPitch_=first;velocity_=velocity;
     }
     void setEnabled(bool enabled,bool noteOff=false) noexcept {
         enabled_=enabled;
@@ -119,10 +124,12 @@ public:
     }
     S::uint32 PLUGIN_API addRef() override {return ++refs_;}
     S::uint32 PLUGIN_API release() override {return --refs_;}
-    S::int32 PLUGIN_API getEventCount() override {return enabled_?1:0;}
+    S::int32 PLUGIN_API getEventCount() override {return enabled_?static_cast<S::int32>(count_):0;}
     S::tresult PLUGIN_API getEvent(S::int32 index,V::Event& event) override {
-        if(index!=0||!enabled_)return S::kResultFalse;
+        if(index<0||static_cast<unsigned>(index)>=count_||!enabled_)return S::kResultFalse;
         event=note_;
+        if(noteOff_)event.noteOff.pitch=static_cast<S::int16>(firstPitch_+index);
+        else {event.noteOn.pitch=static_cast<S::int16>(firstPitch_+index);event.noteOn.velocity=velocity_;}
         return S::kResultOk;
     }
     S::tresult PLUGIN_API addEvent(V::Event&) override {
@@ -145,6 +152,7 @@ int main(int argc,char** argv) {
     const double hostRate=hostRateEnv?std::atof(hostRateEnv):44100.;
     if(hostRate!=44100.&&hostRate!=48000.)return fail("Unsupported native test host rate");
     const bool sweep=std::getenv("AWE64_TEST_CHEEZOIDS_SWEEP")!=nullptr;
+    const bool performance=std::getenv("AWE64_TEST_PERFORMANCE")!=nullptr;
     const bool effectTest=std::getenv("AWE64_TEST_EFFECT_TYPES")!=nullptr;
     const char* sendTest=std::getenv("AWE64_TEST_SEND_PAIR");
     const unsigned sendPair=sendTest?static_cast<unsigned>(std::strtoul(sendTest,nullptr,10)):0;
@@ -339,6 +347,130 @@ int main(int argc,char** argv) {
            std::memcmp(saved.getData(),externalState.data(),externalState.size())!=0)
             return fail("Active external SF2 state did not roundtrip");
         std::cout<<"REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS\n";
+    }
+    if(performance) {
+        // Real-time native host benchmark; no trace logging in this run.
+        // The known looping RAM sine has a fast attack and known noise floor.
+        if(!originalMode||ramHz!=441.||externalState.empty())
+            return fail("Performance gate requires original 441-Hz RAM bank");
+        constexpr unsigned buffer=128;
+        data.numSamples=buffer;
+        const double blockMs=1000.*buffer/hostRate;
+        using Clock=std::chrono::steady_clock;
+        const auto start=Clock::now();
+        unsigned block=0;
+        double maxCallbackMs=0.,maxLateMs=0.;
+        unsigned lateCallbacks=0;
+        bool measure=false;
+        auto tick=[&](bool on,bool off) {
+            midiEvents.setEnabled(on||off,off);
+            l.fill(0);r.fill(0);
+            const auto deadline=start+std::chrono::duration_cast<Clock::duration>(
+                std::chrono::duration<double>(block*buffer/hostRate));
+            std::this_thread::sleep_until(deadline);
+            // Sleep may overshoot on a shared Windows runner. Record this
+            // separately rather than pretending it is plugin CPU time.
+            const auto before=Clock::now();
+            if(processor->process(data)!=S::kResultOk)return false;
+            const auto after=Clock::now();
+            if(measure){
+                const double elapsed=std::chrono::duration<double,std::milli>(after-before).count();
+                const double late=std::max(0.,std::chrono::duration<double,std::milli>(before-deadline).count());
+                maxCallbackMs=std::max(maxCallbackMs,elapsed);
+                maxLateMs=std::max(maxLateMs,late);
+                lateCallbacks+=elapsed>blockMs;
+            }
+            ++block;
+            for(unsigned k=0;k<buffer;++k)
+                if(!std::isfinite(l[k])||!std::isfinite(r[k]))return false;
+            return true;
+        };
+        auto nblocks=[&](double seconds){return static_cast<unsigned>(std::ceil(seconds*hostRate/buffer));};
+        for(unsigned i=0;i<nblocks(12.);++i)if(!tick(false,false))return fail("Performance warmup failed");
+        auto cpu100ns=[]()->std::uint64_t{
+            FILETIME created{},exited{},kernel{},user{};
+            if(!GetProcessTimes(GetCurrentProcess(),&created,&exited,&kernel,&user))return 0;
+            auto value=[](FILETIME f){return (static_cast<std::uint64_t>(f.dwHighDateTime)<<32)|f.dwLowDateTime;};
+            return value(kernel)+value(user);
+        };
+        const auto cpuStart=cpu100ns();
+        if(!cpuStart)return fail("Process CPU counter unavailable");
+        const auto wallStart=Clock::now();
+        measure=true;
+        std::vector<double> latencies;
+        unsigned silentHeldBlocks=0;
+        for(unsigned repeat=0;repeat<12;++repeat) {
+            // A separate settled idle check protects against measuring stale
+            // tail audio as an early MIDI-to-PCM onset.
+            for(unsigned i=0;i<nblocks(.8);++i)if(!tick(false,false))return fail("Latency silence failed");
+            double idlePeak=0.;
+            for(unsigned k=0;k<buffer;++k)idlePeak=std::max(idlePeak,double(std::max(std::abs(l[k]),std::abs(r[k]))));
+            if(idlePeak>=.002)return fail("Latency idle not settled");
+            const double threshold=std::max(.002,8.*idlePeak);
+            unsigned first=0, streak=0;bool found=false;
+            for(unsigned i=0;i<nblocks(.35);++i){
+                if(!tick(i==0,false))return fail("Latency note failed");
+                double peak=0.;
+                for(unsigned k=0;k<buffer;++k){
+                    const double x=std::max(std::abs(l[k]),std::abs(r[k]));
+                    peak=std::max(peak,x);
+                    streak=x>=threshold?streak+1:0;
+                    if(!found&&streak>=4){first=i*buffer+k-3;found=true;}
+                }
+                if(i*blockMs>120.&&peak<.0005)++silentHeldBlocks;
+            }
+            if(!found)return fail("No audible note onset in latency probe");
+            latencies.push_back(1000.*first/hostRate);
+            if(!tick(false,true))return fail("Latency release failed");
+        }
+        // Stress with 32 distinct MIDI notes (not a claim of 32 available
+        // sample voices: original driver can reserve voices or steal them).
+        for(unsigned i=0;i<nblocks(1.);++i)if(!tick(false,false))return fail("Chord idle failed");
+        midiEvents.setChord(32,44,24.f/127.f);
+        const auto polyCpuStart=cpu100ns();
+        const auto polyWallStart=Clock::now();
+        double chordEnergy=0.;unsigned chordSilent=0;
+        for(unsigned i=0;i<nblocks(5.);++i){
+            if(!tick(i==0,false))return fail("Polyphonic callback failed");
+            double e=0.;
+            for(unsigned k=0;k<buffer;++k)e+=(double(l[k])*l[k]+double(r[k])*r[k])*.5;
+            if(i*blockMs>500.){
+                chordEnergy+=e;
+                if(e/buffer<1.e-8)++chordSilent;
+            }
+        }
+        const auto polyCpuEnd=cpu100ns();
+        const double polySeconds=std::chrono::duration<double>(Clock::now()-polyWallStart).count();
+        if(!tick(false,true))return fail("Chord release failed");
+        const auto cpuEnd=cpu100ns();
+        const double wallSeconds=std::chrono::duration<double>(Clock::now()-wallStart).count();
+        if(cpuEnd<cpuStart||polyCpuEnd<polyCpuStart||polySeconds<=0||wallSeconds<=0)
+            return fail("Invalid process CPU measurements");
+        const auto cores=GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+        if(!cores)return fail("Logical CPU count unavailable");
+        const double corePercent=100.*(cpuEnd-cpuStart)*1.e-7/wallSeconds;
+        const double polyPercent=100.*(polyCpuEnd-polyCpuStart)*1.e-7/polySeconds;
+        std::sort(latencies.begin(),latencies.end());
+        const double p95=latencies[static_cast<unsigned>(std::ceil(.95*latencies.size()))-1];
+        std::cout<<"PERF_HOST_RATE="<<hostRate<<" PERF_BLOCK="<<buffer<<" LOGICAL_CPUS="<<cores<<"\n"
+                 <<"PERF_MIDI_TO_PCM_MEDIAN_MS="<<latencies[latencies.size()/2]
+                 <<" P95_MS="<<p95<<" MAX_MS="<<latencies.back()<<"\n"
+                 <<"PERF_PROCESS_ONE_CORE_PERCENT="<<corePercent<<" TOTAL_MACHINE_PERCENT="<<corePercent/cores<<"\n"
+                 <<"PERF_32_NOTE_ONE_CORE_PERCENT="<<polyPercent<<" TOTAL_MACHINE_PERCENT="<<polyPercent/cores<<"\n"
+                 <<"PERF_CALLBACK_MAX_MS="<<maxCallbackMs<<" CALLBACK_DEADLINE_OVERRUNS="<<lateCallbacks
+                 <<" HOST_WAKE_MAX_LATE_MS="<<maxLateMs<<"\n"
+                 <<"PERF_HELD_SILENT_BLOCKS="<<silentHeldBlocks<<" POLY_SILENT_BLOCKS="<<chordSilent
+                 <<" POLY_ENERGY="<<chordEnergy<<"\n"
+                 <<"PERF_REPORTED_VST3_LATENCY_SAMPLES="<<processor->getLatencySamples()<<"\n";
+        if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
+           component->terminate()!=S::kResultOk)return fail("Performance shutdown failed");
+        processor->release();component->release();factory->release();FreeLibrary(module);
+        if(silentHeldBlocks||chordSilent||chordEnergy<=0.)return fail("Held-tone stability gate failed");
+        if(p95>20.)return fail("MIDI-to-PCM p95 exceeds 20 ms target");
+        std::cout<<"REAL_VST3_PERFORMANCE_MEASUREMENT_PASS; CI CPU NOT OWNER CPU\n";
+        std::cout<<"PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED\n"
+                 <<"VST3_HOST_NOTE_ON_EVENTS_SENT=44\nVST3_HOST_NOTE_OFF_EVENTS_SENT=44\n";
+        return 0;
     }
     if(sweep) {
         if(!originalMode||externalState.empty()||hostRate!=44100.)return fail("Sweep needs authentic external bank");

@@ -60,6 +60,8 @@ def run_private_creative_host(command: list[str], plugin: Path, seconds: int):
             raise TimeoutError("Real Creative-DOS VST3 host exceeded private test timeout")
         stdout, stderr = tail(out), tail(err)
         if not log.is_file():
+            print(stdout, file=sys.stderr)
+            print(stderr, file=sys.stderr)
             raise RuntimeError("Creative DEMO.EXE never created its DOS stdout boot log")
         final_text = log.read_bytes()[:32768].decode("cp437", errors="replace")
         failures = [line.strip() for line in final_text.splitlines()

@@ -238,6 +238,33 @@ try {
         [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
         [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
     }
+    # First measure performance without trace I/O or competing test processes.
+    $perfExit = 0
+    $prevPerf = [Environment]::GetEnvironmentVariable('AWE64_TEST_PERFORMANCE','Process')
+    try {
+        foreach ($rate in @('44100','48000')) {
+            $perfBoot = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
+            [Environment]::SetEnvironmentVariable('AWE64_TEST_PERFORMANCE','1','Process')
+            [Environment]::SetEnvironmentVariable('AWE64_TEST_HOST_RATE',$rate,'Process')
+            [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2',$ramFixture,'Process')
+            [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ','441','Process')
+            [Environment]::SetEnvironmentVariable('EMU8K_TRACE',$null,'Process')
+            [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER','dummy','Process')
+            [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY','1','Process')
+            [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG',$perfBoot,'Process')
+            & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
+            if ($LASTEXITCODE -ne 0) { $perfExit = 1 }
+        }
+    } finally {
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_PERFORMANCE',$prevPerf,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_HOST_RATE',$previousHostRate,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2',$previousExternal,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ',$previousRamHz,'Process')
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE',$previousTrace,'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER',$previousSdl,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY',$previousOriginal,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG',$previousBootLog,'Process')
+    }
     # Isolate absolute send endpoint semantics before enabling GUI controls.
     $sendFailures = @()
     foreach ($cc in @(0,127)) {
@@ -255,6 +282,7 @@ try {
         foreach ($pair in @(0,255,65280)) {
             $sendTrace = Join-Path $temporary ("send_" + $pair + ".trace")
             $sendBoot = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
+            [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', 'dummy', 'Process')
             [Environment]::SetEnvironmentVariable('AWE64_TEST_SEND_PAIR', [string]$pair, 'Process')
             [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', $wetFixture, 'Process')
             [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ', '441', 'Process')
@@ -268,6 +296,7 @@ try {
             if ((Get-FileHash -Algorithm SHA256 $wetFixture).Hash -ne $wetHash) { throw 'Wet source changed.' }
         }
     } finally {
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
         [Environment]::SetEnvironmentVariable('AWE64_TEST_SEND_PAIR', $previousPair, 'Process')
         [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', $previousExternal, 'Process')
         [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ', $previousRamHz, 'Process')
@@ -326,6 +355,7 @@ try {
     if ($directEffectExit -ne 0) { throw "Direct original Creative effect gate failed." }
     if ($sendFailures.Count -ne 0) { throw ("Original send endpoint gates failed: " + ($sendFailures -join "; ")) }
     if ($cheezExit -ne 0) { throw 'Cheezoids all-program comparison failed.' }
+    if ($perfExit -ne 0) { throw 'Native performance/stability gate failed.' }
     # Only announce final PASS after BOTH independent tests and all original
     # owner SHA-256/Git-blob and EMU8000 trace gates have actually succeeded.
     Write-Host "PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS; PORT_WRITES=$writes; ORIGINAL_ROM=VERIFIED; MIDI_NOTE_ON_OFF=VERIFIED"
