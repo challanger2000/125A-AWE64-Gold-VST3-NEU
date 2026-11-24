@@ -238,7 +238,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         guestStatus_.store(-2,std::memory_order_release);
         return kResultFalse; // original DOS guest exited; no fake playback
     }
-    const bool ready=engine.ready();
+    const bool ready=engine.ready(data.numSamples>0?static_cast<std::size_t>(data.numSamples):0u);
     if(ready)guestStatus_.store(2,std::memory_order_release);
 
     if(data.inputParameterChanges) {

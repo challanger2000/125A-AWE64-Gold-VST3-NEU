@@ -23,7 +23,12 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('AbsoluteSendWord(port,val&0xffffu)',r)
         with self.assertRaises(ValueError):patch.patch_emu(r)
     def test_true_pcm_tap(self):
-        s='#define MIXER_SSIZE 4\nSDL_AudioDeviceID SDL2_AudioDevice = 0; /* valid IDs are 2 or higher, 1 for compat, 0 is never a valid ID */\n    if (mixer.nosound) {\n    }\n}\n\nstd::string mixerinfo() {'
+        s=('#define MIXER_SSIZE 4\n'
+           'SDL_AudioDeviceID SDL2_AudioDevice = 0; /* valid IDs are 2 or higher, 1 for compat, 0 is never a valid ID */\n'
+           'static void MIXER_Mix(void) {\n    MIXER_FillUp();\n}\n\n'
+           'static void SDLCALL MIXER_CallBack(void*,Uint8*,int) {\n    }\n}\n\nstd::string mixerinfo() {\n'
+           '    if (mixer.nosound) {\n        SDL_PauseAudioDevice(SDL2_AudioDevice, 0);\n'
+           '        mixer.prebuffer_samples = ((unsigned int)ms * (unsigned int)mixer.freq) / 1000u;')
         r=patch.patch_mixer(s)
         self.assertIn('reinterpret_cast<const int16_t*>(stream)',r)
         self.assertIn('awe64_pcm_receiver.load',r)
@@ -31,6 +36,10 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('AWE64_IsInternalAudioOnly',r)
         self.assertGreater(r.index('AWE64_IsInternalAudioOnly'),r.index('SDL_AudioDeviceID SDL2_AudioDevice = 0'))
         self.assertIn('mixer.nosound=true;',r)
+        self.assertIn('AWE64_SetGuestClockPCM',r)
+        self.assertIn('MIXER_CallBack(nullptr,reinterpret_cast<Uint8*>(pcm),n*MIXER_SSIZE)',r)
+        self.assertIn('if(!awe64_guest_clock_pcm.load(std::memory_order_acquire))',r)
+        self.assertIn('mixer.prebuffer_samples=0;',r)
         with self.assertRaises(ValueError):patch.patch_mixer(r)
     def test_real_creative_unchanged_mpu401_input(self):
         s='#include <assert.h>\nextern bool enable_slave_pic;\n' + (

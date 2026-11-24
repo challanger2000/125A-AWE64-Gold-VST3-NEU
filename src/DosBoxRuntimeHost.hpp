@@ -39,6 +39,8 @@ class DosBoxRuntimeHost final {
     AWE64_RequestStopFn requestStop_=nullptr;
     AWE64_IsGuestMidiReadyFn ready_=nullptr;
     AWE64_SetAbsoluteSendsFn sends_=nullptr;
+    AWE64_SetGuestClockPCMFn guestClockPcm_=nullptr;
+    bool pcmPrimed_=false;
     unsigned lastSends_=0x10000u;
     bool authenticGuest_=false;
     // Opt-in measurement only; no console I/O or file writes on RT thread.
@@ -167,7 +169,8 @@ public:
                           GetProcAddress(module_,"AWE64_RequestStop"));
         ready_=reinterpret_cast<AWE64_IsGuestMidiReadyFn>(GetProcAddress(module_,"AWE64_IsGuestMidiReady"));
         sends_=reinterpret_cast<AWE64_SetAbsoluteSendsFn>(GetProcAddress(module_,"AWE64_SetAbsoluteSends"));
-        if(!registerMidi_||!registerPCM_||!startGuest_||!requestStop_||!ready_||!sends_) {
+        guestClockPcm_=reinterpret_cast<AWE64_SetGuestClockPCMFn>(GetProcAddress(module_,"AWE64_SetGuestClockPCM"));
+        if(!registerMidi_||!registerPCM_||!startGuest_||!requestStop_||!ready_||!sends_||!guestClockPcm_) {
             stop();return false;
         }
         try {
@@ -264,6 +267,8 @@ public:
             // Two output destinations: original MPU-401 guest input and
             // original DOSBox audio mixer. Do NOT register BEE0 MIDI consumer.
             sends_(0x10000u);lastSends_=0x10000u;
+            pcmPrimed_=false;
+            guestClockPcm_(authenticGuest_?1u:0u);
             registerMidi_(adapter_.get(),&DosBoxHostAdapter::pullMidi);
             registerPCM_(adapter_.get(),&DosBoxHostAdapter::receivePCM);
             finished_.store(false,std::memory_order_release);
@@ -298,6 +303,8 @@ public:
         }
         performanceStats_=measurementStarted_=false;
         if(sends_)sends_(0x10000u);
+        if(guestClockPcm_)guestClockPcm_(0u);
+        pcmPrimed_=false;
         authenticGuest_=false;lastSends_=0x10000u;
         if(registerMidi_)registerMidi_(nullptr,nullptr);
         if(registerPCM_)registerPCM_(nullptr,nullptr);
@@ -306,7 +313,7 @@ public:
         if(module_)FreeLibrary(module_);
         module_=nullptr;
         registerMidi_=nullptr;registerPCM_=nullptr;
-        startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;sends_=nullptr;
+        startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;sends_=nullptr;guestClockPcm_=nullptr;
         argvStorage_.clear();
         if(!stagedDirectory_.empty()) {
             std::error_code ec;std::filesystem::remove_all(stagedDirectory_,ec);
@@ -318,7 +325,15 @@ public:
             owns_=false;
         }
     }
-    [[nodiscard]] bool ready() const noexcept {return ready_&&ready_()!=0;}
+    [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
+        if(!ready_||!ready_())return false;
+        if(!authenticGuest_||pcmPrimed_)return true;
+        // One initial prefill: 8.7 ms at native rate, or one larger block.
+        const auto target=std::max<std::size_t>(384,std::min<std::size_t>(hostBlock,8192)+128);
+        if(!queues_||queues_->snapshot().audioFrames<target)return false;
+        pcmPrimed_=true;
+        return true;
+    }
     [[nodiscard]] bool running() const noexcept {
         return running_.load(std::memory_order_acquire);
     }

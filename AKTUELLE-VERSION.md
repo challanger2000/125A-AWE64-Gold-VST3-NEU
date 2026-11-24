@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Guest-Tick-PCM statt unabhängiger SDL-Dummy-Uhr
+
+- Windows 45402226002: 44,1/48 kHz p95 96,08/97,31 ms, 23040/23135 Unterlauf-Frames, keine Audio-/MIDI-Drops oder Callback-Fristüberschreitungen. CPU 1,81/2,36 % eines CI-Kerns. Exakte Cheezoids-Revision (128 Programme), RAM-Frequenzen, alle drei absoluten Sends/Recall und Effekttypen erneut PASS. Transport/Version PASS.
+- Neue ABI-Option nur für authentischen VST3-Start: SDL-Dummy-Gerät bleibt geöffnet, aber pausiert. Derselbe originale PCM-Konvertierungscallback leert im vorhandenen Gast-Tick die fertig gerenderten Frames. Interne SDL-Vorpufferung entfällt; einmalige Host-Vorfüllung (384 native Frames bzw. größerer Block +128). Kein Eingriff in Chip-DSP oder Creative-Treiber. Direkter Referenzpfad unverändert.
+- Implementierung noch nicht auf Windows verifiziert. Alle bisherigen Klang- und Performance-Grenzen bleiben verbindlich. Kein Release.
+
 ## 24.11.2026 — Windows-Performance-Befund und CRLF-Auswertung
 
 - Windows 45314956767 FAIL: 44,1/48 kHz p95 95,7823/86,0625 ms, Unterlauf 23168/23252 Frames, keine Audio-/MIDI-Drops, keine Callback-Fristüberschreitungen. Queue-Mittel 560,30/562,56 Frames; CPU 2,28/3,46 % eines CI-Kerns. Alle drei absoluten Send-State-/Register-Gates und Cheezoids-128-Vergleich PASS. Transport 45314956648 und Version 45314956701 SUCCESS.

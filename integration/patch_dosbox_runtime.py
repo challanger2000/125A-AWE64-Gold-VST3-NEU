@@ -49,6 +49,11 @@ static void awe64_write_guest_port(Bitu p,Bitu v,Bitu len) {
 PCM_BRIDGE = r'''
 #ifdef AWE64_VST3_RUNTIME
 using Awe64ReceivePCM = void (__cdecl *)(void*,const int16_t*,unsigned int);
+// Opt-in guest-clock PCM for the genuine VST3; direct references stay on SDL.
+static std::atomic<bool> awe64_guest_clock_pcm{false};
+extern "C" __declspec(dllexport) void __cdecl AWE64_SetGuestClockPCM(unsigned enabled) noexcept {
+    awe64_guest_clock_pcm.store(enabled!=0,std::memory_order_release);
+}
 static std::atomic<void*> awe64_pcm_context{nullptr};
 static std::atomic<Awe64ReceivePCM> awe64_pcm_receiver{nullptr};
 extern "C" __declspec(dllexport) void __cdecl AWE64_HostRegisterPCM(
@@ -172,7 +177,7 @@ extern "C" __declspec(dllexport) int __cdecl AWE64_IsInternalAudioOnly() noexcep
 }
 #endif''')
     anchor='    }\n}\n\nstd::string mixerinfo() {'
-    return once(s,anchor,'''    }
+    s=once(s,anchor,'''    }
 #ifdef AWE64_VST3_RUNTIME
     // Original final stereo mixer PCM, not a generated test signal.
     if(len>0 && len%MIXER_SSIZE==0) {
@@ -185,6 +190,40 @@ extern "C" __declspec(dllexport) int __cdecl AWE64_IsInternalAudioOnly() noexcep
 }
 
 std::string mixerinfo() {''')
+    # Reuse the original final mixer callback on the guest's existing 1-ms
+    # timer. SDL dummy remains open but paused. No change to the chip DSP.
+    s=once(s,'static void MIXER_Mix(void) {',r'''#ifdef AWE64_VST3_RUNTIME
+static void SDLCALL MIXER_CallBack(void*,Uint8*,int);
+#endif
+static void MIXER_Mix(void) {''')
+    s=once(s,'    MIXER_FillUp();\n}\n\nstatic void SDLCALL MIXER_CallBack',r'''    MIXER_FillUp();
+#ifdef AWE64_VST3_RUNTIME
+    if(awe64_guest_clock_pcm.load(std::memory_order_acquire) && SDL2_AudioDevice!=0) {
+        int remains=(int)mixer.work_in-(int)mixer.work_out;
+        if(remains<0)remains+=(int)mixer.work_wrap;
+        int16_t pcm[128*2];
+        while(remains>0) {
+            const int n=remains>128?128:remains;
+            MIXER_CallBack(nullptr,reinterpret_cast<Uint8*>(pcm),n*MIXER_SSIZE);
+            remains-=n;
+        }
+    }
+#endif
+}
+
+static void SDLCALL MIXER_CallBack''')
+    s=once(s,'        SDL_PauseAudioDevice(SDL2_AudioDevice, 0);',r'''#ifdef AWE64_VST3_RUNTIME
+        if(!awe64_guest_clock_pcm.load(std::memory_order_acquire))
+#endif
+        SDL_PauseAudioDevice(SDL2_AudioDevice, 0);''')
+    s=once(s,'        mixer.prebuffer_samples = ((unsigned int)ms * (unsigned int)mixer.freq) / 1000u;',r'''        mixer.prebuffer_samples = ((unsigned int)ms * (unsigned int)mixer.freq) / 1000u;
+#ifdef AWE64_VST3_RUNTIME
+        if(awe64_guest_clock_pcm.load(std::memory_order_acquire)) {
+            mixer.prebuffer_samples=0;
+            mixer.prebuffer_wait=false;
+        }
+#endif''')
+    return s
 MPU_BRIDGE = r'''
 #ifdef AWE64_VST3_RUNTIME
 // Host -> guest through the ORIGINAL MPU-401 UART FIFO at 330h/331h.
