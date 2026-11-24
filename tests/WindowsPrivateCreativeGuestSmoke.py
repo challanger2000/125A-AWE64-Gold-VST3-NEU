@@ -207,7 +207,7 @@ def corrected_sysex_copy(original: bytes) -> bytes:
     """
     expected_blob = "e10b8705c6a46444a998c4f6aa74a1cda2081506"
     if len(original) != 40197 or hashlib.sha1(
-            ("blob %d\\0" % len(original)).encode("ascii") + original).hexdigest() != expected_blob:
+            ("blob %d\0" % len(original)).encode("ascii") + original).hexdigest() != expected_blob:
         raise ValueError("Unexpected Creative DEMO.EXE identity")
     return repair_sysex_compare(original)
 

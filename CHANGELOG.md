@@ -2,6 +2,7 @@
 
 ## 24.11.2026 — Original-SysEx-Vergleichsfehler auf Instruktionsebene isoliert
 
+- Korrektur des neuen Prüfskripts: Git-Blob-Header mit echtem NUL-Byte und eigener YAML-Testschritt; keine Änderung der Originaldaten oder Produktlaufzeit.
 - Windows 45301207140: Byte-exakter echter 33-Byte-MPU-UART-Test PASS; alle drei RAM-Spektralfälle und Sparse-State-Negativtests PASS. Original-Direktgast empfängt beide GS-Makros, aber beide Effektregister fehlen, ebenso im VST3. CC91/93=0 liefert bei expliziten SF2-Sends weiterhin Chorus 250, 127 liefert 255; Reverb-Messung 0/0. Keine Send-Freigabe.
 - Analyse der hashverifizierten originalen Creative DEMO.EXE (MZ-Datei, 40197 Bytes, dokumentierter Git-Blob): bei Datei-Offset 21834+0x35 lädt die SysEx-Musterprüfung AL aus CS:[SI], führt CBW aus und vergleicht danach AX mit nullerweitertem DX. Statusbyte F0 wird FFF0, empfangenes F0 wird 00F0, also zwangsläufig ungleich. AH ist beim Einstieg in beide Muster durch AX=0x12/0x28 bereits 0; eine lokale NOP statt CBW (Offset 21892) erhält AH=0. Keine Änderung der Effektalgorithmen, ROM-Daten oder Chipemulation.
 - Nur für isolierten privaten Archiv-Referenztest: exakter Original-Git-Blob und Instruktionsanker vor der Änderung, temporäre FXDEMO.EXE mit einem Byte Unterschied, Original niemals überschreiben, kein Upload. Original unverändert als Negativkontrolle, korrigierte Kopie muss die originalen INIT-Registersignaturen zeigen. Der Produktions-VST3-Pfad bleibt bis zum Nachweis unverändert. Kein Release.
