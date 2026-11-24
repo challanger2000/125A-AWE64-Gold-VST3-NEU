@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — P165-GUI-Lifecycle PASS; vollständiger Steinberg-Validator als Pflichtgate
+
+- [Windows 45453837727](../../actions/runs/45453837727) SUCCESS auf b6975b8a; Transport 45453837608 und Version 45453837600 SUCCESS. Tatsächlicher nativer Editor zweimal erstellt/angehängt/entfernt, jeweils anfänglich und nach Attach 1000x708, Win32-Client ebenfalls 1000x708. Das fehlende IPlugFrame war eine Abweichung des Testhosts; P165-Produktgrafik unverändert.
+- Original-Archivtest erneut PASS einschließlich Cheezoids 128/128, Master-PCM-Recall und 60-Sekunden-Polyphonie. Latenz p95 bei 44,1/48/96 kHz 14,4444/12,9167/15,6146 ms, 7296/28522/14269 Queue-Blöcke ohne Audio-/MIDI-Drops oder Unterläufe.
+- Neuer Pflichtschritt: kompletter originaler Steinberg-Validator aus dem gepinnten SDK 3.7.12, ohne Suite-Filter, auf der tatsächlichen VST3-Binärdatei mit internem DOSBox-DLL und synthetischem Gast. Exit 0 und explizite Zusammenfassung mit >0 bestandenen und 0 fehlgeschlagenen Tests erforderlich; keine automatische Freigabe aus Build allein. Original-Archivtests und GUI-Lifecycle unverändert. Validator-Ergebnis offen; kein Nachweis der deaktivierten AMP-/FILTER-Regler, keine Installer-/DAW-Abnahme, kein Release.
+
 ## 24.11.2026 — OLE-/Klangprüfung PASS; fehlendes IPlugFrame im GUI-Testhost ergänzt
 
 - [Windows 45446318739](../../actions/runs/45446318739) insgesamt FAIL ausschließlich beim nativen Editor-Größengate: OLE/InitDll, createView und attached erfolgreich; Größe nicht 1000x708. Sämtliche vorhergehenden Windows-Original-Archiv-, PCM-, Performance-, Stabilitäts- und Negativkontrollschritte SUCCESS. Transport 45446318910 und Version 45446318523 SUCCESS. OLE-Korrektur behebt den früheren Abbruch, aber GUI-Abnahme noch nicht vollständig.

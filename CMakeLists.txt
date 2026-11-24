@@ -61,9 +61,9 @@ if(AWE64_BUILD_VST3_DEV)
     message(FATAL_ERROR "Original owner-approved faceplate hash mismatch.")
   endif()
 
-  # The DEV shell intentionally cannot activate without a real DOS guest.
-  # Its validator FAIL is expected; compile/package it but never mark it as
-  # Steinberg-validated or publish it as a usable instrument.
+  # Do not run the validator automatically during link: the DOSBox DLL and
+  # synthetic guest assets are staged afterwards. CI explicitly runs the
+  # full pinned official SDK validator on the actual staged VST3.
   set(SMTG_RUN_VST_VALIDATOR OFF CACHE BOOL "" FORCE)
   set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "" FORCE)
   set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES ON CACHE BOOL "" FORCE)
