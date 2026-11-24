@@ -8,11 +8,19 @@ spec.loader.exec_module(patch)
 
 class DosBoxPatchTests(unittest.TestCase):
     def test_emu_port_hw(self):
-        s='#include <string>\nclass EMU8000_Device {\nIO_WriteHandleObject WriteHandler[EMU_PORT_GROUPS];\n\tchan = MixerChan.Install(emu8000_callback, EMU_RATE, EMU8000_MIXER_CHANNEL);'
+        s=('#include <string>\nclass EMU8000_Device {\n'
+           '\t/* Emulated time in chip frames (44100 Hz) since the reset. */\n'
+           'IO_WriteHandleObject WriteHandler[EMU_PORT_GROUPS];\n'
+           '\tchan = MixerChan.Install(emu8000_callback, EMU_RATE, EMU8000_MIXER_CHANNEL);\n'
+           'void EMU8000_Device::Write(Bitu port, Bitu val, Bitu iolen) {\n\tSync();\n}\n'
+           'void EMU8000_Device::Mix(Bitu len) {\n\t/* synthetic mixer anchor */\n}')
         r=patch.patch_emu(s)
         self.assertIn('AweHostRead.Install(0xBEE0u',r)
         self.assertIn('AweHostWrite.Install(0xBEF0u',r)
         self.assertIn('AWE64_HostRegisterIO',r)
+        self.assertIn('AWE64_SetAbsoluteSends',r)
+        self.assertIn('ApplyAbsoluteSends();',r)
+        self.assertIn('AbsoluteSendWord(port,val&0xffffu)',r)
         with self.assertRaises(ValueError):patch.patch_emu(r)
     def test_true_pcm_tap(self):
         s='#define MIXER_SSIZE 4\nSDL_AudioDeviceID SDL2_AudioDevice = 0; /* valid IDs are 2 or higher, 1 for compat, 0 is never a valid ID */\n    if (mixer.nosound) {\n    }\n}\n\nstd::string mixerinfo() {'

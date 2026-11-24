@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Effektumschaltung im echten VST3 bestanden
+
+- Windows 45309812893: alle drei RAM-Spektralfälle bestanden, unveränderter Originalgast Effekt-Register 0/0, korrigierter Originalgast 1/1, tatsächlicher VST3 `EFFECT_TRACE_PLATE=True; EFFECT_TRACE_FEEDBACK=True`. Damit sind beide getesteten originalen Effekttypen im VST3 nachgewiesen. Der ältere Lauf scheiterte noch an den unveränderten CC-Sends, nicht an der Effekttyp-Umschaltung.
+- Windows 45310753140: neuer Cheezoids-/Absolute-Send-Lauf noch aktiv. Linux-Quellpatchtest scheiterte ausschließlich an einer unvollständigen synthetischen EMU8000-Testvorlage (fehlende neue Zeitbasis-/Write-/Mix-Anker). Vorlage ergänzt, Send-Export und Registerwrite-Aufruf explizit geprüft, keine Änderung des Produkt-DSP. Versions- und Transportregressionen 45310753256/45310753337 bereits PASS. Keine Freigabe.
+
 ## 24.11.2026 — Cheezoids: gezielte Regression aller 128 Programme
 
 - Nutzer meldet aus früherem Stand mehrheitlich falsche kurze Bleep-Klänge. Die konkrete private Datei war in der Bibliotheksliste nicht vorhanden. Öffentlich freigegebene Originalbank von Analoguesque Sound Designs (Ian Wilson) im Autor-Repository `Analoguesque/freepatches`, Commit `681907983ec024c1994f6a02615d650877913696`, Archiv-Git-Blob `c12461b3e016f70b36e39eca2f78eac5685a0fbf`. Nur temporär herunterladen, keine Bankdaten, PCM oder Traces hochladen. Identität zur früheren privaten Kopie nicht behaupten.
