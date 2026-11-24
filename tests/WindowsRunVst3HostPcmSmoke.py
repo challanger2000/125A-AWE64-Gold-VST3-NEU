@@ -80,6 +80,23 @@ def run_private_creative_host(command: list[str], plugin: Path, seconds: int):
         err.close()
 
 
+def validate_voice_overlay_report(stdout: str):
+    """Validate native evidence, including Windows CRLF from binary spools."""
+    lines = stdout.splitlines()
+    if lines.count("REAL_VST3_VOICE_CONTROLS_PCM_PASS") != 1:
+        raise RuntimeError("Bundled ten-control musical PCM gate failed")
+    if lines.count("REAL_VST3_VOICE_PCM_SUMMARY=10/10 NEUTRAL_RESTORE=PASS") != 1:
+        raise RuntimeError("Missing or ambiguous ten-control summary")
+    results = [re.fullmatch(r"VOICE_PCM_RESULT ID=(\d+) .* PASS", line)
+               for line in lines if line.startswith("VOICE_PCM_RESULT ")]
+    if any(m is None for m in results) or sorted(int(m[1]) for m in results) != list(range(1100,1110)):
+        raise RuntimeError("Missing or ambiguous per-control PCM evidence")
+    silence = [line for line in lines if line.startswith("FILTER_PRE_NOTE_SILENCE ")]
+    if len(silence) != 9 or any(not re.fullmatch(r"FILTER_PRE_NOTE_SILENCE .* PASS", line)
+                                for line in silence):
+        raise RuntimeError("Missing measured silence before a filter trial")
+
+
 def run_native_host(exe: Path, vst3: Path, original: bool = False,
                     seconds: int = 45):
     if not (15 <= seconds <= 120):
@@ -104,13 +121,7 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
             "REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS" not in proc.stdout:
         raise RuntimeError("Active external SF2 guest restart missing")
     if original and os.environ.get("AWE64_TEST_VOICE_OVERLAYS") == "1":
-        if "REAL_VST3_VOICE_CONTROLS_PCM_PASS" not in proc.stdout:
-            raise RuntimeError("Bundled ten-control musical PCM gate failed")
-        results = re.findall(r"^VOICE_PCM_RESULT ID=(\d+) .* PASS$", proc.stdout, re.M)
-        if sorted(map(int, results)) != list(range(1100,1110)):
-            raise RuntimeError("Missing or ambiguous per-control PCM evidence")
-        if len(re.findall(r'^FILTER_PRE_NOTE_SILENCE .* PASS$',proc.stdout,re.M)) != 9:
-            raise RuntimeError('Missing measured silence before a filter trial')
+        validate_voice_overlay_report(proc.stdout)
     if original and os.environ.get("AWE64_TEST_PERFORMANCE") == "1":
         if "PERF_HOST_RATE=44100 " in proc.stdout and "REAL_VST3_SUSTAIN_PCM_PASS" not in proc.stdout:
             raise RuntimeError("Original Creative CC64 sustain PCM gate missing")

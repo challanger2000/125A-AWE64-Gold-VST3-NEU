@@ -18,6 +18,7 @@ on:
       - 'tests/WindowsVst3HostPcmSmoke.cpp'
       - 'tests/CreativeMidiBankSelectTest.cpp'
       - 'tests/WindowsRunVst3HostPcmSmoke.py'
+      - 'tests/test_voice_overlay_report.py'
       - 'tests/WindowsPrivateCreativeGuestSmoke.py'
       - 'tests/WindowsCheezoidsSweep.py'
       - 'tests/MakeRamSampleSf2.py'
@@ -56,6 +57,7 @@ jobs:
           python -m unittest discover -s tests -p test_dosbox_runtime_patch.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_mpu_probe.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_ram_sample_sf2.py -v
+          PYTHONPATH=tests python -m unittest discover -s tests -p test_voice_overlay_report.py -v
           python integration/patch_dosbox_runtime.py third_party/dosbox-x-AWE32
           grep -q 'AweHostRead.Install(0xBEE0u' third_party/dosbox-x-AWE32/src/hardware/emu8000.cpp
           grep -q 'AWE64_HostRegisterPCM' third_party/dosbox-x-AWE32/src/hardware/mixer.cpp
