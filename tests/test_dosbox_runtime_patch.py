@@ -33,7 +33,11 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('AWE64_HostRegisterMidi(',r)
         self.assertIn('AWE64_PumpGuestMidi()',r)
         self.assertIn('MPU401_QUEUE-3',r)
-        self.assertIn('if(mpu.mode!=M_UART)return;',r)
+        self.assertIn('if(mpu.mode!=M_UART) {',r)
+        self.assertIn('AWE64_IsGuestMidiReady()',r)
+        self.assertIn('awe64_guest_midi_ready.store(false',r)
+        self.assertIn('if(mpu.queue_used!=0)return;',r)
+        self.assertLess(r.index('if(mpu.queue_used!=0)return;'),r.index('auto pull=awe64_mpu_pull.load'))
         with self.assertRaises(ValueError):patch.patch_mpu(r)
     def test_guest_entry(self):
         s='void GFX_Events() {}\n| SDL_WINDOW_SHOWN | (SDL2_resize_enable ? SDL_WINDOW_RESIZABLE : 0)\nint main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {}'

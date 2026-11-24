@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Windows-RAM- und Hostrate-Nachweis
+
+- Windows 45296517847: Original-RAM-Referenz und VST3-Programme 0/17 bei 44,1 kHz sowie Programm 17 bei 48 kHz mit erwarteter Frequenz nachgewiesen; 48-kHz-Leistungsverhältnis >223. Temporäre Referenzbereinigung erfolgreich. Effektregisterprüfung weiterhin FAIL (Plate=False, Feedback=False).
+- Separater Quellpatch-Test scheiterte an veralteter exakter UART-Guard-Zeichenfolge. Assertion auf neuen Guard, Bereitschaftsexport und ACK-Reihenfolge aktualisiert. Transport- und Versionsworkflows PASS. Keine Gesamtfreigabe.
+
 ## 24.11.2026 — RAM-Klang bei 44,1 kHz nachgewiesen; Initialisierungs-PCM unterdrücken
 
 - Windows 45294125748: originale RAM-SF2 Programme 0/17 im echten VST3 mit korrekten 441/735-Hz-Signaturen (Leistungsverhältnis >114), RMS 0,0249977/0,0277133. Direkte Original-DLL-Referenz RMS 0,025432038/0,027798085; RAM-Adressschreibzugriffe vorhanden. Direkter Test scheiterte nach der Messung ausschließlich an Windows-Freigabe von RAMBOOT.LOG. Parent besitzt nun das temporäre Verzeichnis und entfernt es nach Prozessende.
