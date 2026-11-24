@@ -7,6 +7,9 @@ include(CTest)
 # Transport tests are portable and do not pretend that DOSBox-X is connected.
 if(BUILD_TESTING)
   find_package(Threads REQUIRED)
+  add_executable(awe64_creative_sysex_repair_test tests/CreativeSysexRepairTest.cpp)
+  target_include_directories(awe64_creative_sysex_repair_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  add_test(NAME AWE64_CreativeSysexRepair COMMAND awe64_creative_sysex_repair_test)
   add_executable(awe64_host_rate_converter_test tests/HostRateConverterTest.cpp)
   target_include_directories(awe64_host_rate_converter_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
   add_test(NAME AWE64_HostRateConverter COMMAND awe64_host_rate_converter_test)
@@ -187,7 +190,7 @@ void PresetBrowserView::ChooseRom() {
     "${AWE64_VST3SDK}" "${CMAKE_CURRENT_SOURCE_DIR}/gui"
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/integration")
-  target_link_libraries(AWE64GoldDOSBoxDev PRIVATE sdk vstgui_support comdlg32)
+  target_link_libraries(AWE64GoldDOSBoxDev PRIVATE sdk vstgui_support comdlg32 bcrypt)
   target_compile_features(AWE64GoldDOSBoxDev PRIVATE cxx_std_20)
   # The real Steinberg factory/process() is exercised on Windows with a
   # PUBLIC synthetic DOS executable: NO original Creative assets in CI.

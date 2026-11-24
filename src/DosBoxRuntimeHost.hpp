@@ -9,6 +9,8 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <bcrypt.h>
+#include "CreativeSysexRepair.hpp"
 #include "DosBoxHostAdapter.hpp"
 #include "ExternalSoundFont.hpp"
 #include "AWE64_DOSBOX_ABI.h"
@@ -51,6 +53,34 @@ class DosBoxRuntimeHost final {
             const auto n=std::filesystem::file_size(p);
             return n>0 && (expectedSize==0 || n==expectedSize);
         } catch (...) {return false;}
+    }
+
+    // Check the full original Git blob, not just the instruction anchor.
+    // No external process; BCrypt is Windows' built-in cryptographic API.
+    static bool authenticDemo(const std::vector<std::uint8_t>& bytes) noexcept {
+        if(bytes.size()!=40197)return false;
+        constexpr unsigned char expected[20]={0xe1,0x0b,0x87,0x05,0xc6,0xa4,0x64,0x44,0xa9,0x98,0xc4,0xf6,0xaa,0x74,0xa1,0xcd,0xa2,0x08,0x15,0x06};
+        unsigned char prefix[]="blob 40197";
+        unsigned char digest[20]{};
+        BCRYPT_ALG_HANDLE alg=nullptr;
+        BCRYPT_HASH_HANDLE hash=nullptr;
+        if(BCryptOpenAlgorithmProvider(&alg,BCRYPT_SHA1_ALGORITHM,nullptr,0)<0)return false;
+        bool ok=BCryptCreateHash(alg,&hash,nullptr,0,nullptr,0,0)>=0;
+        if(ok)ok=BCryptHashData(hash,prefix,sizeof(prefix),0)>=0;
+        if(ok)ok=BCryptHashData(hash,const_cast<PUCHAR>(bytes.data()),static_cast<ULONG>(bytes.size()),0)>=0;
+        if(ok)ok=BCryptFinishHash(hash,digest,sizeof(digest),0)>=0;
+        if(hash)BCryptDestroyHash(hash);
+        BCryptCloseAlgorithmProvider(alg,0);
+        return ok&&std::memcmp(digest,expected,sizeof(expected))==0;
+    }
+    bool makeStagingDirectory() {
+        if(!stagedDirectory_.empty())return true;
+        wchar_t root[MAX_PATH+1]{},name[MAX_PATH+1]{};
+        const DWORD n=GetTempPathW(MAX_PATH,root);
+        if(!n||n>=MAX_PATH||!GetTempFileNameW(root,L"AWE",0,name))return false;
+        if(!DeleteFileW(name)||!CreateDirectoryW(name,nullptr))return false;
+        stagedDirectory_=std::filesystem::path(name);
+        return true;
     }
 
     static std::string utf8(const std::filesystem::path& p) {
@@ -131,6 +161,20 @@ public:
         }
         try {
             std::string guestBank="SYNTHGM.SF2";
+            std::string guestProgram="DEMO.EXE";
+            // Original files remain untouched. Only the exact proven original
+            // Creative executable gets a disposable one-byte compatibility fix.
+            if(isUsableFile(guest,40197)) {
+                std::vector<std::uint8_t> image(40197);
+                std::ifstream input(guest,std::ios::binary);
+                if(!input.read(reinterpret_cast<char*>(image.data()),image.size())||
+                   !authenticDemo(image)||!awe64::guest::repairCreativeSysexCompare(image)||
+                   !makeStagingDirectory()||
+                   !awe64::guest::writeExternalSf2(stagedDirectory_/"FXDEMO.EXE",image)) {
+                    stop();return false;
+                }
+                guestProgram="D:\\FXDEMO.EXE";
+            }
             if(!externalBank.empty()) {
                 std::vector<std::uint8_t> bytes;
                 bool adapted=false;
@@ -138,15 +182,7 @@ public:
                     stop();return false;
                 }
                 // Unique disposable directory, outside the installed bundle.
-                wchar_t root[MAX_PATH+1]{}, name[MAX_PATH+1]{};
-                const DWORD n=GetTempPathW(MAX_PATH,root);
-                if(!n||n>=MAX_PATH||!GetTempFileNameW(root,L"AWE",0,name)){
-                    stop();return false;
-                }
-                if(!DeleteFileW(name)||!CreateDirectoryW(name,nullptr)){
-                    stop();return false;
-                }
-                stagedDirectory_=std::filesystem::path(name);
+                if(!makeStagingDirectory()){stop();return false;}
                 if(!awe64::guest::writeExternalSf2(stagedDirectory_/"BANK.SF2",bytes)){
                     stop();return false;
                 }
@@ -205,10 +241,9 @@ public:
                     }
                     bootLog=requested;
                 }
-                argvStorage_.push_back("DEMO.EXE /SBK:"+guestBank+" > "+bootLog);
+                argvStorage_.push_back(guestProgram+" /SBK:"+guestBank+" > "+bootLog);
             } else {
-                if(externalBank.empty())argvStorage_.push_back("DEMO.EXE /SBK:SYNTHGM.SF2");
-                else argvStorage_.push_back("DEMO.EXE /SBK:"+guestBank);
+                argvStorage_.push_back(guestProgram+" /SBK:"+guestBank);
             }
             // Two output destinations: original MPU-401 guest input and
             // original DOSBox audio mixer. Do NOT register BEE0 MIDI consumer.

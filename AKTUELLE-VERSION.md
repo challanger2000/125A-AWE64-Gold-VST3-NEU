@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Original-SysEx-Korrektur tatsächlich bewiesen und in VST3 integriert
+
+- Windows 45306739416: originale unveränderte Creative DEMO.EXE liefert beide Registersignaturen 0/0, die ausschließlich temporär um ein Byte korrigierte Kopie liefert Plate=1 und Short Delay Feedback=1. Damit ist der konkrete Vergleichsfehler experimentell bestätigt, nicht mehr nur Disassemblierungshypothese. Beide RAM-Programme, 48-kHz-Klang und Sparse-Recall weiter PASS.
+- VST3-Start übernimmt nun die exakt geprüfte Korrektur ausschließlich für die bekannte 40197-Byte-Originaldatei nach vollständiger Git-Blob-SHA1-Prüfung via Windows BCrypt und Instruktionsanker. Temporäre FXDEMO.EXE im ohnehin privaten, pro Start angelegten Verzeichnis; Original bleibt byteidentisch. Kein neuer Treiber, keine Änderung des EMU8000-Kerns, keine Veröffentlichung von Creative-Binärdaten. Eigener synthetischer C++-Regressionstest. Echter VST3-Effektregister-Nachweis dieser Integration steht noch aus.
+- Unveränderte Original-CC91/93-Endpunktprüfungen weiterhin FAIL. Kein Release.
+
 ## 24.11.2026 — Original-SysEx-Vergleichsfehler auf Instruktionsebene isoliert
 
 - Korrektur des neuen Prüfskripts: Git-Blob-Header mit echtem NUL-Byte und eigener YAML-Testschritt; keine Änderung der Originaldaten oder Produktlaufzeit.
