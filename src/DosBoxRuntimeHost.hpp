@@ -17,6 +17,8 @@
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
+#include <cstdio>
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <memory>
@@ -39,6 +41,11 @@ class DosBoxRuntimeHost final {
     AWE64_SetAbsoluteSendsFn sends_=nullptr;
     unsigned lastSends_=0x10000u;
     bool authenticGuest_=false;
+    // Opt-in measurement only; no console I/O or file writes on RT thread.
+    bool performanceStats_=false, measurementStarted_=false;
+    rt::RealtimeQueues::Snapshot measurementStart_{},measurementEnd_{};
+    std::uint64_t measuredBlocks_=0,depthTotal_=0;
+    std::size_t depthMin_=32768,depthMax_=0,midiDepthMax_=0;
     std::unique_ptr<rt::RealtimeQueues> queues_;
     std::unique_ptr<DosBoxHostAdapter> adapter_;
     std::thread worker_;
@@ -193,6 +200,10 @@ public:
                 }
                 guestBank="D:\\BANK.SF2";
             }
+            const char* perf=std::getenv("AWE64_TEST_PERFORMANCE");
+            performanceStats_=perf&&std::strcmp(perf,"1")==0;
+            measurementStarted_=false;measuredBlocks_=depthTotal_=0;
+            depthMin_=32768;depthMax_=midiDepthMax_=0;
             queues_=std::make_unique<rt::RealtimeQueues>();
             adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_);
             // Original DOSBox-X sblaster.cpp forces SBT_NONE if opt_silent.
@@ -273,6 +284,19 @@ public:
             // a permanently blocked guest remains an unresolved risk.
             worker_.join();
         }
+        if(performanceStats_&&measurementStarted_&&measuredBlocks_) {
+            // Snapshot was taken at the last audio callback, before the
+            // worker stops; do not count shutdown as a runtime failure.
+            std::printf("PERF_QUEUE_BLOCKS=%llu AUDIO_DROPPED_FRAMES=%llu MIDI_DROPPED_EVENTS=%llu UNDERRUN_FRAMES=%llu\n",
+                static_cast<unsigned long long>(measuredBlocks_),
+                static_cast<unsigned long long>(measurementEnd_.audioDrops-measurementStart_.audioDrops),
+                static_cast<unsigned long long>(measurementEnd_.midiDrops-measurementStart_.midiDrops),
+                static_cast<unsigned long long>(measurementEnd_.underruns-measurementStart_.underruns));
+            std::printf("PERF_QUEUE_DEPTH_MIN=%zu MAX=%zu MEAN=%.2f MIDI_DEPTH_MAX=%zu\n",
+                depthMin_,depthMax_,double(depthTotal_)/double(measuredBlocks_),midiDepthMax_);
+            std::fflush(stdout);
+        }
+        performanceStats_=measurementStarted_=false;
         if(sends_)sends_(0x10000u);
         authenticGuest_=false;lastSends_=0x10000u;
         if(registerMidi_)registerMidi_(nullptr,nullptr);
@@ -311,7 +335,25 @@ public:
         }
     }
     bool sendMidi(const rt::MidiEvent& e) noexcept {
-        return queues_ && queues_->pushMidi(e);
+        if(!queues_)return false;
+        if(performanceStats_&&!measurementStarted_&&(e.status&0xf0u)==0x90u&&e.data2) {
+            // First actual NoteOn after warm-up establishes the baseline.
+            measurementStart_=measurementEnd_=queues_->snapshot();
+            measurementStarted_=true;
+        }
+        return queues_->pushMidi(e);
+    }
+    void measureQueueBeforeBlock() noexcept {
+        if(!measurementStarted_||!queues_)return;
+        const auto sample=queues_->snapshot();
+        depthMin_=std::min(depthMin_,sample.audioFrames);
+        depthMax_=std::max(depthMax_,sample.audioFrames);
+        midiDepthMax_=std::max(midiDepthMax_,sample.midiEvents);
+        depthTotal_+=sample.audioFrames;
+        ++measuredBlocks_;
+    }
+    void measureQueueAfterBlock() noexcept {
+        if(measurementStarted_&&queues_)measurementEnd_=queues_->snapshot();
     }
     std::size_t readAudio(float* left,float* right,std::size_t n) noexcept {
         return queues_?queues_->readAudio(left,right,n):0u;

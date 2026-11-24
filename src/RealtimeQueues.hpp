@@ -106,6 +106,16 @@ public:
             audioUnderruns_.fetch_add(frames - available, std::memory_order_relaxed);
         return available;
     }
+    // Consumer-side diagnostic; no writes to the queue or additional
+    // work on the sample producer path.
+    struct Snapshot {
+        std::uint64_t audioDrops, midiDrops, underruns;
+        std::size_t audioFrames, midiEvents;
+    };
+    Snapshot snapshot() const noexcept {
+        return {audioDrops(),midiDrops(),audioUnderruns(),
+                audio_.sizeApprox(),midi_.sizeApprox()};
+    }
     std::uint64_t audioDrops() const noexcept {
         return audioDrops_.load(std::memory_order_relaxed);
     }

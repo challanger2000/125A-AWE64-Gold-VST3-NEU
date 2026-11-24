@@ -337,6 +337,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         auto* left=data.outputs[0].channelBuffers32[0];
         auto* right=data.outputs[0].channelBuffers32[1];
         if(left&&right){
+            engine.measureQueueBeforeBlock();
             // Preserve native mixer samples at 44.1 kHz. For higher host
             // rates convert the original final PCM, not the chip clock.
             if(!ready){std::fill_n(left,data.numSamples,0.f);std::fill_n(right,data.numSamples,0.f);}
@@ -344,6 +345,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
             else rateConverter_.render(left,right,static_cast<std::size_t>(data.numSamples),[&engine]() noexcept {
                 rt::StereoFrame f{};engine.readAudio(&f.left,&f.right,1);return f;
             });
+            engine.measureQueueAfterBlock();
             const float gain=master_.load(std::memory_order_acquire);
             for(int32 i=0;i<data.numSamples;i++){
                 left[i]*=gain;right[i]*=gain;

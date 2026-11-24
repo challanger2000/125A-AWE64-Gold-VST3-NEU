@@ -24,7 +24,10 @@ int main() {
     CHECK(a.readAudio(left, right, 4) == 0);
     for (int i = 0; i < 4; ++i) { CHECK(left[i] == 0.f); CHECK(right[i] == 0.f); }
     CHECK(a.audioUnderruns() == 4);
+    const auto empty=a.snapshot();
+    CHECK(empty.underruns==4 && empty.audioFrames==0 && empty.audioDrops==0 && empty.midiEvents==0);
     CHECK(a.pushAudio({0.125f, -0.5f}));
+    CHECK(a.snapshot().audioFrames==1);
     CHECK(a.readAudio(left, right, 4) == 1);
     CHECK(left[0] == 0.125f && right[0] == -0.5f);
     CHECK(left[1] == 0.f && right[3] == 0.f);
@@ -32,6 +35,7 @@ int main() {
 
     const MidiEvent midi{729, 0x90, 60, 127, 3};
     CHECK(a.pushMidi(midi));
+    CHECK(a.snapshot().midiEvents==1);
     MidiEvent received{};
     CHECK(a.popMidi(received));
     CHECK(received.absoluteHostSample == 729 && received.status == 0x90 &&

@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Transportmessung getrennt vom Klang-/CPU-Test
+
+- Performance-Gate ergänzt: echte SPSC-Audio-/MIDI-Queue-Zähler, Startsnapshot erst beim ersten tatsächlichen NoteOn nach Warmup, Endsnapshot am letzten Audio-Callback vor Shutdown. Pufferfüllstand min/max/mittel vor jedem Block, maximale MIDI-Tiefe; verlorene Audioframes, verlorene MIDI-Events und Unterlauf-Frames müssen exakt 0 sein. Kein Logging im Audio-Callback, keine zusätzlichen Atomics pro erzeugtem Sample; Ausgabe nur bei explizitem Performance-Test nach Worker-Join. Damit werden auch sehr kurze Aussetzer sichtbar, die RMS-/Stille-Tests übersehen.
+- Zählung der tatsächlich im nativen VST3-Test angebotenen NoteOn/Off-Events statt fest kodierter 44. Keine Änderung der Klangerzeugung, Puffergröße oder voreilige Optimierung. Neuer Snapshot-Unit-Test.
+- Windows 45313059825 noch aktiv; neuer Performance-/Send-Test 45314023251 bislang eingereiht. Transport-/Versions-CI 45314023240/45314023242 SUCCESS. Noch keine belegten Performance-Messwerte und kein Release.
+
 ## 24.11.2026 — Exakte Cheezoids-Revision bestanden; Performance-Abnahme
 
 - Windows 45310753140: Autorbank SHA-256 exakt identisch zur hochgeladenen 652206-Byte-Datei. Alle 128 Programme im echten VST3 gegen direkten originalen Creative-DOSBox-Pfad gemessen. Original und VST3 kurze Abklingverläufe identisch [10,22,28,47,49,73,75,77], verlorenes Sustain [], Pegelfensterabweichungen >20 dB []. `CHEEZ_ALL_128_ENVELOPE_COMPARISON_PASS`. Der frühere Mehrheits-Bleep reproduziert sich in diesem Test nicht. Keine Behauptung bitidentischer Hardware oder subjektiver Klangabnahme.

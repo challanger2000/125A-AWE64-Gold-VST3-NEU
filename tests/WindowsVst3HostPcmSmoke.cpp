@@ -399,6 +399,7 @@ int main(int argc,char** argv) {
         measure=true;
         std::vector<double> latencies;
         unsigned silentHeldBlocks=0;
+        unsigned actualOn=0,actualOff=0;
         for(unsigned repeat=0;repeat<12;++repeat) {
             // A separate settled idle check protects against measuring stale
             // tail audio as an early MIDI-to-PCM onset.
@@ -410,6 +411,7 @@ int main(int argc,char** argv) {
             unsigned first=0, streak=0;bool found=false;
             for(unsigned i=0;i<nblocks(.35);++i){
                 if(!tick(i==0,false))return fail("Latency note failed");
+                if(i==0)actualOn+=midiEvents.getEventCount();
                 double peak=0.;
                 for(unsigned k=0;k<buffer;++k){
                     const double x=std::max(std::abs(l[k]),std::abs(r[k]));
@@ -422,6 +424,7 @@ int main(int argc,char** argv) {
             if(!found)return fail("No audible note onset in latency probe");
             latencies.push_back(1000.*first/hostRate);
             if(!tick(false,true))return fail("Latency release failed");
+            actualOff+=midiEvents.getEventCount();
         }
         // Stress with 32 distinct MIDI notes (not a claim of 32 available
         // sample voices: original driver can reserve voices or steal them).
@@ -432,6 +435,7 @@ int main(int argc,char** argv) {
         double chordEnergy=0.;unsigned chordSilent=0;
         for(unsigned i=0;i<nblocks(5.);++i){
             if(!tick(i==0,false))return fail("Polyphonic callback failed");
+            if(i==0)actualOn+=midiEvents.getEventCount();
             double e=0.;
             for(unsigned k=0;k<buffer;++k)e+=(double(l[k])*l[k]+double(r[k])*r[k])*.5;
             if(i*blockMs>500.){
@@ -442,6 +446,7 @@ int main(int argc,char** argv) {
         const auto polyCpuEnd=cpu100ns();
         const double polySeconds=std::chrono::duration<double>(Clock::now()-polyWallStart).count();
         if(!tick(false,true))return fail("Chord release failed");
+        actualOff+=midiEvents.getEventCount();
         const auto cpuEnd=cpu100ns();
         const double wallSeconds=std::chrono::duration<double>(Clock::now()-wallStart).count();
         if(cpuEnd<cpuStart||polyCpuEnd<polyCpuStart||polySeconds<=0||wallSeconds<=0)
@@ -469,7 +474,8 @@ int main(int argc,char** argv) {
         if(p95>20.)return fail("MIDI-to-PCM p95 exceeds 20 ms target");
         std::cout<<"REAL_VST3_PERFORMANCE_MEASUREMENT_PASS; CI CPU NOT OWNER CPU\n";
         std::cout<<"PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED\n"
-                 <<"VST3_HOST_NOTE_ON_EVENTS_SENT=44\nVST3_HOST_NOTE_OFF_EVENTS_SENT=44\n";
+                 <<"VST3_HOST_NOTE_ON_EVENTS_SENT="<<actualOn<<"\n"
+                 <<"VST3_HOST_NOTE_OFF_EVENTS_SENT="<<actualOff<<"\n";
         return 0;
     }
     if(sweep) {

@@ -101,6 +101,13 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
     if original and os.environ.get("AWE64_TEST_EXTERNAL_SF2") and \
             "REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS" not in proc.stdout:
         raise RuntimeError("Active external SF2 guest restart missing")
+    if original and os.environ.get("AWE64_TEST_PERFORMANCE") == "1":
+        rows = re.findall(r"^PERF_QUEUE_BLOCKS=(\d+) AUDIO_DROPPED_FRAMES=(\d+) MIDI_DROPPED_EVENTS=(\d+) UNDERRUN_FRAMES=(\d+)$", proc.stdout, re.M)
+        if len(rows) != 1:
+            raise RuntimeError("Missing or ambiguous measured queue statistics")
+        blocks, audio_drop, midi_drop, underrun = map(int, rows[0])
+        if not blocks or audio_drop or midi_drop or underrun:
+            raise RuntimeError(f"Realtime queue stability failed: audio drops={audio_drop}, MIDI drops={midi_drop}, underrun frames={underrun}")
     if proc.returncode or expected not in proc.stdout:
         raise RuntimeError("Actual Windows VST3 factory/host process() PCM test FAILED")
     def count(label: str) -> int:
