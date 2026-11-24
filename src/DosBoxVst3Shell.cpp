@@ -78,7 +78,8 @@ tresult PLUGIN_API DosBoxVst3Shell::initialize(FUnknown* context) {
                 nullptr,0.,1.,spec.initial,0,ParameterInfo::kCanAutomate|ParameterInfo::kIsHidden));
         }
     }
-    originalMidiCatalog_.SetOriginalCreativeMidiNumbers();
+    if(!loadCatalog({},originalMidiCatalog_))
+        originalMidiCatalog_.SetOriginalCreativeMidiNumbers();
     startedCatalog_=originalMidiCatalog_;
     return kResultOk;
 }
@@ -92,17 +93,41 @@ std::string DosBoxVst3Shell::soundFontStatus() {
         return "SF2 vorgemerkt: beim naechsten Aktivieren laden.";
     return {};
 }
-bool DosBoxVst3Shell::requestSoundFont(const std::string& path) {
+bool DosBoxVst3Shell::loadCatalog(const std::string& selected,AWE125::PresetCatalog& candidate) const {
+    using Host=integration::DosBoxRuntimeHost;
+    const auto binary=Host::pluginBinaryPath();
+    const auto source=selected.empty()?(Host::privateAssetsDir(binary)/"SYNTHGM.SF2"):std::filesystem::u8path(selected);
+    const auto utf8=source.u8string();
+    const std::string path(reinterpret_cast<const char*>(utf8.data()),utf8.size());
+    std::string error;
+    if(candidate.LoadSoundFont(path,error))candidate.KeepMidiBankZero();
+    else if(selected.empty())candidate.SetOriginalCreativeMidiNumbers(); // no real names claimed for synthetic fixture
+    return !candidate.Entries().empty();
+}
+void DosBoxVst3Shell::publishCatalogLocked(AWE125::PresetCatalog&& candidate) {
+    // Caller holds lifecycle lock. Controller writes and UI snapshot publish
+    // share the selection lock; audio reads only under lifecycle lock.
+    std::lock_guard<std::mutex> lock(selectionMutex_);
+    startedCatalog_=std::move(candidate);
+    if(!startedCatalog_.Find(0,program_.load(std::memory_order_acquire))) {
+        const auto program=startedCatalog_.Entries().front().program;
+        program_.store(program,std::memory_order_release);
+        (void)SingleComponentEffect::setParamNormalized(kProgram,program/127.);
+    }
+    bank_.store(0,std::memory_order_release);
+    (void)SingleComponentEffect::setParamNormalized(kBank,0.);
+    catalogRevision_.fetch_add(1,std::memory_order_release);
+}
+bool DosBoxVst3Shell::requestSoundFont(const std::string& path,int expectedProgram) {
     try {
         if(path.size()>32768 || path.find('\0')!=std::string::npos)return false;
         if(!path.empty()) {
             std::vector<std::uint8_t> bytes;bool adapted=false;
-            AWE125::PresetCatalog candidate;std::string error;
-            if(!guest::readExternalSf2(std::filesystem::u8path(path),bytes,adapted) ||
-               !candidate.LoadSoundFont(path,error))return false;
-            candidate.KeepMidiBankZero();
-            if(candidate.Entries().empty())return false;
+            if(!guest::readExternalSf2(std::filesystem::u8path(path),bytes,adapted))return false;
         }
+        AWE125::PresetCatalog candidate;
+        if(!loadCatalog(path,candidate))return false;
+        if(expectedProgram>=0 && (expectedProgram>127||!candidate.Find(0,static_cast<std::uint8_t>(expectedProgram))))return false;
         std::lock_guard<std::mutex> lifecycle(runtimeMutex_);
         const auto previous=requestedSoundFont();
         if(previous==path && (!runtime_||!runtime_->finished()))return true;
@@ -114,7 +139,7 @@ bool DosBoxVst3Shell::requestSoundFont(const std::string& path) {
                 (void)startRuntimeLocked(previous);
                 return false;
             }
-        }
+        } else publishCatalogLocked(std::move(candidate));
         {
             std::lock_guard<std::mutex> lock(selectionMutex_);
             requestedBank_=path;
@@ -145,27 +170,16 @@ bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected) {
         auto engine=std::make_unique<integration::DosBoxRuntimeHost>();
         const auto ownBinary=engine->pluginBinaryPath();
         const auto privateDir=integration::DosBoxRuntimeHost::privateAssetsDir(ownBinary);
-        const auto source=selected.empty()?(privateDir/"SYNTHGM.SF2"):std::filesystem::u8path(selected);
-        const auto utf8=source.u8string();
-        const std::string path(reinterpret_cast<const char*>(utf8.data()),utf8.size());
-        AWE125::PresetCatalog candidate;std::string error;
-        if(candidate.LoadSoundFont(path,error))candidate.KeepMidiBankZero();
-        else if(selected.empty())candidate.SetOriginalCreativeMidiNumbers(); // synthetic fixture only
-        if(candidate.Entries().empty()||ownBinary.empty()||!engine->begin(ownBinary,privateDir,selected)) {
+        AWE125::PresetCatalog candidate;
+        if(!loadCatalog(selected,candidate)||ownBinary.empty()||!engine->begin(ownBinary,privateDir,selected)) {
             guestStatus_.store(-1,std::memory_order_release);
             return false;
         }
         runtime_=std::move(engine);
-        if(!candidate.Find(0,program_.load(std::memory_order_acquire))) {
-            const auto program=candidate.Entries().front().program;
-            (void)setParamNormalized(kProgram,static_cast<double>(program)/127.);
-        }
-        (void)setParamNormalized(kBank,0.);
+        publishCatalogLocked(std::move(candidate));
         {
             std::lock_guard<std::mutex> lock(selectionMutex_);
             startedBank_=selected;
-            startedCatalog_=std::move(candidate);
-            catalogRevision_.fetch_add(1,std::memory_order_release);
         }
         guestStatus_.store(1,std::memory_order_release);
         initialProgramSent_=false;
@@ -247,12 +261,13 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
                 continue;
             const double value=std::clamp(normalized,0.,1.);
             switch(q->getParameterId()) {
-                case kProgram:
-                    program_.store(static_cast<std::uint8_t>(std::lround(value*127.)),
-                                   std::memory_order_release);break;
-                case kBank:
-                    bank_.store(static_cast<std::uint8_t>(std::lround(value*127.)),
-                                std::memory_order_release);break;
+                case kProgram: {
+                    if(!std::isfinite(value))break;
+                    const auto p=static_cast<std::uint8_t>(std::lround(value*127.));
+                    if(startedCatalog_.Find(0,p))program_.store(p,std::memory_order_release);
+                    break;
+                }
+                case kBank:break; // only physical bank zero is currently proven
                 case kMaster:
                     master_.store(static_cast<float>(value),std::memory_order_release);
                     break;
@@ -334,8 +349,22 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         absoluteSamplePosition_+=static_cast<std::uint64_t>(data.numSamples);
     return kResultOk;
 }
+ParamValue PLUGIN_API DosBoxVst3Shell::getParamNormalized(ParamID id) {
+    if(id==kProgram)return program_.load(std::memory_order_acquire)/127.;
+    if(id==kBank)return 0.;
+    if(id==kMaster)return master_.load(std::memory_order_acquire);
+    if(id==kReverbType)return reverbType_.load(std::memory_order_acquire)/7.;
+    if(id==kChorusType)return chorusType_.load(std::memory_order_acquire)/7.;
+    return SingleComponentEffect::getParamNormalized(id);
+}
 tresult PLUGIN_API DosBoxVst3Shell::setParamNormalized(ParamID id,ParamValue value) {
     if(!std::isfinite(value)||value<0.||value>1.)return kInvalidArgument;
+    std::unique_lock<std::mutex> selection(selectionMutex_,std::defer_lock);
+    if(id==kBank && std::lround(value*127.)!=0)return kResultFalse;
+    if(id==kProgram) {
+        selection.lock();
+        if(!startedCatalog_.Find(0,static_cast<std::uint8_t>(std::lround(value*127.))))return kResultFalse;
+    }
     const auto result=SingleComponentEffect::setParamNormalized(id,value);
     if(result!=kResultOk)return result;
     if(id==kProgram)
@@ -387,7 +416,7 @@ tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
        read!=static_cast<int32>(image.size())||
        !std::equal(kSignature.begin(),kSignature.end(),image.begin())||
        (image[4]!=1&&image[4]!=2&&image[4]!=3)||image[9]!=0x5a||image[10]!=0xa5||
-       image[5]>127||image[6]>127)return kResultFalse;
+       image[5]!=0||image[6]>127)return kResultFalse;
     const unsigned volume=image[7]|(static_cast<unsigned>(image[8])<<8);
     if(volume>10000)return kResultFalse;
     std::array<std::uint8_t,2> effects{4,2};
@@ -403,9 +432,9 @@ tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
         if(n&&(stream->read(selected.data(),static_cast<int32>(n),&read)!=kResultOk||
            read!=static_cast<int32>(n)))return kResultFalse;
     }
-    if(!requestSoundFont(selected))return kResultFalse;
-    (void)setParamNormalized(kBank,static_cast<double>(image[5])/127.);
-    (void)setParamNormalized(kProgram,static_cast<double>(image[6])/127.);
+    if(!requestSoundFont(selected,image[6]))return kResultFalse;
+    if(setParamNormalized(kBank,0.)!=kResultOk||
+       setParamNormalized(kProgram,static_cast<double>(image[6])/127.)!=kResultOk)return kResultFalse;
     (void)setParamNormalized(kMaster,static_cast<double>(volume)/10000.);
     (void)setParamNormalized(kReverbType,effects[0]/7.);
     (void)setParamNormalized(kChorusType,effects[1]/7.);

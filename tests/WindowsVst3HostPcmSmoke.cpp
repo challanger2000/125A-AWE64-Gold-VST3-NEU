@@ -220,6 +220,22 @@ int main(int argc,char** argv) {
                outgoing.getSize()!=static_cast<S::TSize>(bytes.size())||
                std::memcmp(outgoing.getData(),bytes.data(),bytes.size())!=0)
                 return fail("External SF2 real IComponent state did not roundtrip");
+            if(ramHz>0.) {
+                auto absent=bytes;absent[6]=1;
+                S::MemoryStream invalidProgram(absent.data(),absent.size());
+                if(component->setState(&invalidProgram)==S::kResultOk)
+                    return fail("Sparse RAM bank accepted nonexistent preset 1");
+                auto otherBank=bytes;otherBank[5]=1;
+                S::MemoryStream invalidBank(otherBank.data(),otherBank.size());
+                if(component->setState(&invalidBank)==S::kResultOk)
+                    return fail("Original bank-zero mode accepted unproven bank 1");
+                S::MemoryStream after;
+                if(component->getState(&after)!=S::kResultOk||
+                   after.getSize()!=static_cast<S::TSize>(bytes.size())||
+                   std::memcmp(after.getData(),bytes.data(),bytes.size())!=0)
+                    return fail("Rejected sparse state mutated valid project state");
+                std::cout<<"REAL_VST3_SPARSE_INVALID_STATE_REJECTED_PASS\n";
+            }
             externalState=bytes;
             // Start with ROM, then switch to the external bank while the
             // same component remains active. Both go through actual state.

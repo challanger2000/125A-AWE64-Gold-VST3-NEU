@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Sparse-Preset-Recall ohne falsche Programmauswahl
+
+- Bestehender Fehler: nach SF2-Wechsel konnte setState ein nicht vorhandenes Preset oder unbewiesene Banknummer erneut setzen. Browser konnte vor Aktivierung noch die alte Liste zeigen. Jetzt vor jedem State-Wechsel tatsächliches phdr-Preset validieren, ungültige Bank/Preset-Kombination ohne Mutation zurückweisen; auch inaktive Auswahl aktualisiert Browser-Snapshot. Kein ROM-Padding in externen SF2.
+- Echtzeit-Programmautomation akzeptiert nur vorhandene Programme; kBank bleibt 0, solange höhere Banken nicht nachgewiesen sind. Controller-Readback für Bank/Programm/Master/Effekttypen direkt aus dem tatsächlichen atomaren Zustand. Native negative Tests prüfen nicht vorhandenes Programm 1 und Bank 1 in der 0/17-RAM-Bank, einschließlich unverändertem gültigen State. Windows-Nachweis noch offen.
+- Original-P165-Grafik, originaler Creative-Treiber und EMU8000 unverändert.
+
 ## 24.11.2026 — SysEx-Fehler am Originalpfad isolieren
 
 - Windows 45296517847 bestätigt die RAM-Programme 0/17 und 48-kHz-Audiowiedergabe; keine Änderung dieser bestandenen Pfade. Original-Effekt-Recall funktioniert, aber beide späten INIT-Registersignaturen fehlen.

@@ -45,7 +45,9 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::string requestedBank_;
     std::string startedBank_;
     std::atomic<std::uint64_t> catalogRevision_{1};
-    bool requestSoundFont(const std::string&);
+    bool loadCatalog(const std::string&,AWE125::PresetCatalog&) const;
+    void publishCatalogLocked(AWE125::PresetCatalog&&);
+    bool requestSoundFont(const std::string&,int expectedProgram=-1);
     std::string requestedSoundFont();
     std::string soundFontStatus();
 public:
@@ -66,6 +68,7 @@ public:
     Steinberg::tresult PLUGIN_API setupProcessing(Steinberg::Vst::ProcessSetup&) override;
     Steinberg::tresult PLUGIN_API setProcessing(Steinberg::TBool) override;
     Steinberg::tresult PLUGIN_API process(Steinberg::Vst::ProcessData&) override;
+    Steinberg::Vst::ParamValue PLUGIN_API getParamNormalized(Steinberg::Vst::ParamID) override;
     Steinberg::tresult PLUGIN_API setParamNormalized(
         Steinberg::Vst::ParamID,Steinberg::Vst::ParamValue) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream*) override;
