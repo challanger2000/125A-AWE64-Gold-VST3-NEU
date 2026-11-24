@@ -79,6 +79,13 @@ try {
         throw 'VST3 test binary absent. Build awe64_vst3_host_pcm_smoke locally or use -HostExe.'
     }
     $pluginBinary = Join-Path $native 'AWE64GoldDOSBoxDev.vst3'
+    # Independently run the public author-bank regression before other
+    # original gates can fail. No owner data or downloaded assets uploaded.
+    $cheezExit = 0
+    if ($env:AWE64_TEST_CHEEZOIDS -eq '1') {
+        & python (Join-Path $root 'tests/WindowsCheezoidsSweep.py') --bundle $bundlePath --exe $hostTestExe
+        $cheezExit = $LASTEXITCODE
+    }
     # Acquire direct mixer evidence before the VST3 gate.
     if ($Seconds -ge 20) {
         & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds --reference
@@ -313,6 +320,7 @@ try {
     if ($ramFailures.Count -ne 0) { throw ("RAM gates failed: " + ($ramFailures -join "; ")) }
     if ($directEffectExit -ne 0) { throw "Direct original Creative effect gate failed." }
     if ($sendFailures.Count -ne 0) { throw ("Original send endpoint gates failed: " + ($sendFailures -join "; ")) }
+    if ($cheezExit -ne 0) { throw 'Cheezoids all-program comparison failed.' }
     # Only announce final PASS after BOTH independent tests and all original
     # owner SHA-256/Git-blob and EMU8000 trace gates have actually succeeded.
     Write-Host "PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS; PORT_WRITES=$writes; ORIGINAL_ROM=VERIFIED; MIDI_NOTE_ON_OFF=VERIFIED"

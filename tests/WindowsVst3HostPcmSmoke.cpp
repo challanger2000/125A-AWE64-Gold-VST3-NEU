@@ -144,6 +144,7 @@ int main(int argc,char** argv) {
     const char* hostRateEnv=std::getenv("AWE64_TEST_HOST_RATE");
     const double hostRate=hostRateEnv?std::atof(hostRateEnv):44100.;
     if(hostRate!=44100.&&hostRate!=48000.)return fail("Unsupported native test host rate");
+    const bool sweep=std::getenv("AWE64_TEST_CHEEZOIDS_SWEEP")!=nullptr;
     const bool effectTest=std::getenv("AWE64_TEST_EFFECT_TYPES")!=nullptr;
     const char* sendTest=std::getenv("AWE64_TEST_SEND_PAIR");
     const unsigned sendPair=sendTest?static_cast<unsigned>(std::strtoul(sendTest,nullptr,10)):0;
@@ -338,6 +339,48 @@ int main(int argc,char** argv) {
            std::memcmp(saved.getData(),externalState.data(),externalState.size())!=0)
             return fail("Active external SF2 state did not roundtrip");
         std::cout<<"REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS\n";
+    }
+    if(sweep) {
+        if(!originalMode||externalState.empty()||hostRate!=44100.)return fail("Sweep needs authentic external bank");
+        V::IEditController* control=nullptr;
+        if(component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&control))!=S::kResultOk||!control)
+            return fail("Sweep controller unavailable");
+        // One guest and one bank load, not 128 independent boots.
+        const auto begin=std::chrono::steady_clock::now();
+        unsigned block=0;
+        auto tick=[&](bool on,bool off) {
+            midiEvents.setEnabled(on||off,off);
+            l.fill(0);r.fill(0);
+            if(processor->process(data)!=S::kResultOk)return false;
+            for(unsigned i=0;i<512;++i)if(!std::isfinite(l[i])||!std::isfinite(r[i]))return false;
+            std::this_thread::sleep_until(begin+std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>((++block)*512./44100.)));
+            return true;
+        };
+        for(unsigned i=0;i<1292;++i)if(!tick(false,false))return fail("Sweep warmup failed");
+        for(unsigned program=0;program<128;++program) {
+            if(control->setParamNormalized(1000,program/127.)!=S::kResultOk||
+                std::abs(control->getParamNormalized(1000)-program/127.)>1e-6)
+                return fail("Sweep program selection failed: "+std::to_string(program));
+            for(unsigned i=0;i<22;++i)if(!tick(false,false))return fail("Sweep settle failed");
+            double early=0,late=0;unsigned en=0,ln=0;
+            for(unsigned i=0;i<151;++i) {
+                if(!tick(i==0,false))return fail("Sweep held note failed");
+                for(unsigned k=0;k<512;++k){
+                    const double e=(double(l[k])*l[k]+double(r[k])*r[k])*0.5;
+                    if(i>=17&&i<52){early+=e;++en;}
+                    if(i>=95&&i<138){late+=e;++ln;}
+                }
+            }
+            for(unsigned i=0;i<44;++i)if(!tick(false,i==0))return fail("Sweep release failed");
+            std::cout<<"CHEEZ_VST3 "<<program<<" "<<std::sqrt(early/en)<<" "<<std::sqrt(late/ln)<<"\n";
+        }
+        control->release();
+        if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
+           component->terminate()!=S::kResultOk)return fail("Sweep shutdown failed");
+        processor->release();component->release();factory->release();FreeLibrary(module);
+        std::cout<<"CHEEZ_VST3_SWEEP_COMPLETE\n";
+        return 0;
     }
     V::IEditController* effectController=nullptr;
     if((effectTest||sendTest)&&component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&effectController))!=S::kResultOk)

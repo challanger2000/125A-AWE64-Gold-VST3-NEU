@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Cheezoids: gezielte Regression aller 128 Programme
+
+- Nutzer meldet aus früherem Stand mehrheitlich falsche kurze Bleep-Klänge. Die konkrete private Datei war in der Bibliotheksliste nicht vorhanden. Öffentlich freigegebene Originalbank von Analoguesque Sound Designs (Ian Wilson) im Autor-Repository `Analoguesque/freepatches`, Commit `681907983ec024c1994f6a02615d650877913696`, Archiv-Git-Blob `c12461b3e016f70b36e39eca2f78eac5685a0fbf`. Nur temporär herunterladen, keine Bankdaten, PCM oder Traces hochladen. Identität zur früheren privaten Kopie nicht behaupten.
+- Autor beschreibt kurze Single-Cycle-Wellenformen und Kompatibilitätsprobleme mancher SF2-Player. Deshalb ausdrücklich kein einzelner Peak als Klangbeweis: alle 128 tatsächlichen Bank-0-Programme, Note 60 Velocity 100, etwa 1,75 s gehalten, frühe/späte RMS-Fenster und Original-Creative-DLL-Direktvergleich mit identischen trockenen Hardware-Sends; VST3-Programmauswahl und Bankwechsel über echten Host. Meldet verlorenen Sustain, abweichende Programmpegel und kurze Originalreferenzen getrennt; Mehrheits-Bleep auch im direkten Originalpfad bleibt Fehler zur Untersuchung. Originalquelle unverändert. Noch kein ausgeführter Cheezoids-Klang-PASS.
+
 ## 24.11.2026 — Absolute Hardware-Sends statt additiver Creative-CCs
 
 - Die bereits nachgewiesene Nicht-Null des originalen CC93 trotz Wert 0 wird nicht als Produktfunktion ausgegeben. Die P165-Sends 1110/1111 setzen jetzt ausschließlich die beiden originalen EMU8000-Registerbytes PTRX[15:8] und CSL[31:24] für Stimmen 0–29, via originaler Register-Schreibroutine im DOSBox-Gerätewrapper. Keine Änderung der gepinnten Chip-DSP-Implementierung. Der Host publiziert nur ein atomares Wertepaar; kein Chipzugriff vom DAW-Callback. Nach Gastbereitschaft wird 0/0 als Standard gesetzt, bei Live-Änderung auch bestehende Stimmen aktualisiert; Original-Referenz ohne gesetzte Host-Overrides unverändert. Reservierte Stimmen 30/31 und andere Registerfelder bleiben unangetastet.
