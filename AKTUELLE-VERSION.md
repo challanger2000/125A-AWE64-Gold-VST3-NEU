@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Sustain-PCM PASS; sieben Audio-Unterlaufframes bei 44,1 kHz
+
+- [Windows 45487683372](../../actions/runs/45487683372) auf 97a8eaa0 insgesamt FAIL ausschließlich wegen 7 Unterlaufframes bei 44,1 kHz (9254 gemessene Blöcke, 0 Audio- und MIDI-Drops, Queue-Minimum 121 bei Blockgröße 128, Host-Wakeup-Verzögerung bis 7,62096 ms, keine Callback-Fristüberschreitung). Kein Nachweis für die genaue Ursache oder den Zeitpunkt des Unterlaufs; Host-Jitter ist eine mögliche Erklärung, nicht bewiesen. Striktes Null-Unterlauf-Gate bleibt unverändert.
+- Neuer echter Sustain-Test PASS: RMS ohne Note 0,000152588, gehalten 0,0275908, NoteOff ohne Pedal 0,00012207, NoteOff mit Pedal 0,0274312, nach Pedal-Off 0,000107896. Steinberg 47/47, Cheezoids 128/128, Master-Recall, P165-Lifecycle PASS. p95 13,5601/14,1875/12,9792 ms bei 44,1/48/96 kHz; 48 und 96 kHz weiterhin 0 Unterläufe und Drops. Transport 45487683433 und Version 45487683504 SUCCESS.
+- Kein neuer teurer Gesamtlauf nur wegen dieses einzelnen Unterlaufs; mit dem gebündelten Reglerport gezielte 44,1-kHz-Queue-Diagnose und frühe Performance-Prüfung vor dem langen Preset-Sweep vorbereiten. Kein Produktcode geändert, keine Freigabe, keine gelockerten Testgrenzen.
+
 ## 24.11.2026 — P175/P165-Reglerport: alte Implementierung als verbindliche Vorlage
 
 - Nutzerentscheidung: penibel, effizient; alle verbliebenen Regler gemeinsam portieren und in einem gebündelten Windows-Prüflauf testen. Vorhandene P175/P165-Implementierung und Tests aus dem alten Projekt wiederverwenden, keine Rückkehr zur alten nativen Synth-Engine. Quellabgleich in `docs/P165-CONTROL-PORT.md`.
