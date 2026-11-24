@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Original-Send-Endpunkte prüfen (0 % muss tatsächlich aus sein)
+
+- Original ADIP DOS awe32Controller dokumentiert CC91/CC93, nicht aber eine verlässliche absolute Nullsetzung für bereits im SF2 enthaltene Sends. Vor Aktivierung der beiden P165-Sendregler wird dies im originalen Creative-Treiber nachgemessen.
+- Erweitert ausschließlich selbst erzeugtes RAM-Testmaterial um explizite 1000-Promille-SF2-Sendgeneratoren (15/16), getrennt vom unveränderten trockenen Frequenztest. Zwei unabhängige Originalgast-Läufe setzen CC91/93 = 0 bzw. 127. Original-PTRX/CSL-Register an späten RAM-Voice-CCCA-Schreibzugriffen ausgewertet; 0 verlangt beide Register-Sends exakt null, 127 beide größer null. Kein approximierter Effekt und kein fiktiver Regler. Windows-Prüfung offen.
+- Windows 45299958012 bestätigte erneut beide 44,1-kHz-RAM-Klänge und 48 kHz, Effektregister weiterhin FAIL. Keine Gesamtfreigabe.
+
 ## 24.11.2026 — Sparse-Preset-Recall ohne falsche Programmauswahl
 
 - Bestehender Fehler: nach SF2-Wechsel konnte setState ein nicht vorhandenes Preset oder unbewiesene Banknummer erneut setzen. Browser konnte vor Aktivierung noch die alte Liste zeigen. Jetzt vor jedem State-Wechsel tatsächliches phdr-Preset validieren, ungültige Bank/Preset-Kombination ohne Mutation zurückweisen; auch inaktive Auswahl aktualisiert Browser-Snapshot. Kein ROM-Padding in externen SF2.

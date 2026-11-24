@@ -36,5 +36,14 @@ class RamFixtureTest(unittest.TestCase):
                           for i in range(2)], [1,1])  # mono RAM, not ROM
         self.assertEqual(len(lists[b"sdta"][b"smpl"]), (4000+46+3600+46)*2)
 
+    def test_wet_fixture_has_explicit_both_sends(self):
+        data = build(wet=True)
+        lists = dict((body[:4], dict(children(body, 4, len(body))))
+                     for tag, body in children(data, 12, len(data)) if tag == b"LIST")
+        igen = lists[b"pdta"][b"igen"]
+        self.assertEqual(len(igen), 11*4)
+        self.assertEqual(struct.unpack_from("<4H",igen,0),(15,1000,16,1000))
+        self.assertEqual(struct.unpack_from("<4H",igen,20),(15,1000,16,1000))
+
 if __name__ == "__main__":
     unittest.main()

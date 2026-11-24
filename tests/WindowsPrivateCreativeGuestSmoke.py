@@ -226,9 +226,42 @@ def effect_trace_summary(trace):
     return all(counts)
 
 
+def send_trace_summary(trace):
+    # Register layout from original EMU8000 programmer guide and upstream
+    # snd_emu8k.h: PTRX[15:8] reverb, CSL[31:24] chorus. No DSP replacement.
+    selected = -1
+    latest = {}
+    latched = []
+    with trace.open(encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            match = EMU8000_TRACE_WORD.fullmatch(raw.strip())
+            if not match:
+                continue
+            frame, port, value = raw.strip().split()
+            frame, port, value = int(frame), int(port,16), int(value,16)
+            if port == 0xe22:
+                selected = value & 255
+                continue
+            reg, voice = selected >> 5, selected & 31
+            if reg == 1 and port == 0x620:
+                latest[(voice,"reverb")] = (value >> 8) & 255
+            elif reg == 7 and port == 0x622:
+                latest[(voice,"chorus")] = (value >> 8) & 255
+            elif frame > 176400 and reg == 0 and port == 0xa22 and voice < 30:
+                # CCCA high word pointing at DRAM (sample word address 0x200000+).
+                if value & 255 >= 0x20 and (voice,"reverb") in latest and (voice,"chorus") in latest:
+                    latched.append((latest[(voice,"reverb")],latest[(voice,"chorus")]))
+    if not latched:
+        raise RuntimeError("No late RAM voice with both hardware send writes")
+    reverb = max(x[0] for x in latched)
+    chorus = max(x[1] for x in latched)
+    print(f"DIRECT_SEND_VOICE_COUNT={len(latched)}; REVERB={reverb}; CHORUS={chorus}")
+    return reverb, chorus
+
+
 def run_child(bundle: Path, seconds: float, reference: bool = False,
               ram_program: int | None = None, parent_work: Path | None = None,
-              effect_reference: bool = False):
+              effect_reference: bool = False, send_reference: int | None = None):
     if os.name != "nt":
         raise RuntimeError("This test must run on Windows x64")
     dll_file, assets = find_private_bundle(bundle)
@@ -246,7 +279,7 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
         if ram_program is not None:
             from MakeRamSampleSf2 import build
             ram_dir = Path(work)
-            (ram_dir / "RAMTEST.SF2").write_bytes(build())
+            (ram_dir / "RAMTEST.SF2").write_bytes(build(wet=send_reference is not None))
         os.environ["EMU8K_TRACE"] = str(trace)
         with os.add_dll_directory(str(dll_file.parent)):
             dll = ctypes.WinDLL(str(dll_file))
@@ -340,6 +373,9 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
                         if effect_reference and not sent_effects and elapsed >= REFERENCE_BOUNDARIES[0]:
                             pending.extend(effect_packets())
                             sent_effects = True
+                        if send_reference is not None and not sent_effects and elapsed >= REFERENCE_BOUNDARIES[0]:
+                            pending.extend((bytes((0xb0,91,send_reference)),bytes((0xb0,93,send_reference))))
+                            sent_effects = True
                         if elapsed >= REFERENCE_BOUNDARIES[1] and not notes_sent[0]:
                             pending.append(bytes((0x90, 60, 100)))
                             notes_sent[0] = True
@@ -387,12 +423,22 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
                             bytes((0x90, 60, 100)), bytes((0x80, 60, 0))]
                 if effect_reference:
                     expected[2:2] = list(effect_packets())
+                if send_reference is not None:
+                    expected[2:2] = [bytes((0xb0,91,send_reference)),bytes((0xb0,93,send_reference))]
                 if delivered != expected:
                     raise RuntimeError('Direct mixer did not deliver complete MIDI sequence')
                 if effect_reference:
                     print("DIRECT_EFFECT_SYSEX_DELIVERED_PASS")
                     if not effect_trace_summary(trace):
                         raise RuntimeError("Original direct guest effect registers missing")
+                if send_reference is not None:
+                    reverb, chorus = send_trace_summary(trace)
+                    print(f"DIRECT_SEND_CC_VALUE={send_reference}")
+                    if send_reference == 0 and (reverb != 0 or chorus != 0):
+                        raise RuntimeError("Original CC91/93 zero does not suppress embedded SF2 sends")
+                    if send_reference == 127 and (reverb == 0 or chorus == 0):
+                        raise RuntimeError("Original CC91/93 maximum did not produce both sends")
+                    print("DIRECT_ORIGINAL_SEND_ENDPOINT_PASS")
                 metrics.report()
                 print('DIRECT_DOSBOX_MIXER_MEASURED; NOT_A_MUSICAL_PASS')
                 return
@@ -416,6 +462,7 @@ def main():
     parser.add_argument("--trace-summary", type=Path)
     parser.add_argument("--ram-program", type=int, choices=(0, 17))
     parser.add_argument("--effect-reference", action="store_true")
+    parser.add_argument("--send-reference", type=int, choices=(0,127))
     parser.add_argument("--seconds", type=float, default=30.)
     parser.add_argument("--child", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--parent-work", type=Path, help=argparse.SUPPRESS)
@@ -426,6 +473,8 @@ def main():
         return
     if opt.bundle is None:
         parser.error("--bundle required")
+    if opt.send_reference is not None and (not opt.reference or opt.ram_program != 0 or opt.effect_reference):
+        parser.error("--send-reference requires --reference --ram-program 0")
     if opt.effect_reference and (not opt.reference or opt.ram_program is not None):
         parser.error("--effect-reference requires --reference and no RAM fixture")
     if opt.ram_program is not None and not opt.reference:
@@ -433,7 +482,7 @@ def main():
     if not (5 <= opt.seconds <= 120):
         parser.error("--seconds must be 5..120")
     if opt.child:
-        run_child(opt.bundle, opt.seconds, opt.reference, opt.ram_program, opt.parent_work, opt.effect_reference)
+        run_child(opt.bundle, opt.seconds, opt.reference, opt.ram_program, opt.parent_work, opt.effect_reference, opt.send_reference)
         return
     # A native crash or hang must not terminate the controlling test process.
     command = [sys.executable, str(Path(__file__).resolve()), "--child",
@@ -444,6 +493,8 @@ def main():
         command.append('--reference')
     if opt.effect_reference:
         command.append("--effect-reference")
+    if opt.send_reference is not None:
+        command.extend(("--send-reference",str(opt.send_reference)))
     if opt.ram_program is not None:
         command.extend(('--ram-program', str(opt.ram_program)))
     with tempfile.TemporaryDirectory(prefix="awe64_private_trace_") as work:

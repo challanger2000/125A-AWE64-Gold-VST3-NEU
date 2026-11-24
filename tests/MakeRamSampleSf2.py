@@ -40,7 +40,7 @@ def shdr(label, start, end, ls, le, rate, pitch, sample_type):
                        rate, pitch, 0, 0, sample_type)
 
 
-def build():
+def build(wet=False):
     samples = []
     headers = []
     for label, period, count in (("RAM 441 Hz", 100, 4000),
@@ -56,6 +56,10 @@ def build():
                       chunk(b"isng", b"EMU8000\0"),
                       chunk(b"INAM", b"125A RAM sample test\0\0"))
     sdta = list_chunk(b"sdta", chunk(b"smpl", pcm))
+    # Deliberately high embedded sends to test whether the original CC91/93
+    # zero setting truly suppresses all hardware sends, not merely an offset.
+    send = gen(15,1000) + gen(16,1000) if wet else b""
+    instruments = 5 if wet else 3
     pdta = list_chunk(
         b"pdta",
         chunk(b"phdr", phdr("RAM 441 Hz", 0, 0) +
@@ -64,10 +68,10 @@ def build():
         chunk(b"pmod", bytes(10)),
         chunk(b"pgen", gen(41, 0) + gen(41, 1) + gen(0, 0)),
         chunk(b"inst", inst("RAM 441 Hz", 0) + inst("RAM 735 Hz", 1) + inst("EOI", 2)),
-        chunk(b"ibag", struct.pack("<6H", 0, 0, 3, 0, 6, 0)),
+        chunk(b"ibag", struct.pack("<6H", 0, 0, instruments, 0, instruments*2, 0)),
         chunk(b"imod", bytes(10)),
-        chunk(b"igen", gen(38, -2400) + gen(54, 1) + gen(53, 0) +
-              gen(38, -2400) + gen(54, 1) + gen(53, 1) + gen(0, 0)),
+        chunk(b"igen", send + gen(38, -2400) + gen(54, 1) + gen(53, 0) +
+              send + gen(38, -2400) + gen(54, 1) + gen(53, 1) + gen(0, 0)),
         chunk(b"shdr", b"".join(headers) +
               shdr("EOS", len(samples), len(samples), len(samples),
                    len(samples), 0, 0, 0)))
