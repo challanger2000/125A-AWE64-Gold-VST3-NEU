@@ -12,5 +12,11 @@ class MpuComTests(unittest.TestCase):
         self.assertIn(bytes([0xb0,0x3f,0xee]),b)
         self.assertIn(bytes([0xb8,0x00,0x4c,0xcd,0x21]),b)
         self.assertNotIn(b"DEMO.EXE",b)
+    def test_variable_length_uart_probe(self):
+        b=build_probe(33)
+        self.assertEqual(b[-33:],bytes(33))
+        self.assertIn(bytes([0xbd,33,0]),b)
+        self.assertIn(bytes([0xb4,0x40,0xb9,33,0]),b)
+        with self.assertRaises(ValueError):build_probe(65)
 if __name__=="__main__":
     unittest.main()

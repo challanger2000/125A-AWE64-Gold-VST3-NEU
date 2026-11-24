@@ -13,7 +13,12 @@ def run_child(dllpath):
     os.environ['SDL_VIDEODRIVER']="dummy"
     with tempfile.TemporaryDirectory(prefix="awe64-original-mpu-") as tmp:
         folder=pathlib.Path(tmp)
-        (folder/"MPUPROBE.COM").write_bytes(build_probe())
+        packets = [bytes.fromhex("b00000"), bytes.fromhex("c000"),
+                   bytes.fromhex("f041104212400130050af7"),
+                   bytes.fromhex("f0411042124001380700f7"),
+                   bytes.fromhex("903c64"), bytes.fromhex("803c00")]
+        expected = b"".join(packets)
+        (folder/"MPUPROBE.COM").write_bytes(build_probe(len(expected)))
         with os.add_dll_directory(str(dllpath.parent)):
             dll=ctypes.WinDLL(str(dllpath))
             register=dll.AWE64_HostRegisterMidi
@@ -22,13 +27,16 @@ def run_child(dllpath):
             register.argtypes=[ctypes.c_void_p,fn]
             register.restype=None
             called=[]
-            expected=b"\x90\x3c\x64"  # NoteOn ch0 note60 velocity100
+            # Includes two full Creative effect messages and adjacent MIDI.
+            # 33 bytes exceed the real 32-byte UART FIFO.
             @fn
             def feed(ctx,buffer,limit):
-                if limit<3 or called:return 0
-                for i,x in enumerate(expected):buffer[i]=x
+                if len(called)>=len(packets):return 0
+                packet=packets[len(called)]
+                if limit<len(packet):return 0
+                for i,x in enumerate(packet):buffer[i]=x
                 called.append(1)
-                return len(expected)
+                return len(packet)
             register(None,feed)
             try:
                 start=dll.AWE64_StartGuest
@@ -49,8 +57,9 @@ def run_child(dllpath):
                 if actual!=expected:
                     raise RuntimeError("MPU401 guest received "+actual.hex()+
                                        ", expected "+expected.hex())
-                if len(called)!=1:raise RuntimeError("Real host MIDI pull was not consumed exactly once")
+                if len(called)!=len(packets):raise RuntimeError("Real host MIDI packet count mismatch")
                 print("ORIGINAL_MPU401_16BIT_GUEST_MIDI=903c64",flush=True)
+                print("ORIGINAL_MPU401_16BIT_GUEST_SYSEX_BYTE_EXACT_PASS",flush=True)
             finally:
                 register(None,fn())  # deregister without leaving Python callback alive
 
@@ -61,7 +70,7 @@ def run_parent(dllpath):
     print("CHILD RETURN:",result.returncode)
     print("CHILD STDOUT:",result.stdout[-4500:])
     print("CHILD STDERR:",result.stderr[-4500:])
-    if result.returncode or "ORIGINAL_MPU401_16BIT_GUEST_MIDI=903c64" not in result.stdout:
+    if result.returncode or "ORIGINAL_MPU401_16BIT_GUEST_SYSEX_BYTE_EXACT_PASS" not in result.stdout:
         raise SystemExit("Real 16-bit MPU401 MIDI-to-DOS regression FAILED")
 
 if __name__=="__main__":

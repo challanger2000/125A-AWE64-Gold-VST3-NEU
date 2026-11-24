@@ -201,8 +201,34 @@ class MixerWindowMetrics:
             print(f"REFERENCE_{name}_PEAK={self.peak[i] / 32768:.9f}")
 
 
+def effect_packets():
+    return (bytes.fromhex("f041104212400130050af7"),
+            bytes.fromhex("f0411042124001380700f7"))
+
+
+def effect_trace_summary(trace):
+    # The original Creative library uses these INIT1/INIT3 locations.
+    # Compare the same late register signatures as the native VST3 gate.
+    selected = -1
+    counts = [0, 0]
+    with trace.open(encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            match = re.fullmatch(r"(\d+) ([0-9A-Fa-f]{3,4}) ([0-9A-Fa-f]{4})",raw.strip())
+            if not match:
+                continue
+            frame, port, value = int(match[1]),int(match[2],16),int(match[3],16)
+            if port == 0xe22:
+                selected = value & 255
+            elif frame > 176400 and port == 0xa20:
+                counts[0] += selected == 0x43 and value == 0xb4ff
+                counts[1] += selected == 0x69 and value == 0xe6c0
+    print(f"DIRECT_EFFECT_TRACE_PLATE={counts[0]}; FEEDBACK={counts[1]}")
+    return all(counts)
+
+
 def run_child(bundle: Path, seconds: float, reference: bool = False,
-              ram_program: int | None = None, parent_work: Path | None = None):
+              ram_program: int | None = None, parent_work: Path | None = None,
+              effect_reference: bool = False):
     if os.name != "nt":
         raise RuntimeError("This test must run on Windows x64")
     dll_file, assets = find_private_bundle(bundle)
@@ -300,6 +326,7 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
             last_note = 0.0
             isolated_seen = False
             sent_off = False
+            sent_effects = False
             try:
                 while time.monotonic() - started < seconds:
                     if not thread.is_alive():
@@ -310,6 +337,9 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
                     # Repeat after startup because authentic SF2 loading can
                     # consume variable emulated DOS time. Use CC0, not CC32.
                     if reference:
+                        if effect_reference and not sent_effects and elapsed >= REFERENCE_BOUNDARIES[0]:
+                            pending.extend(effect_packets())
+                            sent_effects = True
                         if elapsed >= REFERENCE_BOUNDARIES[1] and not notes_sent[0]:
                             pending.append(bytes((0x90, 60, 100)))
                             notes_sent[0] = True
@@ -355,8 +385,14 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
             if reference:
                 expected = [bytes((0xb0, 0, 0)), bytes((0xc0, ram_program or 0)),
                             bytes((0x90, 60, 100)), bytes((0x80, 60, 0))]
+                if effect_reference:
+                    expected[2:2] = list(effect_packets())
                 if delivered != expected:
                     raise RuntimeError('Direct mixer did not deliver complete MIDI sequence')
+                if effect_reference:
+                    print("DIRECT_EFFECT_SYSEX_DELIVERED_PASS")
+                    if not effect_trace_summary(trace):
+                        raise RuntimeError("Original direct guest effect registers missing")
                 metrics.report()
                 print('DIRECT_DOSBOX_MIXER_MEASURED; NOT_A_MUSICAL_PASS')
                 return
@@ -379,6 +415,7 @@ def main():
     parser.add_argument("--bundle", type=Path)
     parser.add_argument("--trace-summary", type=Path)
     parser.add_argument("--ram-program", type=int, choices=(0, 17))
+    parser.add_argument("--effect-reference", action="store_true")
     parser.add_argument("--seconds", type=float, default=30.)
     parser.add_argument("--child", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--parent-work", type=Path, help=argparse.SUPPRESS)
@@ -389,12 +426,14 @@ def main():
         return
     if opt.bundle is None:
         parser.error("--bundle required")
+    if opt.effect_reference and (not opt.reference or opt.ram_program is not None):
+        parser.error("--effect-reference requires --reference and no RAM fixture")
     if opt.ram_program is not None and not opt.reference:
         parser.error("--ram-program requires --reference")
     if not (5 <= opt.seconds <= 120):
         parser.error("--seconds must be 5..120")
     if opt.child:
-        run_child(opt.bundle, opt.seconds, opt.reference, opt.ram_program, opt.parent_work)
+        run_child(opt.bundle, opt.seconds, opt.reference, opt.ram_program, opt.parent_work, opt.effect_reference)
         return
     # A native crash or hang must not terminate the controlling test process.
     command = [sys.executable, str(Path(__file__).resolve()), "--child",
@@ -403,6 +442,8 @@ def main():
         if opt.seconds < 20:
             parser.error('--reference requires at least 20 seconds')
         command.append('--reference')
+    if opt.effect_reference:
+        command.append("--effect-reference")
     if opt.ram_program is not None:
         command.extend(('--ram-program', str(opt.ram_program)))
     with tempfile.TemporaryDirectory(prefix="awe64_private_trace_") as work:

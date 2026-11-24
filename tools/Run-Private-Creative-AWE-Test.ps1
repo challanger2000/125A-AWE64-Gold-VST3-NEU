@@ -226,6 +226,9 @@ try {
         [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
         [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
     }
+    # Direct reference: use exactly the same original GS macros without VST3.
+    & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds --reference --effect-reference
+    $directEffectExit = $LASTEXITCODE
     # Genuine Creative DOS SysEx type change: observe specific physical
     # EMU8000 register writes, not merely queued host messages.
     $effectTrace = Join-Path $temporary 'original_effect_types.trace'
@@ -268,6 +271,7 @@ try {
     & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds
     if ($LASTEXITCODE -ne 0) { throw 'Private Creative ROM/SF2/DEMO DLL-level PCM gate FAILED.' }
     if ($ramFailures.Count -ne 0) { throw ("RAM gates failed: " + ($ramFailures -join "; ")) }
+    if ($directEffectExit -ne 0) { throw "Direct original Creative effect gate failed." }
     # Only announce final PASS after BOTH independent tests and all original
     # owner SHA-256/Git-blob and EMU8000 trace gates have actually succeeded.
     Write-Host "PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS; PORT_WRITES=$writes; ORIGINAL_ROM=VERIFIED; MIDI_NOTE_ON_OFF=VERIFIED"

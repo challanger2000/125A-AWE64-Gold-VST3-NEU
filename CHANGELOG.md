@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 24.11.2026 — SysEx-Fehler am Originalpfad isolieren
+
+- Windows 45296517847 bestätigt die RAM-Programme 0/17 und 48-kHz-Audiowiedergabe; keine Änderung dieser bestandenen Pfade. Original-Effekt-Recall funktioniert, aber beide späten INIT-Registersignaturen fehlen.
+- Originale Creative ADIP-DOS-API dokumentiert beide GS-Makros; die originale SF2LIB/RAWE32S.LIB enthält tatsächlich die SysEx-Erkennung sowie Reverb-/Chorus-Funktionen. Kein Ersatz-DSP und keine Änderung des Originaltreibers.
+- Neuer bytegenauer 33-Byte-UART-Test (Bank/Programm, zwei 11-Byte-Effekt-SysEx, NoteOn/Off), größer als der 32-Byte-FIFO; prüft vollständige Übertragung einschließlich Backpressure. Zusätzlich direkter Original-DLL-Vergleich derselben Effektbefehle ohne VST3/Controller: vollständige Paketfolge und originale späte INIT1/INIT3-Signaturen. Beide Gates bleiben verbindlich, kein Freigabetrick. Windows-Ergebnis offen.
+
 ## 24.11.2026 — Windows-RAM- und Hostrate-Nachweis
 
 - Windows 45296517847: Original-RAM-Referenz und VST3-Programme 0/17 bei 44,1 kHz sowie Programm 17 bei 48 kHz mit erwarteter Frequenz nachgewiesen; 48-kHz-Leistungsverhältnis >223. Temporäre Referenzbereinigung erfolgreich. Effektregisterprüfung weiterhin FAIL (Plate=False, Feedback=False).

@@ -49,7 +49,9 @@ class Asm:
                 self.b[pos:pos+2]=(delta&65535).to_bytes(2,"little")
         return bytes(self.b)
 
-def build_probe():
+def build_probe(length=3):
+    if not 1 <= length <= 64:
+        raise ValueError('Invalid probe byte count')
     a=Asm()
     a.put(0x0e,0x1f)       # PUSH CS / POP DS
     a.put(0xba,0x31,0x03)  # MOV DX, 0331h
@@ -65,7 +67,7 @@ def build_probe():
     a.put(0x3c,0xfe)       # CMP AL, MPU_ACK_OK
     a.jr(0x75,"write_file")
     a.put(0xbe);a.word("buffer") # MOV SI,buffer
-    a.put(0xbd,0x03,0x00)  # MOV BP,3
+    a.put(0xbd,length,0x00)  # MOV BP,3
     a.mark("next_byte")
     a.put(0xba,0x31,0x03)  # MOV DX,331
     a.put(0xb9,0xff,0xff)  # MOV CX,ffff
@@ -84,7 +86,7 @@ def build_probe():
     a.put(0xcd,0x21)            # INT 21h: create
     a.jr(0x72,"exit")           # JC
     a.put(0x89,0xc3)            # MOV BX,AX (file handle)
-    a.put(0xb4,0x40,0xb9,0x03,0x00) # AH=write CX=3
+    a.put(0xb4,0x40,0xb9,length,0x00) # AH=write CX=3
     a.put(0xba);a.word("buffer")
     a.put(0xcd,0x21)            # INT 21h: write
     a.put(0xb4,0x3e,0xcd,0x21) # close
@@ -93,7 +95,7 @@ def build_probe():
     a.mark("filename")
     a.put(*b"MIDI.BIN\0")
     a.mark("buffer")
-    a.put(0,0,0)
+    a.put(*([0]*length))
     data=a.build()
     if len(data)>=512:raise AssertionError("MPU test too big")
     return data
