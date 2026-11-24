@@ -68,8 +68,8 @@ def find_private_bundle(bundle: Path):
     return runtime, assets
 
 
-def guest_arguments(assets: Path):
-    return [
+def guest_arguments(assets: Path, ram_dir: Path | None = None):
+    args = [
         "AWE64DOSBoxRuntime", "-noconfig", "-nogui", "-nomenu",
         "-set", "sblaster sbtype=sbawe",
         # This is a HARD original-EMU8000 sound test. Exclude other DOSBox
@@ -85,6 +85,10 @@ def guest_arguments(assets: Path):
         "-c", "c:",
         "-c", "DEMO.EXE /SBK:SYNTHGM.SF2",
     ]
+    if ram_dir is not None:
+        args[-2:] = ["-c", 'mount d "' + str(ram_dir) + '"',
+                     "-c", r"DEMO.EXE /SBK:D:\RAMTEST.SF2 > D:\RAMBOOT.LOG"]
+    return args
 
 
 def probe_midi_sequence():
@@ -119,6 +123,55 @@ def inspect_trace(trace: Path) -> tuple[int, int]:
     return writes, len(ports)
 
 
+
+def summarize_ram_trace(trace: Path):
+    """Print aggregate DRAM write evidence; never print trace data or PCM.
+
+    EMU8000 register 1/voice 26 (selector 0x3a), data ports A20/A22
+    are SMLD/SMRD. Compare contiguous uploaded words with only our own
+    generated PCM, ignoring other hardware initialization traffic.
+    """
+    from MakeRamSampleSf2 import build
+    import struct
+    data = build()
+    start = data.index(b"smpl")
+    size = struct.unpack_from("<I", data, start + 4)[0]
+    samples = struct.unpack_from("<" + "H" * (size // 2), data, start + 8)
+    expected = (samples[0:100], samples[4046:4106])
+    matcher = re.compile(r"^(\d+) ([0-9A-Fa-f]{3,4}) ([0-9A-Fa-f]{4})$")
+    selector = -1
+    writes = nonzero = note_address_writes = 0
+    window = deque(maxlen=100)
+    matches = [0, 0]
+    addresses = {}
+    with trace.open(encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            m = matcher.fullmatch(raw.strip())
+            if not m:
+                continue
+            frame, port, word = int(m[1]), int(m[2], 16), int(m[3], 16)
+            if port == 0xe22:
+                selector = word & 255
+            elif selector == 0x3a and port in (0xa20, 0xa22):
+                writes += 1
+                nonzero += word != 0
+                window.append(word)
+                for i, signature in enumerate(expected):
+                    if len(window) >= len(signature) and word == signature[-1]:
+                        if tuple(window)[-len(signature):] == signature:
+                            matches[i] += 1
+            elif 0 <= selector < 32 and port in (0xa20, 0xa22):
+                if port == 0xa20:
+                    addresses[selector] = word
+                elif selector in addresses:
+                    address = ((word & 255) << 16) | addresses[selector]
+                    if frame > 176400 and address >= 0x200000:
+                        note_address_writes += 1
+    print(f"RAM_TRACE_DATA_WRITES={writes}; NONZERO={nonzero}; "
+          f"MATCH_441={matches[0]}; MATCH_735={matches[1]}; "
+          f"LATE_RAM_CCCA_WRITES={note_address_writes}")
+
+
 # Same nominal schedule as native VST3 host. Wall-clock windows,
 # not a sample-aligned or bit-identical oracle.
 REFERENCE_BOUNDARIES = tuple(n * 512 / 44100 for n in (800, 880, 980, 1230))
@@ -148,7 +201,8 @@ class MixerWindowMetrics:
             print(f"REFERENCE_{name}_PEAK={self.peak[i] / 32768:.9f}")
 
 
-def run_child(bundle: Path, seconds: float, reference: bool = False):
+def run_child(bundle: Path, seconds: float, reference: bool = False,
+              ram_program: int | None = None):
     if os.name != "nt":
         raise RuntimeError("This test must run on Windows x64")
     dll_file, assets = find_private_bundle(bundle)
@@ -159,6 +213,11 @@ def run_child(bundle: Path, seconds: float, reference: bool = False):
     os.environ.pop("SDL_AUDIODRIVER", None)
     with tempfile.TemporaryDirectory(prefix="awe64_private_trace_") as work:
         trace = Path(work) / "emu8k.trace"
+        ram_dir = None
+        if ram_program is not None:
+            from MakeRamSampleSf2 import build
+            ram_dir = Path(work)
+            (ram_dir / "RAMTEST.SF2").write_bytes(build())
         os.environ["EMU8K_TRACE"] = str(trace)
         with os.add_dll_directory(str(dll_file.parent)):
             dll = ctypes.WinDLL(str(dll_file))
@@ -226,13 +285,13 @@ def run_child(bundle: Path, seconds: float, reference: bool = False):
 
             register_midi(None, read_midi)
             register_pcm(None, read_pcm)
-            args = [s.encode("mbcs") for s in guest_arguments(assets)]
+            args = [s.encode("mbcs") for s in guest_arguments(assets, ram_dir)]
             argv = (ctypes.c_char_p * (len(args) + 1))(*args, None)
             guest_result = []
             thread = threading.Thread(
                 target=lambda: guest_result.append(start(len(args), argv)), daemon=True)
             if reference:
-                pending.extend((bytes((0xb0, 0, 0)), bytes((0xc0, 0))))
+                pending.extend((bytes((0xb0, 0, 0)), bytes((0xc0, ram_program or 0))))
             started = time.monotonic()
             thread.start()
             last_note = 0.0
@@ -274,6 +333,13 @@ def run_child(bundle: Path, seconds: float, reference: bool = False):
                 raise RuntimeError("DOSBox mixer failed internal SDL2 dummy-only isolation")
             if guest_result != [0]:
                 raise RuntimeError("DOSBox/Creative guest failed to exit normally: " + repr(guest_result))
+            if ram_program is not None:
+                print(f"DIRECT_RAM_PROGRAM={ram_program}")
+                summarize_ram_trace(trace)
+                boot = ram_dir / "RAMBOOT.LOG"
+                if boot.exists():
+                    log = boot.read_bytes().upper()
+                    print("DIRECT_RAM_CREATIVE_ERROR=" + str(b"ERROR" in log))
             writes, used_ports = inspect_trace(trace)
             if writes < 16 or used_ports < 2:
                 raise RuntimeError(
@@ -284,7 +350,7 @@ def run_child(bundle: Path, seconds: float, reference: bool = False):
             if pcm_frames[0] == 0:
                 raise RuntimeError("No original DOSBox PCM callback frames")
             if reference:
-                expected = [bytes((0xb0, 0, 0)), bytes((0xc0, 0)),
+                expected = [bytes((0xb0, 0, 0)), bytes((0xc0, ram_program or 0)),
                             bytes((0x90, 60, 100)), bytes((0x80, 60, 0))]
                 if delivered != expected:
                     raise RuntimeError('Direct mixer did not deliver complete MIDI sequence')
@@ -307,15 +373,24 @@ def run_child(bundle: Path, seconds: float, reference: bool = False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bundle", type=Path, required=True)
+    parser.add_argument("--bundle", type=Path)
+    parser.add_argument("--trace-summary", type=Path)
+    parser.add_argument("--ram-program", type=int, choices=(0, 17))
     parser.add_argument("--seconds", type=float, default=30.)
     parser.add_argument("--child", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--reference", action="store_true", help="Measure direct mixer without VST3")
     opt = parser.parse_args()
+    if opt.trace_summary is not None:
+        summarize_ram_trace(opt.trace_summary)
+        return
+    if opt.bundle is None:
+        parser.error("--bundle required")
+    if opt.ram_program is not None and not opt.reference:
+        parser.error("--ram-program requires --reference")
     if not (5 <= opt.seconds <= 120):
         parser.error("--seconds must be 5..120")
     if opt.child:
-        run_child(opt.bundle, opt.seconds, opt.reference)
+        run_child(opt.bundle, opt.seconds, opt.reference, opt.ram_program)
         return
     # A native crash or hang must not terminate the controlling test process.
     command = [sys.executable, str(Path(__file__).resolve()), "--child",
@@ -324,6 +399,8 @@ def main():
         if opt.seconds < 20:
             parser.error('--reference requires at least 20 seconds')
         command.append('--reference')
+    if opt.ram_program is not None:
+        command.extend(('--ram-program', str(opt.ram_program)))
     completed = subprocess.run(
         command, capture_output=True, text=True, check=False,
         timeout=opt.seconds + 25)

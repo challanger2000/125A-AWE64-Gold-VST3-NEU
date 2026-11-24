@@ -183,6 +183,13 @@ try {
     & python (Join-Path $root 'tests/MakeRamSampleSf2.py') --output $ramFixture
     if ($LASTEXITCODE -ne 0) { throw 'RAM fixture creation failed.' }
     $ramHash = (Get-FileHash -Algorithm SHA256 $ramFixture).Hash
+    $ramFailures = @()
+    # Measure the same self-authored SF2 in the original DLL/Creative guest
+    # directly, without IComponent, state handling or VST3 PCM conversion.
+    foreach ($program in @(0,17)) {
+        & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds --reference --ram-program $program
+        if ($LASTEXITCODE -ne 0) { $ramFailures += "direct RAM program $program" }
+    }
     $previousRamHz = [Environment]::GetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ','Process')
     $previousHostRate = [Environment]::GetEnvironmentVariable('AWE64_TEST_HOST_RATE','Process')
     try {
@@ -198,8 +205,15 @@ try {
             [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', '1', 'Process')
             [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $ramBoot, 'Process')
             & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
-            if ($LASTEXITCODE -ne 0) { throw ("RAM sample spectral gate failed: " + $hz) }
-            if (-not (Test-Path -PathType Leaf $ramTrace)) { throw 'RAM sample EMU8000 trace absent.' }
+            $ramExit = $LASTEXITCODE
+            if (Test-Path -PathType Leaf $ramTrace) {
+                & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --trace-summary $ramTrace
+                if ($LASTEXITCODE -ne 0) { $ramFailures += "trace summary ${hz}:${rate}" }
+            } else { $ramFailures += "missing trace ${hz}:${rate}" }
+            if ($ramExit -ne 0) {
+                $ramFailures += "VST3 RAM spectral ${hz}:${rate}"
+                continue
+            }
             if ((Get-FileHash -Algorithm SHA256 $ramFixture).Hash -ne $ramHash) { throw 'RAM fixture modified.' }
             Write-Host "RAM_SAMPLE_PROGRAM_SPECTRAL_PASS; HZ=$hz; HOST_RATE=$rate; SOURCE_UNCHANGED"
         }
@@ -252,6 +266,7 @@ try {
     # Independent secondary original-Creative test in an isolated DLL child.
     & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds
     if ($LASTEXITCODE -ne 0) { throw 'Private Creative ROM/SF2/DEMO DLL-level PCM gate FAILED.' }
+    if ($ramFailures.Count -ne 0) { throw ("RAM gates failed: " + ($ramFailures -join "; ")) }
     # Only announce final PASS after BOTH independent tests and all original
     # owner SHA-256/Git-blob and EMU8000 trace gates have actually succeeded.
     Write-Host "PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS; PORT_WRITES=$writes; ORIGINAL_ROM=VERIFIED; MIDI_NOTE_ON_OFF=VERIFIED"

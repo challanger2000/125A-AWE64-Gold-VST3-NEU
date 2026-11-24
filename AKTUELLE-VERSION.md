@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — RAM-Fehler isolieren, Original-Effektprüfung unabhängig ausführen
+
+- Windows 45292853463: Original-ROM-GM und externer ROM-GM-Bankwechsel erneut nachgewiesen (Held-RMS 0,00845848 bzw. 0,00839579). Erste selbst erzeugte RAM-SF2 (441 Hz) dagegen **FAIL**, Held-RMS 0,0000127707, 0 aktive Notenblöcke. Keine Gleichsetzung von ROM-Bankwechsel mit RAM-Klang.
+- Neuer direkter Original-DLL-Referenztest derselben selbst erzeugten SF2 für Programme 0/17, unabhängig von VST3-State und Hostrate. Aggregierte EMU8000-DRAM-Datenregister-, Eigen-PCM-Signatur- und späte RAM-Adress-Schreibdiagnose, keine Originaldaten, Roh-Traces oder Audio veröffentlichen. RAM-Fälle werden getrennt ausgewertet; Fehler blockieren die unabhängige Original-Effektprüfung nicht und verhindern weiterhin den Gesamt-PASS.
+- Portable Hostrate-/SysEx-Tests und Version 45293022107/45293391865/45293391664 PASS. Windows 45293391812 noch ausstehend. Keine Klangbehauptung ohne Auswertung; unveränderte Chipemulation.
+
 ## 24.11.2026 — Original-Creative-Reverb-/Chorustyp über DOS-SysEx
 
 - Originales ADIP v3.01, Part II, awe32Sysex (https://doczz.net/doc/8351592/developer-s-information-pack): dokumentiert 11-Byte-GS-Effektvariationsbefehle; die unveränderte Creative-DEMO empfängt SysEx bereits. Erweiterung ausschließlich der Host-MIDI-Transportlänge/FIFO: vollständige Nachricht oder warten, keine Teilpakete, normale MIDI-Nachrichten unverändert.
