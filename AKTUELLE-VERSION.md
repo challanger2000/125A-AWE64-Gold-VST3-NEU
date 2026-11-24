@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Validator nach Stop-Korrektur erneut Timeout; Kurzdiagnose statt Gesamtwiederholung
+
+- [Windows 45470071317](../../actions/runs/45470071317) FAIL auf ad4b2905 ausschließlich wegen erneutem 8-Minuten-Validator-Timeout. Neu kompilierte DLL, Stop/Join, MPU/PCM, Negativkontrolle, vollständige Creative-Archivprüfung und P165-Lifecycle jeweils SUCCESS. Transport 45470071331 und Version 45470071262 SUCCESS. Die Korrektur hat den Gesamt-Validator noch nicht nachweislich repariert; das gepufferte Protokoll zeigt nicht, ob derselbe oder ein anderer Fehler vorliegt.
+- Nur den isolierten Validator-Diagnoseworkflow erneut auslösen; er protokolliert den aktuellen Commit und die tatsächlichen Validator-Ausgaben live. Keine erneute Originalklangprüfung, keine Produktänderung auf Verdacht, kein Release. Der vollständige Validator bleibt Pflicht.
+
 ## 24.11.2026 — Validator-Reaktivierung: DOSBox-Abbruchgrenze korrigiert
 
 - [Diagnose 45467327483](../../actions/runs/45467327483) FAIL im ersten `Valid State Transition 32bits`: Parameter-/MIDI-/Unit-Prüfungen bestanden, beim zweiten DOSBox-Start `DOSBoxMenu::alloc_item() name '_separator_' already taken`, danach Timeout. Der gepinnte Steinberg-Test deaktiviert unmittelbar nach setActive(true), wiederholt viermal und terminiert/initialisiert neu.

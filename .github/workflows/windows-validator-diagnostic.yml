@@ -82,6 +82,8 @@ jobs:
         shell: pwsh
         timeout-minutes: 5
         run: |
+          Write-Host "VALIDATOR_DIAGNOSTIC_COMMIT=$env:GITHUB_SHA"
+          # Keep live output visible even if an upstream lifecycle call blocks.
           $validator=(Resolve-Path 'build-vst3/bin/Release/validator.exe').Path
           $bundle=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3').Path
           $env:SDL_AUDIODRIVER='dummy'
