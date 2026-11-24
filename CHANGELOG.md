@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Validator-Reaktivierung: DOSBox-Abbruchgrenze korrigiert
+
+- [Diagnose 45467327483](../../actions/runs/45467327483) FAIL im ersten `Valid State Transition 32bits`: Parameter-/MIDI-/Unit-Prüfungen bestanden, beim zweiten DOSBox-Start `DOSBoxMenu::alloc_item() name '_separator_' already taken`, danach Timeout. Der gepinnte Steinberg-Test deaktiviert unmittelbar nach setActive(true), wiederholt viermal und terminiert/initialisiert neu.
+- Konkrete Quellabweichung: unser Stop-Hook war auch während DOSBox-Initialisierung und -Abbau in GFX_Events aktiv, außerhalb des originalen DOSBOX_RunMachine/kill-switch try/catch. Abbruch wird jetzt bis zur originalen sicheren Abbruchgrenze vorgemerkt, dort einschließlich vorzeitiger Stop-Anforderung verarbeitet; RAII deaktiviert den Hook während Abbau. Kein Reset der Stop-Anforderung beim Eintritt. Zusätzlich Diagnose für nach FreeLibrary noch gemappte DLL. Keine Veränderung am EMU8000-Kern oder der P165-Grafik. Ursache des verbliebenen Modulzustands muss im Windows-Lauf bestätigt werden, kein Validator-PASS. Patch-Regression aktualisiert.
+
 ## 24.11.2026 — Steinberg-Validator: Timeout, isolierter Diagnose-Workflow
 
 - [Windows 45459861521](../../actions/runs/45459861521) FAIL ausschließlich wegen 8-Minuten-Timeout im offiziellen Validator-Schritt. Windows-Build, synthetische Positiv-/Negativkontrollen, vollständige Original-Archivtests und P165-GUI-Lifecycle erneut PASS. Der Validator selbst wurde erfolgreich kompiliert; kein Testresultat und keine belegte Absturzursache. Version 45459861708 SUCCESS.

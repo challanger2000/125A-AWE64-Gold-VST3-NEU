@@ -310,7 +310,19 @@ public:
         if(registerPCM_)registerPCM_(nullptr,nullptr);
         adapter_.reset();
         queues_.reset();
-        if(module_)FreeLibrary(module_);
+        if(module_) {
+            // Diagnose unexpected retained loader references; never force
+            // unload a module owned by another Windows subsystem.
+            const auto handle=module_;
+            FreeLibrary(module_);
+            HMODULE stillLoaded=nullptr;
+            if(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|
+                    GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                    reinterpret_cast<LPCWSTR>(handle),&stillLoaded)) {
+                std::fprintf(stderr,"AWE64_RUNTIME_MODULE_STILL_MAPPED_AFTER_STOP\\n");
+                std::fflush(stderr);
+            }
+        }
         module_=nullptr;
         registerMidi_=nullptr;registerPCM_=nullptr;
         startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;sends_=nullptr;guestClockPcm_=nullptr;

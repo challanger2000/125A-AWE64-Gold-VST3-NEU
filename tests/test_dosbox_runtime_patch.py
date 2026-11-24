@@ -57,7 +57,7 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertLess(r.index('if(mpu.queue_used!=0)return;'),r.index('auto pull=awe64_mpu_pull.load'))
         with self.assertRaises(ValueError):patch.patch_mpu(r)
     def test_guest_entry(self):
-        s='void GFX_Events() {}\n| SDL_WINDOW_SHOWN | (SDL2_resize_enable ? SDL_WINDOW_RESIZABLE : 0)\nint main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {}'
+        s='void GFX_Events() {}\n| SDL_WINDOW_SHOWN | (SDL2_resize_enable ? SDL_WINDOW_RESIZABLE : 0)\nint main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {}\n            DOSBOX_RunMachine();\n        } catch (int x) {'
         r=patch.patch_main(s)
         self.assertIn('AWE64_StartGuest(',r)
         self.assertIn('return main(argc,argv);',r)
@@ -65,7 +65,10 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('| SDL_WINDOW_HIDDEN |',r)
         self.assertNotIn('| SDL_WINDOW_SHOWN |',r)
         self.assertNotIn('awe64_guest_stop.store(false',r)
-        self.assertIn('if(awe64_guest_stop.load',r)
+        self.assertIn('if(awe64_guest_can_stop && awe64_guest_stop.load',r)
+        self.assertIn('AWE64GuestRunScope awe64_run_scope;',r)
+        self.assertIn('if(awe64_guest_stop.load(std::memory_order_acquire))throw(0);',r)
+        self.assertIn('~AWE64GuestRunScope() { awe64_guest_can_stop=false; }',r)
     def test_sdl2_static_library_cannot_supply_dll_crt_entry(self):
         original='#if (!defined(HAVE_LIBC) || defined(__WATCOMC__)) && !defined(SDL_STATIC_LIB)'
         patched=patch.patch_sdl2_static(original)

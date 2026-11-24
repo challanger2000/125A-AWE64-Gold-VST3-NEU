@@ -313,6 +313,14 @@ def patch_main(s):
 #ifdef AWE64_VST3_RUNTIME
 #include <atomic>
 static std::atomic<bool> awe64_guest_stop{false};
+// GFX_Events is also called during initialization and teardown. Throwing
+// there skips the original main() cleanup. Only the original run-machine
+// try/catch is an established safe cancellation boundary.
+static thread_local bool awe64_guest_can_stop=false;
+struct AWE64GuestRunScope {
+    AWE64GuestRunScope() noexcept { awe64_guest_can_stop=true; }
+    ~AWE64GuestRunScope() { awe64_guest_can_stop=false; }
+};
 // Never exit() the DAW process. The emulator thread observes this flag,
 // throws DOSBox-X's existing shutdown signal and releases its own state.
 extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
@@ -328,8 +336,17 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
            '| SDL_WINDOW_HIDDEN | (SDL2_resize_enable ? SDL_WINDOW_RESIZABLE : 0)')
     s=once(s,event,injected+'\n'+event+'''
 #ifdef AWE64_VST3_RUNTIME
-    if(awe64_guest_stop.load(std::memory_order_acquire))throw(0);
+    if(awe64_guest_can_stop && awe64_guest_stop.load(std::memory_order_acquire))throw(0);
 #endif''')
+    # Defer even a stop requested BEFORE main() until original init is
+    # complete and the existing kill-switch handler can perform cleanup.
+    run='            DOSBOX_RunMachine();\n        } catch (int x) {'
+    s=once(s,run,'''
+#ifdef AWE64_VST3_RUNTIME
+            AWE64GuestRunScope awe64_run_scope;
+            if(awe64_guest_stop.load(std::memory_order_acquire))throw(0);
+#endif
+'''+run)
     return s+'''
 #ifdef AWE64_VST3_RUNTIME
 // Must be invoked on a dedicated host-owned worker, inside the VST3 process.
