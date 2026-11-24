@@ -1,5 +1,9 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Gemeinsame P165-Rohregistermathematik lokal geprüft
+
+- Vorläufige gemeinsame Implementierung unter `research/p165-control-port/VoiceOverlay.hpp`, unabhängiger `VoiceOverlayTest.cpp`. Portiert alte P175-Logik auf rohe DOSBox-Registerwörter mit Bitmasken für Trigger/Engine/Release/DMA/Adresse und Filterroute. Lokaler Linux C++17-Test tatsächlich ausgeführt, `-Wall -Wextra -Werror -O2`, alle 65.536 Registerwörter auf neutrale Identität, fünf nichtneutrale Werte auf Masken und Richtung, Endpunkte, monotone Rate/Skalierung, alle 256 dunklen Cutoff-Basen geprüft. Ergebnis `P165_RAW_REGISTER_MATH_PASS`. Kein DOSBox-/VST3-Klangtest, kein Nachweis der sicheren Voice-Schreibgrenze. Noch nicht in Produkt eingebunden; kein neuer Windows-Gesamtlauf.
+
 ## 24.11.2026 — Sustain-PCM PASS; sieben Audio-Unterlaufframes bei 44,1 kHz
 
 - [Windows 45487683372](../../actions/runs/45487683372) auf 97a8eaa0 insgesamt FAIL ausschließlich wegen 7 Unterlaufframes bei 44,1 kHz (9254 gemessene Blöcke, 0 Audio- und MIDI-Drops, Queue-Minimum 121 bei Blockgröße 128, Host-Wakeup-Verzögerung bis 7,62096 ms, keine Callback-Fristüberschreitung). Kein Nachweis für die genaue Ursache oder den Zeitpunkt des Unterlaufs; Host-Jitter ist eine mögliche Erklärung, nicht bewiesen. Striktes Null-Unterlauf-Gate bleibt unverändert.

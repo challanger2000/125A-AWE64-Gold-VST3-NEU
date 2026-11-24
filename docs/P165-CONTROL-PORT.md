@@ -34,3 +34,7 @@ Die Registerbits sind aus dem gepinnten Chipcode nachgewiesen. Insbesondere darf
 4. Ein gebündelter nativer Windows-Lauf: unveränderte Pflichtgates (47 SDK-Tests, Original-PCM, SF2, 128 Cheezoids, Timing, Stabilität, P165), zusätzlich pro Regler echte Register- und PCM-Gegenprobe einschließlich neutraler Referenz, Zwischenwert, Maximalwert, Recall/Automation und MOD RESET. Kein einzelner Windows-Gesamtbuild je Regler. Keine Bezeichnung als fertig, wenn die Regler lediglich Parameterwerte ändern.
 
 Noch offen: sichere konkrete Note-/Voice-Schreibgrenze, alle zehn Implementierungen und neue Windows-Nachweise. Keine Veränderung an der EMU8000-Synthese oder Creative-DEMO-Binärdatei für diesen Quellabgleich.
+
+## Lokaler Mathematik-Nachweis
+
+`research/p165-control-port/VoiceOverlay.hpp` und `VoiceOverlayTest.cpp`: tatsächlich kompiliert und ausgeführt mit `c++ -std=c++17 -Wall -Wextra -Werror -O2 VoiceOverlayTest.cpp -o test && ./test`. PASS über alle 65.536 Registerwörter; keine produktive Anbindung. Test ohne `NDEBUG` ausführen. SHA-256 Header e1b7d59d5af8dcd43580cfc1960bd62dbd01df8994fdbdcaef231f2ad43a8dbb, Test 3a16c51ac6642a2546dcb2167a056e5cad1ed8965794249aa7175ebd44eed4b0. Die mathematische Funktion der Regler ist nur ein Teilnachweis; echter Note-/Release-Kontext und PCM fehlen weiterhin.
