@@ -40,6 +40,9 @@ class DosBoxRuntimeHost final {
     AWE64_RequestStopFn requestStop_=nullptr;
     AWE64_IsGuestMidiReadyFn ready_=nullptr;
     AWE64_SetAbsoluteSendsFn sends_=nullptr;
+    AWE64_SetVoiceControlsFn voiceControls_=nullptr;
+    std::uint64_t lastVoiceLo_=0;
+    unsigned lastVoiceHi_=0;
     AWE64_SetGuestClockPCMFn guestClockPcm_=nullptr;
     bool pcmPrimed_=false;
     unsigned lastSends_=0x10000u;
@@ -178,7 +181,8 @@ public:
         ready_=reinterpret_cast<AWE64_IsGuestMidiReadyFn>(GetProcAddress(module_,"AWE64_IsGuestMidiReady"));
         sends_=reinterpret_cast<AWE64_SetAbsoluteSendsFn>(GetProcAddress(module_,"AWE64_SetAbsoluteSends"));
         guestClockPcm_=reinterpret_cast<AWE64_SetGuestClockPCMFn>(GetProcAddress(module_,"AWE64_SetGuestClockPCM"));
-        if(!registerMidi_||!registerPCM_||!startGuest_||!requestStop_||!ready_||!sends_||!guestClockPcm_) {
+        voiceControls_=reinterpret_cast<AWE64_SetVoiceControlsFn>(GetProcAddress(module_,"AWE64_SetVoiceControls"));
+        if(!registerMidi_||!registerPCM_||!startGuest_||!requestStop_||!ready_||!sends_||!guestClockPcm_||!voiceControls_) {
             stop();return false;
         }
         try {
@@ -275,6 +279,7 @@ public:
             // Two output destinations: original MPU-401 guest input and
             // original DOSBox audio mixer. Do NOT register BEE0 MIDI consumer.
             sends_(0x10000u);lastSends_=0x10000u;
+            voiceControls_(0,0);lastVoiceLo_=0;lastVoiceHi_=0;
             pcmPrimed_=false;
             guestClockPcm_(authenticGuest_?1u:0u);
             registerMidi_(adapter_.get(),&DosBoxHostAdapter::pullMidi);
@@ -324,6 +329,7 @@ public:
         }
         performanceStats_=measurementStarted_=false;
         if(sends_)sends_(0x10000u);
+        if(voiceControls_)voiceControls_(0,0);
         if(guestClockPcm_)guestClockPcm_(0u);
         pcmPrimed_=false;
         authenticGuest_=false;lastSends_=0x10000u;
@@ -346,7 +352,7 @@ public:
         }
         module_=nullptr;
         registerMidi_=nullptr;registerPCM_=nullptr;
-        startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;sends_=nullptr;guestClockPcm_=nullptr;
+        startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;sends_=nullptr;guestClockPcm_=nullptr;voiceControls_=nullptr;
         argvStorage_.clear();
         if(!stagedDirectory_.empty()) {
             std::error_code ec;std::filesystem::remove_all(stagedDirectory_,ec);
@@ -375,6 +381,11 @@ public:
     }
     [[nodiscard]] int guestExitCode() const noexcept {
         return guestExitCode_.load(std::memory_order_acquire);
+    }
+    void setVoiceControls(std::uint64_t lo,unsigned hi) noexcept {
+        if(authenticGuest_&&voiceControls_&&(lo!=lastVoiceLo_||hi!=lastVoiceHi_)){
+            voiceControls_(lo,hi);lastVoiceLo_=lo;lastVoiceHi_=hi;
+        }
     }
     void setAbsoluteSends(unsigned reverb,unsigned chorus) noexcept {
         const unsigned packed=(reverb&255u)|((chorus&255u)<<8);

@@ -16,6 +16,12 @@ using Awe64IOWrite = void (__cdecl *)(void*,unsigned short,unsigned char);
 // Disabled for unchanged original reference and synthetic tests until the
 // real VST3 host publishes an absolute hardware send setting.
 static std::atomic<unsigned> awe64_absolute_sends{0x10000u};
+static std::atomic<uint64_t> awe64_voice_controls_lo{0};
+static std::atomic<unsigned> awe64_voice_controls_hi{0};
+extern "C" __declspec(dllexport) void __cdecl AWE64_SetVoiceControls(uint64_t lo,unsigned hi) noexcept {
+    awe64_voice_controls_lo.store(lo,std::memory_order_release);
+    awe64_voice_controls_hi.store(hi&65535u,std::memory_order_release);
+}
 extern "C" __declspec(dllexport) void __cdecl AWE64_SetAbsoluteSends(
     unsigned packed) noexcept {
     awe64_absolute_sends.store(packed<=0xffffu?packed:0x10000u,
@@ -66,7 +72,8 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_HostRegisterPCM(
 '''
 def patch_emu(s):
     if 'AWE64_HostRegisterIO(' in s:raise ValueError('Already patched EMU8000')
-    s=once(s,'#include <string>','#include <string>\n#ifdef AWE64_VST3_RUNTIME\n#include <atomic>\n#endif')
+    math=(Path(__file__).resolve().parents[1]/"research/p165-control-port/VoiceOverlay.hpp").read_text(encoding="utf-8").replace("#pragma once\\n","",1)
+    s=once(s,'#include <string>','#include <string>\\n#ifdef AWE64_VST3_RUNTIME\\n#include <atomic>\\n'+math+'\\nextern uint64_t AWE64_OverlayMidiContext() noexcept;\\n#endif')
     s=once(s,'class EMU8000_Device {',PORT_BRIDGE+'\nclass EMU8000_Device {')
     anchor='IO_WriteHandleObject WriteHandler[EMU_PORT_GROUPS];'
     s=once(s,anchor,anchor+'\n#ifdef AWE64_VST3_RUNTIME\n'
@@ -81,6 +88,69 @@ def patch_emu(s):
     # documented send bytes through the actual EMU8000 register writer.
     s=once(s,'\t/* Emulated time in chip frames (44100 Hz) since the reset. */',r'''#ifdef AWE64_VST3_RUNTIME
     unsigned appliedSends=0x10000u;
+    uint64_t overlayContext=0;
+    awe64::overlay::Controls voiceControls{};
+    struct FilterBase { uint16_t ifatn=0,pefe=0; bool haveIfatn=false,havePefe=false; };
+    FilterBase filterBases[30]{};
+    void VoiceWrite(Bitu port,Bitu word) {
+        using namespace awe64::overlay;
+        const auto context=AWE64_OverlayMidiContext();
+        if(context!=overlayContext) {
+            overlayContext=context;
+            const auto lo=awe64_voice_controls_lo.load(std::memory_order_acquire);
+            const auto hi=awe64_voice_controls_hi.load(std::memory_order_acquire);
+            for(unsigned i=0;i<8;++i)voiceControls[i]=static_cast<uint8_t>(lo>>(8*i));
+            voiceControls[8]=static_cast<uint8_t>(hi);
+            voiceControls[9]=static_cast<uint8_t>(hi>>8);
+            for(auto& f:filterBases)f=FilterBase{};
+        }
+        const unsigned voice=emu->cur_voice,reg=emu->cur_reg;
+        const unsigned kind=static_cast<unsigned>(context&3u);
+        // Only complete, actually consumed host MIDI packets, during the
+        // synchronous original DEMO handler, and never DMA/reserved voices.
+        const bool musical=kind && voice<30 && !(emu->voice[voice].ccca&0x04000000u);
+        const bool any=std::any_of(voiceControls.begin(),voiceControls.end(),[](uint8_t x){return x!=0;});
+        if(musical&&any) {
+            const bool on=kind==1;
+            const auto w=static_cast<uint16_t>(word);
+            if(port==base+0x400u) {
+                if(on&&reg==4)word=delay(w,voiceControls[0]);
+                if(on&&reg==6)word=delay(w,voiceControls[4]);
+                if(reg==5 && ((on&&!(w&0x8000u)&&!(w&0x80u))||(w&0x8000u)))
+                    word=decaySustainRelease(w,on?voiceControls[1]:0,on?voiceControls[2]:0,voiceControls[3]);
+                if(reg==7 && (on||(w&0x8000u)))
+                    word=decaySustainRelease(w,on?voiceControls[5]:0,on?voiceControls[6]:0,voiceControls[7]);
+            } else if(on&&port==base+0x402u) {
+                if(reg==4)word=attack(w,voiceControls[0]);
+                if(reg==6)word=attack(w,voiceControls[4]);
+                if(reg==0&&!(w&0x0400u))word=resonance(w,voiceControls[9]);
+            } else if(on&&port==base+0x800u&&(reg==1||reg==2)) {
+                // Pair original IFATN/PEFE words in either driver order.
+                // Apply only once both have been written in this NoteOn.
+                auto& f=filterBases[voice];
+                if(reg==1){f.ifatn=w;f.haveIfatn=true;}
+                else {f.pefe=w;f.havePefe=true;}
+                if(f.haveIfatn&&f.havePefe) {
+                    const auto adjusted=filter(f.ifatn,f.pefe,voiceControls);
+                    const unsigned otherReg=reg==1?2u:1u;
+                    const uint16_t other=reg==1?adjusted.pefe:adjusted.ifatn;
+                    const uint16_t before=reg==1?emu->voice[voice].pefe:emu->voice[voice].ifatn;
+                    if(other!=before) {
+                        AbsoluteSendWrite(base+0x802u,(otherReg<<5)|voice);
+                        AbsoluteSendWrite(base+0x800u,other);
+                        AbsoluteSendWrite(base+0x802u,(reg<<5)|voice);
+                    }
+                    word=reg==1?adjusted.ifatn:adjusted.pefe;
+                } else if(reg==1) {
+                    // Standalone cutoff still works if original driver
+                    // does not subsequently write a modulation route.
+                    Controls cutoffOnly{};cutoffOnly[8]=voiceControls[8];
+                    word=filter(w,0,cutoffOnly).ifatn;
+                }
+            }
+        }
+        AbsoluteSendWrite(port,AbsoluteSendWord(port,word));
+    }
     void AbsoluteSendWrite(Bitu port,Bitu value) {
         Trace(port,value);
         emu8k_outw((uint16_t)port,(uint16_t)value,emu);
@@ -141,6 +211,22 @@ def patch_emu(s):
         }
     }
 #endif'''.replace(r'\t','\t'))
+    # The previous send-only rewrite is superseded by the same original
+    # word writer with voice control handling. Split dwords in bus order.
+    start=changed.index("#ifdef AWE64_VST3_RUNTIME")
+    end=changed.index("#endif",start)+len("#endif")
+    changed=changed[:start]+r'''#ifdef AWE64_VST3_RUNTIME
+    ApplyAbsoluteSends();
+    if(iolen>=4) {
+        VoiceWrite(port,val&0xffffu);
+        VoiceWrite(port+2,(val>>16)&0xffffu);
+    } else if(iolen==2) {
+        VoiceWrite(port,val&0xffffu);
+    } else {
+        VoiceWrite(port&~(Bitu)1,(port&1)?(val&255u)<<8:val&255u);
+    }
+    return;
+#endif'''+changed[end:]
     s=s[:a]+changed+s[b:]
     s=once(s,'void EMU8000_Device::Mix(Bitu len) {\n\t/*',r'''void EMU8000_Device::Mix(Bitu len) {
 #ifdef AWE64_VST3_RUNTIME
@@ -233,6 +319,11 @@ using Awe64PullMidi = unsigned int (__cdecl *)(void*,unsigned char*,unsigned int
 static std::atomic<void*> awe64_mpu_ctx{nullptr};
 static std::atomic<Awe64PullMidi> awe64_mpu_pull{nullptr};
 static std::atomic<bool> awe64_guest_midi_ready{false};
+// Guest CPU thread only. Tags belong to actual FIFO entries, not host
+// enqueue time. The last consumed byte opens the synchronous DEMO handler.
+static unsigned char awe64_overlay_tags[32]{};
+static uint64_t awe64_overlay_epoch=0,awe64_overlay_context=0;
+uint64_t AWE64_OverlayMidiContext() noexcept { return awe64_overlay_context; }
 extern "C" __declspec(dllexport) int __cdecl AWE64_IsGuestMidiReady() noexcept {
     return awe64_guest_midi_ready.load(std::memory_order_acquire)?1:0;
 }
@@ -283,16 +374,28 @@ static void AWE64_PumpGuestMidi() {
             if(!valid)continue;
         } else if(buf[0]<0x80u || buf[0]>=0xf0u ||
            len!=((type==0xc0u || type==0xd0u)?2u:3u))continue;
-        for(unsigned i=0;i<len;++i)QueueByte(buf[i]);
+        unsigned kind=0;
+        if(type==0x90u&&len==3)kind=buf[2]?1u:2u;
+        if(type==0x80u&&len==3)kind=2u;
+        if(type==0xb0u&&len==3&&(buf[1]==64||buf[1]==120||buf[1]==121||buf[1]==123))kind=2u;
+        for(unsigned i=0;i<len;++i) {
+            const Bitu before=mpu.queue_used;
+            QueueByte(buf[i]);
+            if(i+1==len && mpu.queue_used==before+1)
+                awe64_overlay_tags[(mpu.queue_pos+mpu.queue_used-1)%MPU401_QUEUE]=static_cast<unsigned char>(kind);
+        }
     }
 }
 #endif
 
 '''
     s=once(s,anchor,pump+anchor)
+    s=once(s,'mpu.queue[pos]=data;','mpu.queue[pos]=data;\\n#ifdef AWE64_VST3_RUNTIME\\n        awe64_overlay_tags[pos]=0;\\n#endif')
+    s=once(s,'ret=mpu.queue[mpu.queue_pos];','ret=mpu.queue[mpu.queue_pos];\\n#ifdef AWE64_VST3_RUNTIME\\n        const auto tag=awe64_overlay_tags[mpu.queue_pos];\\n        awe64_overlay_tags[mpu.queue_pos]=0;\\n        awe64_overlay_context=tag && mpu.mode==M_UART ? (++awe64_overlay_epoch<<2)|tag : 0;\\n#endif')
     anchor='static Bitu MPU401_ReadStatus(Bitu port,Bitu iolen) {'
     s=once(s,anchor,anchor+'''
 #ifdef AWE64_VST3_RUNTIME
+    awe64_overlay_context=0; // previous synchronous DEMO handler returned
     AWE64_PumpGuestMidi();
 #endif''')
     anchor='if (!MIDI_Available()) return;'

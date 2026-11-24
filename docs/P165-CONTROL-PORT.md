@@ -38,3 +38,7 @@ Noch offen: sichere konkrete Note-/Voice-Schreibgrenze, alle zehn Implementierun
 ## Lokaler Mathematik-Nachweis
 
 `research/p165-control-port/VoiceOverlay.hpp` und `VoiceOverlayTest.cpp`: tatsächlich kompiliert und ausgeführt mit `c++ -std=c++17 -Wall -Wextra -Werror -O2 VoiceOverlayTest.cpp -o test && ./test`. PASS über alle 65.536 Registerwörter; keine produktive Anbindung. Test ohne `NDEBUG` ausführen. SHA-256 Header e1b7d59d5af8dcd43580cfc1960bd62dbd01df8994fdbdcaef231f2ad43a8dbb, Test 3a16c51ac6642a2546dcb2167a056e5cad1ed8965794249aa7175ebd44eed4b0. Die mathematische Funktion der Regler ist nur ein Teilnachweis; echter Note-/Release-Kontext und PCM fehlen weiterhin.
+
+## Produktport (noch nicht abgenommen)
+
+Alle zehn Parameter sind gemeinsam über den Host, ABI und ursprünglichen EMU8000-Registerwriter angebunden. Das FIFO-Tag wird erst beim letzten konsumierten Byte aktiv und beim nächsten Statuspoll beendet. Das ist eine aus dem synchronen Original-DEMO-Quellcode abgeleitete, noch zu verifizierende Schreibgrenze; kein Nachweis durch echte Trace-/PCM-Tests. Neue v5-State- und Altzustands-Recall-Gates. Originale MOD RESET-Funktion setzt zwölf Parameter auf 0. Windows-Klanggegenproben aller Regler, Automation, GUI-Reset und gehaltene/stimmbasierte Grenzfälle bleiben Pflicht vor Freigabe.

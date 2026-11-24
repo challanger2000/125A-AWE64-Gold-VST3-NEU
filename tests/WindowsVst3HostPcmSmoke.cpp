@@ -370,6 +370,30 @@ int main(int argc,char** argv) {
         return fail("Actual VST3 controller assignment failed");
     mapping->release();
     std::cout<<"REAL_VST3_MIDI_MAPPING_PASS\n";
+    {
+        V::IEditController* controls=nullptr;
+        if(component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&controls))!=S::kResultOk||!controls)
+            return fail("Voice control interface missing");
+        S::MemoryStream before;
+        if(component->getState(&before)!=S::kResultOk)return fail("Voice control baseline state save failed");
+        for(unsigned i=0;i<10;++i)
+            if(controls->setParamNormalized(1100u+i,(i+1)/11.)!=S::kResultOk)
+                return fail("Voice control edit failed");
+        S::MemoryStream edited;
+        if(component->getState(&edited)!=S::kResultOk)return fail("Voice control v5 state save failed");
+        for(unsigned i=0;i<10;++i)(void)controls->setParamNormalized(1100u+i,0.);
+        S::MemoryStream restore(edited.getData(),edited.getSize());
+        if(component->setState(&restore)!=S::kResultOk)return fail("Voice control v5 recall failed");
+        for(unsigned i=0;i<10;++i)
+            if(std::abs(controls->getParamNormalized(1100u+i)-std::round((i+1)/11.*255.)/255.)>1.e-6)
+                return fail("Voice control v5 recall value mismatch");
+        S::MemoryStream reset(before.getData(),before.getSize());
+        if(component->setState(&reset)!=S::kResultOk)return fail("Voice control legacy state recall failed");
+        for(unsigned i=0;i<10;++i)
+            if(controls->getParamNormalized(1100u+i)!=0.)return fail("Voice control legacy neutral restore failed");
+        controls->release();
+        std::cout<<"REAL_VST3_VOICE_CONTROLS_V5_RECALL_PASS; NOT_PCM\n";
+    }
     if(component->getBusCount(V::kAudio,V::kOutput)!=1)
         return fail("Expected exactly one real stereo output bus");
     if(component->activateBus(V::kAudio,V::kOutput,0,true)!=S::kResultOk)

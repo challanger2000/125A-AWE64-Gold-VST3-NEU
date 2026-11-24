@@ -80,17 +80,6 @@ try {
         throw 'VST3 test binary absent. Build awe64_vst3_host_pcm_smoke locally or use -HostExe.'
     }
     $pluginBinary = Join-Path $native 'AWE64GoldDOSBoxDev.vst3'
-    # Independently run the public author-bank regression before other
-    # original gates can fail. No owner data or downloaded assets uploaded.
-    $cheezExit = 0
-    if ($Cheezoids) {
-        $ownerBank = (Resolve-Path -LiteralPath $Cheezoids).Path
-        & python (Join-Path $root 'tests/WindowsCheezoidsSweep.py') --bundle $bundlePath --exe $hostTestExe --owner-bank $ownerBank
-        $cheezExit = $LASTEXITCODE
-    } elseif ($env:AWE64_TEST_CHEEZOIDS -eq '1') {
-        & python (Join-Path $root 'tests/WindowsCheezoidsSweep.py') --bundle $bundlePath --exe $hostTestExe
-        $cheezExit = $LASTEXITCODE
-    }
     # Acquire direct mixer evidence before the VST3 gate.
     if ($Seconds -ge 20) {
         & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds --reference
@@ -265,6 +254,18 @@ try {
         [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER',$previousSdl,'Process')
         [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY',$previousOriginal,'Process')
         [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG',$previousBootLog,'Process')
+    }
+    if ($perfExit -ne 0) { throw 'Native performance/stability gate failed before long Cheezoids sweep.' }
+    # Independently run the public author-bank regression before other
+    # original gates can fail. No owner data or downloaded assets uploaded.
+    $cheezExit = 0
+    if ($Cheezoids) {
+        $ownerBank = (Resolve-Path -LiteralPath $Cheezoids).Path
+        & python (Join-Path $root 'tests/WindowsCheezoidsSweep.py') --bundle $bundlePath --exe $hostTestExe --owner-bank $ownerBank
+        $cheezExit = $LASTEXITCODE
+    } elseif ($env:AWE64_TEST_CHEEZOIDS -eq '1') {
+        & python (Join-Path $root 'tests/WindowsCheezoidsSweep.py') --bundle $bundlePath --exe $hostTestExe
+        $cheezExit = $LASTEXITCODE
     }
     # Isolate absolute send endpoint semantics before enabling GUI controls.
     $sendFailures = @()

@@ -1,9 +1,5 @@
 name: Fast official Steinberg validator diagnosis
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/windows-validator-diagnostic.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -40,7 +36,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll
-          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('integration/patch_dosbox_runtime.py') }}
+          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('integration/patch_dosbox_runtime.py','research/p165-control-port/VoiceOverlay.hpp') }}
       - name: Build in-process x64 DOSBox-X-AWE32 DLL
         if: steps.original-dosbox-cache.outputs.cache-hit != 'true'
         shell: pwsh
@@ -54,7 +50,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll
-          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('integration/patch_dosbox_runtime.py') }}
+          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('integration/patch_dosbox_runtime.py','research/p165-control-port/VoiceOverlay.hpp') }}
       - name: Compile VST3 host and stage original internal DOSBox-X runtime DLL
         shell: pwsh
         run: |

@@ -20,7 +20,10 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('AWE64_HostRegisterIO',r)
         self.assertIn('AWE64_SetAbsoluteSends',r)
         self.assertIn('ApplyAbsoluteSends();',r)
-        self.assertIn('AbsoluteSendWord(port,val&0xffffu)',r)
+        self.assertIn('VoiceWrite(port,val&0xffffu)',r)
+        self.assertIn('AbsoluteSendWord(port,word)',r)
+        self.assertIn('AWE64_SetVoiceControls',r)
+        self.assertIn('voice<30 && !(emu->voice[voice].ccca&0x04000000u)',r)
         with self.assertRaises(ValueError):patch.patch_emu(r)
     def test_true_pcm_tap(self):
         s=('#define MIXER_SSIZE 4\n'
@@ -43,6 +46,8 @@ class DosBoxPatchTests(unittest.TestCase):
         with self.assertRaises(ValueError):patch.patch_mixer(r)
     def test_real_creative_unchanged_mpu401_input(self):
         s='#include <assert.h>\nextern bool enable_slave_pic;\n' + (
+          'mpu.queue[pos]=data;\n'
+          'ret=mpu.queue[mpu.queue_pos];\n'
           'static void ClrQueue(void) {\n'
           'static Bitu MPU401_ReadStatus(Bitu port,Bitu iolen) {\n'
           'if (!MIDI_Available()) return;')
@@ -52,6 +57,8 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('MPU401_QUEUE-3',r)
         self.assertIn('if(mpu.mode!=M_UART) {',r)
         self.assertIn('AWE64_IsGuestMidiReady()',r)
+        self.assertIn('awe64_overlay_context=tag && mpu.mode==M_UART',r)
+        self.assertIn('awe64_overlay_context=0; // previous synchronous DEMO handler returned',r)
         self.assertIn('awe64_guest_midi_ready.store(false',r)
         self.assertIn('if(mpu.queue_used!=0)return;',r)
         self.assertLess(r.index('if(mpu.queue_used!=0)return;'),r.index('auto pull=awe64_mpu_pull.load'))

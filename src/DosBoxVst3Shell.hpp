@@ -10,6 +10,7 @@
 #include "HostRateConverter.hpp"
 #include <memory>
 #include <atomic>
+#include <array>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -32,6 +33,7 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::atomic<float> master_{1.f};
     std::atomic<std::uint8_t> reverbType_{4},chorusType_{2};
     std::atomic<std::uint8_t> reverbSend_{0},chorusSend_{0};
+    std::array<std::atomic<std::uint8_t>,10> voiceControls_{};
     std::uint8_t lastReverbType_=4,lastChorusType_=2;
     rt::HostRateConverter rateConverter_{};
     // Lifecycle changes on the host/editor thread. The audio callback uses
