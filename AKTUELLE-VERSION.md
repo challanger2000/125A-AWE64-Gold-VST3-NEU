@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — 96-kHz-End-to-End-Abnahme erweitert (Windows-Ergebnis offen)
+
+- Nativer VST3-Hosttest akzeptiert nun 96 kHz zusätzlich zu 44,1/48 kHz. Die vorhandene RAM-735-Hz-Spektralprüfung und die unveränderte 128-Sample-Performance-/Queue-Prüfung werden auch bei 96 kHz ausgeführt. Keine Änderung an Produktcode, EMU8000, P165-GUI, Puffern oder bisherigen Grenzwerten.
+- Bisherige 44,1/48-kHz-PASS-Ergebnisse bleiben erhalten; der neue Windows-Prüflauf muss tatsächlichen 96-kHz-Klang und Transport bestätigen. Keine Gesamt- oder Releasefreigabe.
+
 ## 24.11.2026 — Guest-Tick-PCM: Windows-Klang und Performance vollständig PASS im bisherigen Testumfang
 
 - [Windows 45415014969](../../actions/runs/45415014969) SUCCESS auf 983c96ce, beide Jobs und alle ausgeführten Schritte bestanden; [Transport 45415014916](../../actions/runs/45415014916) und [Version 45415014891](../../actions/runs/45415014891) SUCCESS.

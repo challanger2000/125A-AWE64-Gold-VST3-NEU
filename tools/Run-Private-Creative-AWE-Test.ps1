@@ -205,7 +205,7 @@ try {
     $previousRamHz = [Environment]::GetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ','Process')
     $previousHostRate = [Environment]::GetEnvironmentVariable('AWE64_TEST_HOST_RATE','Process')
     try {
-        foreach ($case in @('441:44100','735:44100','735:48000')) {
+        foreach ($case in @('441:44100','735:44100','735:48000','735:96000')) {
             $hz,$rate = $case.Split(':')
             [Environment]::SetEnvironmentVariable('AWE64_TEST_HOST_RATE', $rate, 'Process')
             $ramBoot = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
@@ -242,7 +242,7 @@ try {
     $perfExit = 0
     $prevPerf = [Environment]::GetEnvironmentVariable('AWE64_TEST_PERFORMANCE','Process')
     try {
-        foreach ($rate in @('44100','48000')) {
+        foreach ($rate in @('44100','48000','96000')) {
             $perfBoot = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
             [Environment]::SetEnvironmentVariable('AWE64_TEST_PERFORMANCE','1','Process')
             [Environment]::SetEnvironmentVariable('AWE64_TEST_HOST_RATE',$rate,'Process')

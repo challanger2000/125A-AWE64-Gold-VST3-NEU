@@ -150,7 +150,7 @@ int main(int argc,char** argv) {
     const unsigned fixtureProgram=ramHz==735.?17u:0u;
     const char* hostRateEnv=std::getenv("AWE64_TEST_HOST_RATE");
     const double hostRate=hostRateEnv?std::atof(hostRateEnv):44100.;
-    if(hostRate!=44100.&&hostRate!=48000.)return fail("Unsupported native test host rate");
+    if(hostRate!=44100.&&hostRate!=48000.&&hostRate!=96000.)return fail("Unsupported native test host rate");
     const bool sweep=std::getenv("AWE64_TEST_CHEEZOIDS_SWEEP")!=nullptr;
     const bool performance=std::getenv("AWE64_TEST_PERFORMANCE")!=nullptr;
     const bool effectTest=std::getenv("AWE64_TEST_EFFECT_TYPES")!=nullptr;
@@ -281,7 +281,7 @@ int main(int argc,char** argv) {
     setup.maxSamplesPerBlock=512;
     if(processor->canProcessSampleSize(V::kSample32)!=S::kResultTrue ||
        processor->setupProcessing(setup)!=S::kResultOk)
-        return fail("VST3 setupProcessing(44100/float32) failed");
+        return fail("VST3 setupProcessing(requested host rate/float32) failed");
     // Windows runner embeds NO original Creative material. The fake DOS MZ
     // fixture merely drives the original DOSBox PC-speaker hardware.
     if(component->setActive(true)!=S::kResultOk)
