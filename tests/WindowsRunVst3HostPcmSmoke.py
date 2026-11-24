@@ -102,7 +102,8 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
             "REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS" not in proc.stdout:
         raise RuntimeError("Active external SF2 guest restart missing")
     if original and os.environ.get("AWE64_TEST_PERFORMANCE") == "1":
-        rows = re.findall(r"^PERF_QUEUE_BLOCKS=(\d+) AUDIO_DROPPED_FRAMES=(\d+) MIDI_DROPPED_EVENTS=(\d+) UNDERRUN_FRAMES=(\d+)$", proc.stdout, re.M)
+        rows = [re.fullmatch(r"PERF_QUEUE_BLOCKS=(\d+) AUDIO_DROPPED_FRAMES=(\d+) MIDI_DROPPED_EVENTS=(\d+) UNDERRUN_FRAMES=(\d+)", line) for line in proc.stdout.splitlines()]
+        rows = [match.groups() for match in rows if match is not None]
         if len(rows) != 1:
             raise RuntimeError("Missing or ambiguous measured queue statistics")
         blocks, audio_drop, midi_drop, underrun = map(int, rows[0])

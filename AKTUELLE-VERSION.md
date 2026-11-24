@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Windows-Performance-Befund und CRLF-Auswertung
+
+- Windows 45314956767 FAIL: 44,1/48 kHz p95 95,7823/86,0625 ms, Unterlauf 23168/23252 Frames, keine Audio-/MIDI-Drops, keine Callback-Fristüberschreitungen. Queue-Mittel 560,30/562,56 Frames; CPU 2,28/3,46 % eines CI-Kerns. Alle drei absoluten Send-State-/Register-Gates und Cheezoids-128-Vergleich PASS. Transport 45314956648 und Version 45314956701 SUCCESS.
+- Python-Wrapper wertet Queue-Zeilen jetzt mit splitlines/fullmatch aus, damit Windows-CRLF nicht fälschlich als fehlende Statistik gemeldet wird. Grenzwerte unverändert. Transportoptimierung und erneute Windows-Abnahme offen; kein Release.
+
 ## 24.11.2026 — Transportmessung getrennt vom Klang-/CPU-Test
 
 - Performance-Gate ergänzt: echte SPSC-Audio-/MIDI-Queue-Zähler, Startsnapshot erst beim ersten tatsächlichen NoteOn nach Warmup, Endsnapshot am letzten Audio-Callback vor Shutdown. Pufferfüllstand min/max/mittel vor jedem Block, maximale MIDI-Tiefe; verlorene Audioframes, verlorene MIDI-Events und Unterlauf-Frames müssen exakt 0 sein. Kein Logging im Audio-Callback, keine zusätzlichen Atomics pro erzeugtem Sample; Ausgabe nur bei explizitem Performance-Test nach Worker-Join. Damit werden auch sehr kurze Aussetzer sichtbar, die RMS-/Stille-Tests übersehen.
