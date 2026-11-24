@@ -11,6 +11,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX  // Windows.h max/min macros must not break std::max
 #include <windows.h>
+#include <ole2.h>
 #include "pluginterfaces/base/ipluginbase.h"
 #include "pluginterfaces/base/funknown.h"
 #include "pluginterfaces/gui/iplugview.h"
@@ -160,8 +161,9 @@ int main(int argc,char** argv) {
     if(sendPair>65535)return fail("Invalid send test pair");
     const bool originalMode=(argc==4 && std::strcmp(argv[2],"--original")==0);
     const bool exclusionMode=(argc==3 && std::strcmp(argv[2],"--negative")==0);
+    const bool editorMode=(argc==3 && std::strcmp(argv[2],"--editor")==0);
     const int originalSeconds=originalMode ? std::atoi(argv[3]) : 0;
-    if(!(argc==2 || exclusionMode || (originalMode && originalSeconds>=15 && originalSeconds<=120)))
+    if(!(argc==2 || exclusionMode || editorMode || (originalMode && originalSeconds>=15 && originalSeconds<=120)))
         return fail("usage: WindowsVst3HostPcmSmoke.exe Plugin.vst3 [--original 15..120 | --negative]");
     // Private mode runs exclusively on the owner's Windows computer after
     // the launcher verifies the original Creative EXE/SF2/ROM hashes.
@@ -176,6 +178,14 @@ int main(int argc,char** argv) {
             return fail("Private Creative mode requires isolated SDL_AUDIODRIVER=dummy");
     }
 
+    // Match the SDK's actual Windows hosting module: OLE is initialized
+    // on the host UI thread before loading/initializing the plug-in.
+    struct OleScope {
+        HRESULT status=OleInitialize(nullptr);
+        ~OleScope(){if(SUCCEEDED(status))OleUninitialize();}
+    } ole;
+    if(FAILED(ole.status))return fail("Host OLE initialization failed");
+    std::cout<<"HOST_OLE_READY\n";
     std::string filename=argv[1];
     HMODULE module=LoadLibraryExA(filename.c_str(),nullptr,
                                   LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|
@@ -185,7 +195,9 @@ int main(int argc,char** argv) {
     using ModuleLifecycle=bool(*)();
     auto initDll=reinterpret_cast<ModuleLifecycle>(GetProcAddress(module,"InitDll"));
     auto exitDll=reinterpret_cast<ModuleLifecycle>(GetProcAddress(module,"ExitDll"));
+    std::cout<<"HOST_MODULE_INIT_ENTER\n";
     if(!initDll||!exitDll||!initDll())return fail("Steinberg Windows module initialization failed");
+    std::cout<<"HOST_MODULE_INIT_OK\n";
     using GetFactory=S::IPluginFactory* (PLUGIN_API*)();
     auto getFactory=reinterpret_cast<GetFactory>(GetProcAddress(module,"GetPluginFactory"));
     if(!getFactory)return fail("Real Steinberg GetPluginFactory export missing");
@@ -215,7 +227,8 @@ int main(int argc,char** argv) {
     // Exercise the actual VSTGUI editor against a real Win32 parent, once
     // in the synthetic run. This is a lifecycle/geometry gate, not a
     // substitute for interactive control or original sound verification.
-    if(!originalMode&&!exclusionMode) {
+    if(editorMode) {
+        std::cout<<"EDITOR_CONTROLLER_ENTER\n";
         V::IEditController* controller=nullptr;
         if(component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&controller))!=S::kResultOk||!controller)
             return fail("Actual editor controller unavailable");
@@ -223,22 +236,31 @@ int main(int argc,char** argv) {
             0,0,1050,780,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
         if(!parent)return fail("Native editor parent HWND creation failed");
         for(unsigned pass=0;pass<2;++pass) {
+            std::cout<<"EDITOR_CREATE_ENTER "<<pass<<"\n";
             S::IPlugView* view=controller->createView(V::ViewType::kEditor);
             if(!view||view->isPlatformTypeSupported(S::kPlatformTypeHWND)!=S::kResultTrue)
                 return fail("Actual VST3 editor does not support HWND");
+            std::cout<<"EDITOR_ATTACH_ENTER "<<pass<<"\n";
             if(view->attached(parent,S::kPlatformTypeHWND)!=S::kResultOk)
                 return fail("Actual P165 editor attach failed");
+            std::cout<<"EDITOR_ATTACH_OK "<<pass<<"\n";
             S::ViewRect size{};
             if(view->getSize(&size)!=S::kResultOk||size.right-size.left!=1000||size.bottom-size.top!=708)
                 return fail("Actual P165 editor geometry differs from approved 1000x708");
             MSG msg{};
             while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
+            std::cout<<"EDITOR_REMOVE_ENTER "<<pass<<"\n";
             if(view->removed()!=S::kResultOk)return fail("Actual P165 editor detach failed");
             view->release();
         }
         DestroyWindow(parent);
         controller->release();
+        if(component->terminate()!=S::kResultOk)return fail("Editor component termination failed");
+        processor->release();component->release();factory->release();
+        if(!exitDll())return fail("Editor module exit failed");
+        FreeLibrary(module);
         std::cout<<"REAL_VST3_P165_EDITOR_HWND_LIFECYCLE_PASS; SIZE=1000x708; OPEN_CLOSE=2\n";
+        return 0;
     }
     std::vector<std::uint8_t> externalState;
     if(originalMode) {

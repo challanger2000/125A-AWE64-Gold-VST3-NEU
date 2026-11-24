@@ -110,7 +110,7 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
         if not blocks or audio_drop or midi_drop or underrun:
             raise RuntimeError(f"Realtime queue stability failed: audio drops={audio_drop}, MIDI drops={midi_drop}, underrun frames={underrun}")
     if proc.returncode or expected not in proc.stdout:
-        raise RuntimeError("Actual Windows VST3 factory/host process() PCM test FAILED")
+        raise RuntimeError(f"Actual Windows VST3 factory/host process() PCM test FAILED; exit=0x{proc.returncode & 0xffffffff:08x}")
     def count(label: str) -> int:
         lines = [line.removeprefix(label) for line in proc.stdout.splitlines()
                  if line.startswith(label)]

@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Nativer GUI-Test: fehlender Host-OLE-Start und getrennte Diagnose
+
+- [Windows 45442319908](../../actions/runs/45442319908) FAIL: Windows-Kompilierung und DLL-/MPU-/Hardware-Smokes bestanden; neuer gemeinsamer GUI-/Audio-Hosttest brach ohne native Diagnose vor PCM ab. Original-Archivtest wurde deshalb nicht ausgeführt. Transport 45442319845 und Version 45442320269 SUCCESS. Bisherige Klang-/Stabilitätsnachweise bleiben gültig.
+- Steinbergs gepinnter Windows-Hosting-Code `source/vst/hosting/module_win32.cpp` initialisiert OLE vor dem Laden des Moduls. Der eigene Testhost hatte diesen Schritt ausgelassen; ergänzt samt RAII und Link gegen ole32. Dies ist eine konkrete Abweichung des Testhosts, die Absturzursache ist noch nicht abschließend bewiesen.
+- GUI-Gate in eigenem Prozess `--editor` nach den unveränderten Klangtests, mit etappenweisen Diagnosen und Exitcode. GUI bleibt verpflichtend und ein Fehlschlag weiterhin rot; keine Unterdrückung des Gates. Keine Produkt-/DSP-/Grafikänderung. Neuer Windows-Nachweis offen.
+
 ## 24.11.2026 — 60-Sekunden-Polyphonie und Master-PCM-Recall PASS; nativer GUI-Lifecycle-Test
 
 - [Windows 45434254976](../../actions/runs/45434254976) SUCCESS auf b60b5b22; [Transport 45434255359](../../actions/runs/45434255359) und [Version 45434255242](../../actions/runs/45434255242) SUCCESS. Auch 45430630922 abgeschlossen SUCCESS. 48 kHz 60 Sekunden/32 MIDI-Noten: 28522 Queue-Blöcke ohne Unterlauf, Audio-/MIDI-Drop, stumme gehaltene Blöcke oder Callback-Fristüberschreitung; Release-Peak 0,000152588. Master-RMS 100/50/0/Recall: 0,0275808/0,013734/0/0,0137242. Latenz p95 12,3583/14,6042/13,6458 ms bei 44,1/48/96 kHz; alle 128 Cheezoids und RAM-Spektralgates erneut PASS.

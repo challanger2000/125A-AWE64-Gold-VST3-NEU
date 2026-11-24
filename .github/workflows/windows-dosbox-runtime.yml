@@ -242,6 +242,15 @@ jobs:
           } finally {
             Remove-Item -LiteralPath $research -Recurse -Force -ErrorAction SilentlyContinue
           }
+      - name: Verify actual P165 editor open and close in independent Win32 host
+        shell: pwsh
+        timeout-minutes: 2
+        if: ${{ !cancelled() }}
+        run: |
+          $plugin=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3').Path
+          $hostTestExe=(Resolve-Path 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe').Path
+          & $hostTestExe $plugin --editor
+          if ($LASTEXITCODE -ne 0) { throw "Native editor lifecycle FAILED; exit=$LASTEXITCODE" }
       # The source repo is public. Never publish the developer binaries until
       # distribution permissions are cleared. A private-repo runner can
       # deliver the prebuilt asset-free package after BOTH existing gates.
