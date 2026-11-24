@@ -514,10 +514,36 @@ int main(int argc,char** argv) {
             return ok;
         };
         struct Profile {std::array<double,bins> rms{},diff{};};
+        bool filterPhase=false;
+        auto quietBeforeNote=[&](){
+            constexpr double limit=.00025;
+            unsigned consecutive=0;
+            double rms=0.;
+            const auto window=nblocks(.05);
+            // Allow actual release to finish if original DOS CC120 does
+            // not silence the voice immediately. No host gain muting.
+            for(unsigned w=0;w<100;++w){
+                double energy=0.;
+                for(unsigned i=0;i<window;++i){
+                    if(!tick())return false;
+                    for(unsigned k=0;k<buffer;++k)energy+=double(l[k])*l[k]+double(r[k])*r[k];
+                }
+                rms=std::sqrt(energy/(2.*window*buffer));
+                consecutive=rms<=limit?consecutive+1:0;
+                if(consecutive>=3){
+                    std::cout<<"FILTER_PRE_NOTE_SILENCE RMS="<<rms<<" WINDOWS="<<w+1<<" PASS\n";
+                    return true;
+                }
+            }
+            std::cout<<"FILTER_PRE_NOTE_SILENCE RMS="<<rms<<" FAIL\n";
+            return false;
+        };
         auto trial=[&](int id,double value,Profile& p){
             // Send actual host automation before the next NoteOn, isolate
             // the previous release using the original driver's CC120.
-            if(!edit(-1,0.,true)||!settle(.18)||!edit(id,value,false)||!settle(.06))return false;
+            if(!edit(-1,0.,true)||!settle(.18))return false;
+            if(filterPhase&&!quietBeforeNote())return false;
+            if(!edit(id,value,false)||!settle(.06))return false;
             std::cout<<"VOICE_PCM_CASE ID="<<id<<" VALUE="<<value<<"\n";
             const unsigned count=nblocks(.1);
             float prevL=0,prevR=0;
@@ -557,6 +583,7 @@ int main(int argc,char** argv) {
            !settle(.4))return fail("Filter probe program selection failed");
         if(std::abs(select->getParamNormalized(1000)-17./127.)>1.e-6)
             return fail("Filter probe program selection mismatch");
+        filterPhase=true;
         midiEvents.setChord(1,48,100.f/127.f);
         std::cout<<"VOICE_PCM_FILTER_PROBE_PROGRAM=17 NOTE=48\n";
         Profile filterA{},filterB{},filterC{};
@@ -606,6 +633,22 @@ int main(int argc,char** argv) {
             const auto mid=std::min(distance(a,midpoint[i],i),distance(b,midpoint[i],i));
             const auto max=std::min(distance(a,maximum[i],i),distance(b,maximum[i],i));
             const bool pass=mid>threshold&&max>threshold&&(!filterProbe||validFilter);
+            if(filterProbe){
+                auto spectralDistance=[&](const Profile& x,const Profile& y){
+                    unsigned first=i==5?4u:i==6?10u:heldBins;
+                    unsigned last=i==7?bins:heldBins;
+                    double d=0.;
+                    for(unsigned n=first;n<last;++n){
+                        if(x.rms[n]<filterPeak*.1||y.rms[n]<filterPeak*.1)continue;
+                        d=std::max(d,std::abs(x.diff[n]/x.rms[n]-y.diff[n]/y.rms[n]));
+                    }
+                    return d;
+                };
+                std::cout<<"FILTER_SPECTRAL_DIAGNOSTIC ID="<<1100+i
+                         <<" MID="<<spectralDistance(a,midpoint[i])
+                         <<" MAX="<<spectralDistance(a,maximum[i])
+                         <<" NEUTRAL="<<std::max({spectralDistance(a,b),spectralDistance(a,c),spectralDistance(b,c)})<<"\n";
+            }
             passed+=pass;
             std::cout<<"VOICE_PCM_RESULT ID="<<1100+i<<" MID_DELTA="<<mid<<" MAX_DELTA="<<max
                      <<" NEUTRAL_DELTA="<<noise<<" THRESHOLD="<<threshold<<" PROGRAM="<<(filterProbe?17:0)<<" "<<(pass?"PASS":"FAIL")<<"\n";

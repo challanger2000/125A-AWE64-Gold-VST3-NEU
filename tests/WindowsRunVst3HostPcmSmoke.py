@@ -29,7 +29,9 @@ def run_private_creative_host(command: list[str], plugin: Path, seconds: int):
     log = plugin.resolve(strict=True).parent.parent / "Resources" / "PRIVATE" / name
     if log.exists():
         raise RuntimeError("Private Creative boot diagnostic already exists; refusing stale log")
-    deadline = time.monotonic() + seconds + 30
+    # Only the filter isolation suite may need to wait for natural tails.
+    extra = 90 if os.environ.get('AWE64_TEST_VOICE_OVERLAYS') == '1' else 30
+    deadline = time.monotonic() + seconds + extra
     # DOSBox emits large diagnostic output. Undrained PIPE handles can
     # deadlock the guest or its shutdown before poll() ever sees exit.
     # Use disposable local spools; do not publish their contents as artifacts.
@@ -107,6 +109,8 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
         results = re.findall(r"^VOICE_PCM_RESULT ID=(\d+) .* PASS$", proc.stdout, re.M)
         if sorted(map(int, results)) != list(range(1100,1110)):
             raise RuntimeError("Missing or ambiguous per-control PCM evidence")
+        if len(re.findall(r'^FILTER_PRE_NOTE_SILENCE .* PASS$',proc.stdout,re.M)) != 9:
+            raise RuntimeError('Missing measured silence before a filter trial')
     if original and os.environ.get("AWE64_TEST_PERFORMANCE") == "1":
         if "PERF_HOST_RATE=44100 " in proc.stdout and "REAL_VST3_SUSTAIN_PCM_PASS" not in proc.stdout:
             raise RuntimeError("Original Creative CC64 sustain PCM gate missing")

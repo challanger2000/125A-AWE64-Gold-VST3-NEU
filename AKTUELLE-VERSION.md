@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 25.11.2026 — Alle drei DCYSUS-Felder nachgewiesen; PCM-Referenzstreuung isolieren
+
+- [Windows 45508070522](../../actions/runs/45508070522) FAIL: sieben Regler erneut PCM-PASS, Neutralrestore und Program-17-Gültigkeitsprüfung PASS (Peak 0,0186952, late held 0,0179354, Release 450 ms 0,0141889). Filter Decay/Sustain/Release scheitern am PCM-Gate, weil die drei Neutralreferenzen selbst stark streuen (0,00531281 / 0,00406544 / 0,00308254). Erstmals 26 eindeutig passende Note-/Release-Tracepaare; echte DCYSUS-Feldänderungen bei 50/100 % +44/+88 (Decay), -32/-64 (Sustain), +44/+88 (Release). Registeranbindung und Richtung belegt, ausreichende musikalische Wirkung nicht. Validator 47/47, übrige Vorprüfungen und Editor PASS.
+- Hypothese: lange Ausklänge vorheriger Program-17-Noten überlagern nachfolgende Messungen, CC120 war nicht als tatsächliche Stille validiert. Nur Program-17-Fixture verkürzt nominellen Amp-Release 16 auf 4 s, bewiesene Filterbasis/Note unverändert. Vor allen neun Program-17-Trials nun drei aufeinanderfolgende 50-ms-PCM-RMS-Fenster <=0,00025 zwingend, tatsächliches Ausklingen bis max. 5 s abwarten, kein Host-Muting. Referenz-Gültigkeits- und alle ursprünglichen PCM-Schwellen unverändert. Zusätzliche amplitudennormierte Spektraldiagnostik, nicht als Ersatz-PASS. Fallbezogene DCYSUS-Richtung/Abstufung künftig zwingendes zusätzliches Gate; 26 eindeutige Paare erforderlich. Nur isolierter Overlay-Host erhält längeren Watchdog, kein Produkt-/DSP-/GUI-Eingriff. Neuer Lauf offen, keine Freigabe.
+
 ## 25.11.2026 — Filter-Referenz zu leise; vollständige Diagnose ohne Produktänderung
 
 - [Windows 45504615247](../../actions/runs/45504615247) FAIL im neuen Referenz-Gate `Filter probe amplitude masks modulation sustain or release`; kein neuer Einzelreglerbefund, da die Prüfung vor den sechs nichtneutralen Filter-Trials abbrach. 47/47 Validator, übrige vorherige Gates und Editor PASS. Trace: 19 gehaltene DCYSUS-Writes, 19 Release-Writes, 19 nichtneutrale PEFE-Writes; jeweils zwei verschiedene Werte-/Routenvarianten. Das belegt zwei verwendete Presets, nicht die Wirkung der drei fehlenden Regler. Transport/Version SUCCESS.

@@ -65,7 +65,7 @@ class RamFixtureTest(unittest.TestCase):
         self.assertEqual(filter_values[28],0)
         self.assertEqual(filter_values[30],0)
         self.assertEqual(filter_values[37],0)
-        self.assertEqual(filter_values[38],4800)
+        self.assertEqual(filter_values[38],2400)
         self.assertEqual(filter_values[53],1)
         self.assertNotEqual(build(),data)
         self.assertNotEqual(build(wet=True),data)

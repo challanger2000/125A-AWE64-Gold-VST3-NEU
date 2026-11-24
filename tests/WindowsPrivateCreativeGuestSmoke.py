@@ -166,19 +166,16 @@ def summarize_filter_envelope_trace(trace: Path):
     # by 9 program-17 trials. Only attribute deltas if trace cardinality,
     # same-voice pairing and note/release ordering agree.
     if len(note_words) != 26 or len(release_words) != 26:
-        print("FILTER_TRACE_CASE_ALIGNMENT=UNAVAILABLE")
-        return
+        raise RuntimeError("FILTER_TRACE_CASE_ALIGNMENT=UNAVAILABLE")
     for i,(on,off) in enumerate(zip(note_words,release_words)):
         if on[1]!=off[1] or not 44100<=off[0]-on[0]<=88200 or (
                 i+1<len(note_words) and off[0]>=note_words[i+1][0]):
-            print("FILTER_TRACE_CASE_ALIGNMENT=UNAVAILABLE")
-            return
+            raise RuntimeError("FILTER_TRACE_CASE_ALIGNMENT=UNAVAILABLE")
     base = note_words[17][2]
     base_rel = release_words[17][2]
     if any(note_words[i][2]!=base or release_words[i][2]!=base_rel
            for i in (18,25)):
-        print("FILTER_TRACE_CASE_ALIGNMENT=NEUTRAL_REGISTER_VARIATION")
-        return
+        raise RuntimeError("FILTER_TRACE_CASE_ALIGNMENT=NEUTRAL_REGISTER_VARIATION")
     print("FILTER_TRACE_CASE_ALIGNMENT=26_MATCHED_NOTE_RELEASE_PAIRS")
     for index,field in ((1105,"decay"),(1106,"sustain"),(1107,"release")):
         j=19+2*(index-1105)
@@ -189,6 +186,12 @@ def summarize_filter_envelope_trace(trace: Path):
         else:
             delta=[(release_words[k][2]&127)-(base_rel&127) for k in (j,j+1)]
         print(f"FILTER_TRACE_FIELD_DELTA ID={index} MID={delta[0]} MAX={delta[1]}")
+        if field=="sustain":
+            if not delta[1]<delta[0]<0:
+                raise RuntimeError("Filter sustain register direction/midpoint failure")
+        elif not 0<delta[0]<delta[1]:
+            raise RuntimeError("Filter rate register direction/midpoint failure")
+    print("FILTER_TRACE_ALL_THREE_FIELD_GATES_PASS")
 
 
 def summarize_ram_trace(trace: Path):
