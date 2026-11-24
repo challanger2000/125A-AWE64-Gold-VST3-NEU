@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Bundle,
     [Parameter(Mandatory=$true)][string]$Rom,
     [string]$HostExe = '',
+    [string]$Cheezoids = '',
     [int]$Seconds = 45
 )
 $ErrorActionPreference = 'Stop'
@@ -82,7 +83,11 @@ try {
     # Independently run the public author-bank regression before other
     # original gates can fail. No owner data or downloaded assets uploaded.
     $cheezExit = 0
-    if ($env:AWE64_TEST_CHEEZOIDS -eq '1') {
+    if ($Cheezoids) {
+        $ownerBank = (Resolve-Path -LiteralPath $Cheezoids).Path
+        & python (Join-Path $root 'tests/WindowsCheezoidsSweep.py') --bundle $bundlePath --exe $hostTestExe --owner-bank $ownerBank
+        $cheezExit = $LASTEXITCODE
+    } elseif ($env:AWE64_TEST_CHEEZOIDS -eq '1') {
         & python (Join-Path $root 'tests/WindowsCheezoidsSweep.py') --bundle $bundlePath --exe $hostTestExe
         $cheezExit = $LASTEXITCODE
     }

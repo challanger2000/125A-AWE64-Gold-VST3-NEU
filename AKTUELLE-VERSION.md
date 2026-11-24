@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Exakt erneut hochgeladene Cheezoids-Problemrevision festgeschrieben
+
+- Besitzerdatei `Cheezoids.sf2`, 652206 Bytes, SHA-256 `5adad4b3b95a33ef64ae06dd1627038140435b395d183aab622efcb4c920359b`. SF2 2.01, alle 128 Bank-0-Programme, 160 Samples, 1275 Instrumentzonen mit SampleMode 1 (kontinuierlicher Loop). Originalbytes nicht verändern/hochladen. Die öffentliche Autorenbank ist **nur dann** ein Ersatz für diesen konkreten Test, wenn ihr SHA-256 exakt übereinstimmt.
+- Tatsächlich lokal gerenderte unabhängige Referenz via libfluidsynth.so.3: alle 128 Programme bei MIDI 60/Velocity 100, 44,1 kHz, 1,75 Sekunden gehalten, Reverb/Chorus aus. Frühfenster 0,2–0,6 s, spät 1,1–1,6 s. 114 Programme mit spätem RMS >=0,0005 und mindestens 10 % des frühen RMS; 11 kurze Abklingverläufe (6,10,20,22,28,45,47,49,52,73,75), 3 sehr leise (23,53,77). Damit ist die Mehrheit kurzer Bleeps **nicht** in dieser Datei bei allgemeiner SF2-Wiedergabe inhärent. FluidSynth ist keine AWE-Klangreferenz; Original-Creative-DOS und reales VST3 bleiben gesondert zu prüfen. Warnungen für Instrumente PNO Bass/PIANO (ungültige Generatoren verworfen).
+- Neuer exakter Hash-Gate für Autorendownload und private lokale Datei `--owner-bank` bzw. `-Cheezoids`; andersartige öffentliche Revision darf die konkrete Benutzerregression nicht bestehen. Originale Benutzerdatei nicht im Repo, keine Weitergabe. Noch kein tatsächlicher Windows-VST3-Klangnachweis dieser exakten Revision.
+
 ## 24.11.2026 — Effektumschaltung im echten VST3 bestanden
 
 - Windows 45309812893: alle drei RAM-Spektralfälle bestanden, unveränderter Originalgast Effekt-Register 0/0, korrigierter Originalgast 1/1, tatsächlicher VST3 `EFFECT_TRACE_PLATE=True; EFFECT_TRACE_FEEDBACK=True`. Damit sind beide getesteten originalen Effekttypen im VST3 nachgewiesen. Der ältere Lauf scheiterte noch an den unveränderten CC-Sends, nicht an der Effekttyp-Umschaltung.

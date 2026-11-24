@@ -10,6 +10,8 @@ from WindowsPrivateCreativeGuestSmoke import find_private_bundle, guest_argument
 
 ARCHIVE = "https://raw.githubusercontent.com/Analoguesque/freepatches/681907983ec024c1994f6a02615d650877913696/downloads/Analoguesque_SOUNDFONT_Banks.zip"
 BLOB = "c12461b3e016f70b36e39eca2f78eac5685a0fbf"
+OWNER_SHA256 = "5adad4b3b95a33ef64ae06dd1627038140435b395d183aab622efcb4c920359b"
+OWNER_SIZE = 652206
 
 def chunks(buf,start,end):
     while start+8<=end:
@@ -38,7 +40,16 @@ def bank_info(raw):
     result[version[2]+2:version[2]+4]=b"\0\0"
     return bytes(result),version[:2]
 
-def acquire(work):
+def acquire(work, local=None):
+    if local is not None:
+        raw=local.read_bytes()
+        if len(raw)!=OWNER_SIZE or hashlib.sha256(raw).hexdigest()!=OWNER_SHA256:
+            raise ValueError("Wrong owner Cheezoids revision; no substitute")
+        staged,version=bank_info(raw)
+        source=work/"Cheezoids.sf2";source.write_bytes(raw)
+        (work/"RAMTEST.SF2").write_bytes(staged)
+        print("CHEEZ_EXACT_OWNER_BANK_SHA256="+OWNER_SHA256+"; 128 programs",flush=True)
+        return source
     z=work/"author.zip"
     with urlopen(ARCHIVE,timeout=60) as response:
         data=response.read(12_000_000)
@@ -158,6 +169,7 @@ if __name__=="__main__":
     p=argparse.ArgumentParser()
     p.add_argument("--bundle",type=Path,required=True)
     p.add_argument("--exe",type=Path,required=True)
+    p.add_argument("--owner-bank",type=Path,help="Private exact uploaded Cheezoids revision; never commit/upload")
     a=p.parse_args()
     # Direct original DLL holds open DOS handles until child exits. Run
     # reference in separate child to protect native VST3 globals and cleanup.
@@ -170,7 +182,9 @@ if __name__=="__main__":
     else:
         with tempfile.TemporaryDirectory(prefix="awe64-cheez-") as tmp:
             work=Path(tmp)
-            source=acquire(work)
+            source=acquire(work,a.owner_bank)
+            exact=hashlib.sha256(source.read_bytes()).hexdigest()==OWNER_SHA256
+            print("CHEEZ_EXACT_REQUESTED_REVISION="+str(exact),flush=True)
             before=hashlib.sha256(source.read_bytes()).digest()
             env=dict(os.environ,CHEEZ_REFERENCE_WORK=str(work))
             subprocess.run([sys.executable,__file__,"--bundle",str(a.bundle),"--exe",str(a.exe)],env=env,timeout=440,check=True)
@@ -178,3 +192,6 @@ if __name__=="__main__":
             actual=vst3(a.bundle,a.exe,source,work)
             if hashlib.sha256(source.read_bytes()).digest()!=before:raise RuntimeError("Source bank modified")
             compare(ref,actual)
+            if not exact:
+                raise RuntimeError("Public author revision differs from requested owner bank; this is not its acceptance")
+            print("CHEEZ_EXACT_OWNER_REVISION_GATE_PASS")
