@@ -201,6 +201,33 @@ class MixerWindowMetrics:
             print(f"REFERENCE_{name}_PEAK={self.peak[i] / 32768:.9f}")
 
 
+def corrected_sysex_copy(original: bytes) -> bytes:
+    """Private experiment only: unsigned comparison of SysEx status byte.
+    The original MZ image is never overwritten or redistributed.
+    """
+    expected_blob = "e10b8705c6a46444a998c4f6aa74a1cda2081506"
+    if len(original) != 40197 or hashlib.sha1(
+            ("blob %d\\0" % len(original)).encode("ascii") + original).hexdigest() != expected_blob:
+        raise ValueError("Unexpected Creative DEMO.EXE identity")
+    return repair_sysex_compare(original)
+
+
+def repair_sysex_compare(original: bytes) -> bytes:
+    # At file offset 21834: the original far function initializes AX with
+    # a small template offset (0x12 or 0x28), hence AH=0. The subsequent
+    # MOV AL,CS:[SI] / CBW sign-extends F0 to FFF0, while DH is cleared
+    # before loading guest byte F0 into DL. CMP DX,AX can never match.
+    # Replacing CBW with NOP retains AH=0; all offsets/relocations and
+    # Creative effect routines remain exactly as before.
+    prefix = bytes.fromhex("2e8a04988e460a8bd903df2af6268a173bd0")
+    offset = 21834 + 0x35
+    if original[offset:offset+len(prefix)] != prefix:
+        raise ValueError("Unexpected Creative SysEx instruction sequence")
+    fixed = bytearray(original)
+    fixed[offset+3] = 0x90
+    return bytes(fixed)
+
+
 def effect_packets():
     return (bytes.fromhex("f041104212400130050af7"),
             bytes.fromhex("f0411042124001380700f7"))
@@ -261,7 +288,8 @@ def send_trace_summary(trace):
 
 def run_child(bundle: Path, seconds: float, reference: bool = False,
               ram_program: int | None = None, parent_work: Path | None = None,
-              effect_reference: bool = False, send_reference: int | None = None):
+              effect_reference: bool = False, send_reference: int | None = None,
+              corrected_sysex: bool = False):
     if os.name != "nt":
         raise RuntimeError("This test must run on Windows x64")
     dll_file, assets = find_private_bundle(bundle)
@@ -347,7 +375,15 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
 
             register_midi(None, read_midi)
             register_pcm(None, read_pcm)
-            args = [s.encode("mbcs") for s in guest_arguments(assets, ram_dir)]
+            launch = guest_arguments(assets, ram_dir)
+            if corrected_sysex:
+                original = (assets / "DEMO.EXE").read_bytes()
+                fixed = corrected_sysex_copy(original)
+                (Path(work) / "FXDEMO.EXE").write_bytes(fixed)
+                launch[-2:] = ["-c", 'mount d "' + str(work) + '"',
+                               "-c", r"D:\FXDEMO.EXE /SBK:C:\SYNTHGM.SF2"]
+                print("PRIVATE_SYSEX_COMPARE_FIX_STAGED_ONE_BYTE")
+            args = [s.encode("mbcs") for s in launch]
             argv = (ctypes.c_char_p * (len(args) + 1))(*args, None)
             guest_result = []
             thread = threading.Thread(
@@ -429,8 +465,15 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
                     raise RuntimeError('Direct mixer did not deliver complete MIDI sequence')
                 if effect_reference:
                     print("DIRECT_EFFECT_SYSEX_DELIVERED_PASS")
-                    if not effect_trace_summary(trace):
-                        raise RuntimeError("Original direct guest effect registers missing")
+                    actual = effect_trace_summary(trace)
+                    if corrected_sysex:
+                        if not actual:
+                            raise RuntimeError("One-byte comparison fix did not restore original effect registers")
+                        print("PRIVATE_SYSEX_COMPARE_FIX_REGISTER_PASS")
+                    elif actual:
+                        raise RuntimeError("Unmodified driver unexpectedly passed; proposed fix not justified")
+                    else:
+                        print("ORIGINAL_SYSEX_COMPARE_NEGATIVE_CONTROL_CONFIRMED")
                 if send_reference is not None:
                     reverb, chorus = send_trace_summary(trace)
                     print(f"DIRECT_SEND_CC_VALUE={send_reference}")
@@ -462,6 +505,7 @@ def main():
     parser.add_argument("--trace-summary", type=Path)
     parser.add_argument("--ram-program", type=int, choices=(0, 17))
     parser.add_argument("--effect-reference", action="store_true")
+    parser.add_argument("--corrected-sysex", action="store_true")
     parser.add_argument("--send-reference", type=int, choices=(0,127))
     parser.add_argument("--seconds", type=float, default=30.)
     parser.add_argument("--child", action="store_true", help=argparse.SUPPRESS)
@@ -475,6 +519,8 @@ def main():
         parser.error("--bundle required")
     if opt.send_reference is not None and (not opt.reference or opt.ram_program != 0 or opt.effect_reference):
         parser.error("--send-reference requires --reference --ram-program 0")
+    if opt.corrected_sysex and not opt.effect_reference:
+        parser.error("--corrected-sysex requires --effect-reference")
     if opt.effect_reference and (not opt.reference or opt.ram_program is not None):
         parser.error("--effect-reference requires --reference and no RAM fixture")
     if opt.ram_program is not None and not opt.reference:
@@ -482,7 +528,7 @@ def main():
     if not (5 <= opt.seconds <= 120):
         parser.error("--seconds must be 5..120")
     if opt.child:
-        run_child(opt.bundle, opt.seconds, opt.reference, opt.ram_program, opt.parent_work, opt.effect_reference, opt.send_reference)
+        run_child(opt.bundle, opt.seconds, opt.reference, opt.ram_program, opt.parent_work, opt.effect_reference, opt.send_reference, opt.corrected_sysex)
         return
     # A native crash or hang must not terminate the controlling test process.
     command = [sys.executable, str(Path(__file__).resolve()), "--child",
@@ -493,6 +539,8 @@ def main():
         command.append('--reference')
     if opt.effect_reference:
         command.append("--effect-reference")
+    if opt.corrected_sysex:
+        command.append("--corrected-sysex")
     if opt.send_reference is not None:
         command.extend(("--send-reference",str(opt.send_reference)))
     if opt.ram_program is not None:

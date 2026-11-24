@@ -235,6 +235,9 @@ try {
     # Direct reference: use exactly the same original GS macros without VST3.
     & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds --reference --effect-reference
     $directEffectExit = $LASTEXITCODE
+    & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds --reference --effect-reference --corrected-sysex
+    $correctedEffectExit = $LASTEXITCODE
+    if ($correctedEffectExit -ne 0) { $ramFailures += "private one-byte SysEx correction gate" }
     # Genuine Creative DOS SysEx type change: observe specific physical
     # EMU8000 register writes, not merely queued host messages.
     $effectTrace = Join-Path $temporary 'original_effect_types.trace'
