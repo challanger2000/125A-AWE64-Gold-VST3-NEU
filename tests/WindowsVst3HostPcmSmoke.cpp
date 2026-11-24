@@ -13,6 +13,7 @@
 #include <windows.h>
 #include "pluginterfaces/base/ipluginbase.h"
 #include "pluginterfaces/base/funknown.h"
+#include "pluginterfaces/gui/iplugview.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "public.sdk/source/common/memorystream.h"
 #include <vector>
@@ -181,6 +182,10 @@ int main(int argc,char** argv) {
                                   LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
     if(!module)return fail("Windows LoadLibraryEx could not load actual VST3 binary "+
                            std::to_string(GetLastError()));
+    using ModuleLifecycle=bool(*)();
+    auto initDll=reinterpret_cast<ModuleLifecycle>(GetProcAddress(module,"InitDll"));
+    auto exitDll=reinterpret_cast<ModuleLifecycle>(GetProcAddress(module,"ExitDll"));
+    if(!initDll||!exitDll||!initDll())return fail("Steinberg Windows module initialization failed");
     using GetFactory=S::IPluginFactory* (PLUGIN_API*)();
     auto getFactory=reinterpret_cast<GetFactory>(GetProcAddress(module,"GetPluginFactory"));
     if(!getFactory)return fail("Real Steinberg GetPluginFactory export missing");
@@ -207,6 +212,34 @@ int main(int argc,char** argv) {
     MinimalHostApplication host;
     if(component->initialize(&host)!=S::kResultOk)
         return fail("VST3 initialize() failed");
+    // Exercise the actual VSTGUI editor against a real Win32 parent, once
+    // in the synthetic run. This is a lifecycle/geometry gate, not a
+    // substitute for interactive control or original sound verification.
+    if(!originalMode&&!exclusionMode) {
+        V::IEditController* controller=nullptr;
+        if(component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&controller))!=S::kResultOk||!controller)
+            return fail("Actual editor controller unavailable");
+        HWND parent=CreateWindowExW(0,L"STATIC",L"125A editor host",WS_OVERLAPPEDWINDOW,
+            0,0,1050,780,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
+        if(!parent)return fail("Native editor parent HWND creation failed");
+        for(unsigned pass=0;pass<2;++pass) {
+            S::IPlugView* view=controller->createView(V::ViewType::kEditor);
+            if(!view||view->isPlatformTypeSupported(S::kPlatformTypeHWND)!=S::kResultTrue)
+                return fail("Actual VST3 editor does not support HWND");
+            if(view->attached(parent,S::kPlatformTypeHWND)!=S::kResultOk)
+                return fail("Actual P165 editor attach failed");
+            S::ViewRect size{};
+            if(view->getSize(&size)!=S::kResultOk||size.right-size.left!=1000||size.bottom-size.top!=708)
+                return fail("Actual P165 editor geometry differs from approved 1000x708");
+            MSG msg{};
+            while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
+            if(view->removed()!=S::kResultOk)return fail("Actual P165 editor detach failed");
+            view->release();
+        }
+        DestroyWindow(parent);
+        controller->release();
+        std::cout<<"REAL_VST3_P165_EDITOR_HWND_LIFECYCLE_PASS; SIZE=1000x708; OPEN_CLOSE=2\n";
+    }
     std::vector<std::uint8_t> externalState;
     if(originalMode) {
         if(const char* path=std::getenv("AWE64_TEST_EXTERNAL_SF2")) {
@@ -520,7 +553,7 @@ int main(int argc,char** argv) {
         }
         if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
            component->terminate()!=S::kResultOk)return fail("Performance shutdown failed");
-        processor->release();component->release();factory->release();FreeLibrary(module);
+        processor->release();component->release();factory->release();if(!exitDll())return fail("Steinberg Windows module deinitialization failed");FreeLibrary(module);
         if(silentHeldBlocks||chordSilent||chordEnergy<=0.)return fail("Held-tone stability gate failed");
         if(p95>20.)return fail("MIDI-to-PCM p95 exceeds 20 ms target");
         std::cout<<"REAL_VST3_PERFORMANCE_MEASUREMENT_PASS; CI CPU NOT OWNER CPU\n";
@@ -567,7 +600,7 @@ int main(int argc,char** argv) {
         control->release();
         if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
            component->terminate()!=S::kResultOk)return fail("Sweep shutdown failed");
-        processor->release();component->release();factory->release();FreeLibrary(module);
+        processor->release();component->release();factory->release();if(!exitDll())return fail("Steinberg Windows module deinitialization failed");FreeLibrary(module);
         std::cout<<"CHEEZ_VST3_SWEEP_COMPLETE\n";
         return 0;
     }
@@ -675,7 +708,7 @@ int main(int argc,char** argv) {
     processor->release();
     component->release();
     factory->release();
-    FreeLibrary(module);
+    if(!exitDll())return fail("Steinberg Windows module deinitialization failed");FreeLibrary(module);
     if(noteEventsSent<1)return fail("No VST3 NoteOn event injected");
     if(originalMode && noteOffEventsSent<1)return fail("No VST3 NoteOff event injected");
     // The exclusion control uses the SAME repeated MIDI stimulus as the

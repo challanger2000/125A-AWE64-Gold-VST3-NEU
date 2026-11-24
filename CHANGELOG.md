@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 24.11.2026 — 60-Sekunden-Polyphonie und Master-PCM-Recall PASS; nativer GUI-Lifecycle-Test
+
+- [Windows 45434254976](../../actions/runs/45434254976) SUCCESS auf b60b5b22; [Transport 45434255359](../../actions/runs/45434255359) und [Version 45434255242](../../actions/runs/45434255242) SUCCESS. Auch 45430630922 abgeschlossen SUCCESS. 48 kHz 60 Sekunden/32 MIDI-Noten: 28522 Queue-Blöcke ohne Unterlauf, Audio-/MIDI-Drop, stumme gehaltene Blöcke oder Callback-Fristüberschreitung; Release-Peak 0,000152588. Master-RMS 100/50/0/Recall: 0,0275808/0,013734/0/0,0137242. Latenz p95 12,3583/14,6042/13,6458 ms bei 44,1/48/96 kHz; alle 128 Cheezoids und RAM-Spektralgates erneut PASS.
+- Neu: nativer Host ruft die laut Steinberg-Windows-SDK vorgeschriebenen InitDll/ExitDll-Exporte auf. Im synthetischen Test öffnet und entfernt er zweimal den echten VSTGUI-Editor an einem realen Win32-HWND, verlangt exakt 1000x708. Keine Änderung an Produktcode oder P165-Grafik. Noch kein Windows-Ergebnis für GUI-Lifecycle und kein Nachweis aller Bedienelemente: AMP-/FILTER-ADSR, Cutoff/Resonance und MOD RESET weiterhin deaktiviert; vollständige Funktionsabnahme und Installer offen. Kein Release.
+
 ## 24.11.2026 — Master-Volume: echter PCM-/Projekt-Recall-Test ergänzt
 
 - Windows 45430630922 zum Änderungszeitpunkt noch im Original-Archivtest; Transport 45430630997 und Version 45430631151 bereits SUCCESS. Kein vorweggenommener 60-Sekunden-PASS.
