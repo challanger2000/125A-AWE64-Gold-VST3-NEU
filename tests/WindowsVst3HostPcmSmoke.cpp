@@ -557,15 +557,20 @@ int main(int argc,char** argv) {
            !settle(.4))return fail("Filter probe program selection failed");
         if(std::abs(select->getParamNormalized(1000)-17./127.)>1.e-6)
             return fail("Filter probe program selection mismatch");
-        std::cout<<"VOICE_PCM_FILTER_PROBE_PROGRAM=17\n";
+        midiEvents.setChord(1,48,100.f/127.f);
+        std::cout<<"VOICE_PCM_FILTER_PROBE_PROGRAM=17 NOTE=48\n";
         Profile filterA{},filterB{},filterC{};
         if(!trial(-1,0.,filterA)||!trial(-1,0.,filterB))return fail("Filter neutral reference failed");
         const double filterPeak=*std::max_element(filterA.rms.begin(),filterA.rms.end());
         if(filterPeak<.002)return fail("Filter probe has no original PCM");
         // Negative control: amplitude must remain measurable during late
         // sustain and after NoteOff; otherwise a release gate is invalid.
-        if(filterA.rms[14]<filterPeak*.2||filterA.rms[heldBins+4]<filterPeak*.1)
-            return fail("Filter probe amplitude masks modulation sustain or release");
+        const bool validFilter=filterA.rms[14]>=filterPeak*.2&&filterA.rms[heldBins+4]>=filterPeak*.1;
+        std::cout<<"FILTER_PCM_REFERENCE PEAK="<<filterPeak<<" LATE_HELD="<<filterA.rms[14]
+                 <<" RELEASE_450MS="<<filterA.rms[heldBins+4]
+                 <<" VALID="<<(validFilter?"PASS":"FAIL")<<"\n";
+        // Gather all results, even with an invalid reference. Never
+        // allow an invalid reference to pass the overall gate.
         for(int i=5;i<=7;++i)
             if(!trial(i,.5,midpoint[i])||!trial(i,1.,maximum[i]))return fail("Filter probe PCM trial failed");
         if(!trial(-1,0.,filterC))return fail("Filter probe neutral restore failed");
@@ -600,7 +605,7 @@ int main(int argc,char** argv) {
             const double threshold=std::max(referencePeak*.01,noise*2.);
             const auto mid=std::min(distance(a,midpoint[i],i),distance(b,midpoint[i],i));
             const auto max=std::min(distance(a,maximum[i],i),distance(b,maximum[i],i));
-            const bool pass=mid>threshold&&max>threshold;
+            const bool pass=mid>threshold&&max>threshold&&(!filterProbe||validFilter);
             passed+=pass;
             std::cout<<"VOICE_PCM_RESULT ID="<<1100+i<<" MID_DELTA="<<mid<<" MAX_DELTA="<<max
                      <<" NEUTRAL_DELTA="<<noise<<" THRESHOLD="<<threshold<<" PROGRAM="<<(filterProbe?17:0)<<" "<<(pass?"PASS":"FAIL")<<"\n";
@@ -613,7 +618,7 @@ int main(int argc,char** argv) {
         if(!exitDll())return fail("Voice overlay module deinitialization failed");
         FreeLibrary(module);
         std::cout<<"REAL_VST3_VOICE_PCM_SUMMARY="<<passed<<"/10 NEUTRAL_RESTORE="<<(neutralOk?"PASS":"FAIL")<<"\n";
-        if(passed!=10||!neutralOk)return fail("Voice overlay musical PCM gate failed");
+        if(passed!=10||!neutralOk||!validFilter)return fail("Voice overlay musical PCM/reference gate failed");
         std::cout<<"REAL_VST3_VOICE_CONTROLS_PCM_PASS\n"
                  <<"PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED\n"
                  <<"VST3_HOST_NOTE_ON_EVENTS_SENT="<<ons<<"\n"

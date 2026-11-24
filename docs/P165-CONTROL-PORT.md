@@ -50,3 +50,5 @@ Alle zehn Parameter sind gemeinsam über den Host, ABI und ursprünglichen EMU80
 ## Erster nichtneutraler Klanglauf
 
 45502431315: 7/10 PASS, Neutralrestore PASS. Filter Decay/Sustain/Release unter den vorab definierten PCM-Schwellen. Neue getrennte Program-17-Fixture isoliert Filterbewegung von Amp-Hüllkurve; Original-Program 0 für sieben bisher bestandene Regler unverändert. Keine Produktänderung, keine gelockerten Schwellen. Erneuter Nachweis ausstehend; falls drei Regler weiter scheitern, Original-DCYSUS-Registerkontext und SF2-Generatorübersetzung untersuchen statt Grenzen zu senken.
+
+45504615247: Program-17-Referenz zu leise; drei Filterfälle noch nicht ausgeführt. Neuer diagnostischer Versuch mit tieferer Note, angehobener Grundfrequenz des Filters und längerem Amp-Release. Die Gültigkeitsschwelle bleibt zwingend. Alle sechs nichtneutralen Filter-Trials auch bei ungültiger Referenz messen, plus fallbezogene DCYSUS-Felddeltas soweit eindeutig aus Trace rekonstruierbar. Keine Produktänderung.

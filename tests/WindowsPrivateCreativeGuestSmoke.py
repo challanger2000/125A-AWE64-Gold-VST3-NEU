@@ -134,6 +134,7 @@ def summarize_filter_envelope_trace(trace: Path):
     selector = -1
     held, release, routes = set(), set(), set()
     counts = [0, 0, 0]
+    note_words, release_words = [], []
     with trace.open(encoding="utf-8", errors="replace") as fp:
         for line in fp:
             m = pattern.fullmatch(line.strip())
@@ -150,7 +151,9 @@ def summarize_filter_envelope_trace(trace: Path):
                 if word & 0x8000:
                     release.add(word & 127)
                     counts[1] += 1
+                    release_words.append((frame,selector&31,word))
                 else:
+                    note_words.append((frame,selector&31,word))
                     held.add((word >> 8 & 127, word & 127))
                     counts[0] += 1
             elif port == 0xe20 and reg == 2 and word & 255:
@@ -159,6 +162,33 @@ def summarize_filter_envelope_trace(trace: Path):
     print(f"FILTER_TRACE_DIAGNOSTIC HELD_WRITES={counts[0]} RELEASE_WRITES={counts[1]} "
           f"NONZERO_PEFE_WRITES={counts[2]} HELD_VARIANTS={len(held)} "
           f"RELEASE_RATE_VARIANTS={len(release)} ROUTE_VARIANTS={len(routes)}")
+    # The controlled single-note schedule has 17 program-0 trials followed
+    # by 9 program-17 trials. Only attribute deltas if trace cardinality,
+    # same-voice pairing and note/release ordering agree.
+    if len(note_words) != 26 or len(release_words) != 26:
+        print("FILTER_TRACE_CASE_ALIGNMENT=UNAVAILABLE")
+        return
+    for i,(on,off) in enumerate(zip(note_words,release_words)):
+        if on[1]!=off[1] or not 44100<=off[0]-on[0]<=88200 or (
+                i+1<len(note_words) and off[0]>=note_words[i+1][0]):
+            print("FILTER_TRACE_CASE_ALIGNMENT=UNAVAILABLE")
+            return
+    base = note_words[17][2]
+    base_rel = release_words[17][2]
+    if any(note_words[i][2]!=base or release_words[i][2]!=base_rel
+           for i in (18,25)):
+        print("FILTER_TRACE_CASE_ALIGNMENT=NEUTRAL_REGISTER_VARIATION")
+        return
+    print("FILTER_TRACE_CASE_ALIGNMENT=26_MATCHED_NOTE_RELEASE_PAIRS")
+    for index,field in ((1105,"decay"),(1106,"sustain"),(1107,"release")):
+        j=19+2*(index-1105)
+        if field=="decay":
+            delta=[(note_words[k][2]&127)-(base&127) for k in (j,j+1)]
+        elif field=="sustain":
+            delta=[((note_words[k][2]>>8)&127)-((base>>8)&127) for k in (j,j+1)]
+        else:
+            delta=[(release_words[k][2]&127)-(base_rel&127) for k in (j,j+1)]
+        print(f"FILTER_TRACE_FIELD_DELTA ID={index} MID={delta[0]} MAX={delta[1]}")
 
 
 def summarize_ram_trace(trace: Path):
