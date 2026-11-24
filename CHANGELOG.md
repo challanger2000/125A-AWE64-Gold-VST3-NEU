@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 24.11.2026 — P175/P165-Reglerport: alte Implementierung als verbindliche Vorlage
+
+- Nutzerentscheidung: penibel, effizient; alle verbliebenen Regler gemeinsam portieren und in einem gebündelten Windows-Prüflauf testen. Vorhandene P175/P165-Implementierung und Tests aus dem alten Projekt wiederverwenden, keine Rückkehr zur alten nativen Synth-Engine. Quellabgleich in `docs/P165-CONTROL-PORT.md`.
+- Alter Code auf 1f9051fa ist nachgewiesen vorhanden, aber kein Nachweis für die aktuelle DOSBox-Version. Der Registerabgleich zeigt insbesondere Trigger-, Engine- und Release-Bits, die bei direkten Portwrites zwingend erhalten werden müssen. Kein blindes Übertragen der alten Masken; keine Änderung am aktuellen Produktcode und kein zusätzlicher langer Windows-Lauf während des laufenden Sustain-Gates 45487683372.
+
 ## 24.11.2026 — Steinberg 47/47 und vollständiger Original-Klanglauf PASS; Sustain-PCM-Gate
 
 - [Windows 45479848893](../../actions/runs/45479848893) vollständig SUCCESS auf 1a009a4d; Version 45479848909 SUCCESS. Ungefilterter Original-Steinberg-Validator: 47 bestanden, 0 fehlgeschlagen. Kein Stale-Module-/Guest-Exit-/Restart-Refused-Marker im Joblog. Original-Creative-Archivvergleich Cheezoids 128/128, alle PCM-/Effekt-/Recall-Gates und nativer P165-Editor erneut PASS. p95 bei 44,1/48/96 kHz 13,288/14,9583/13,2812 ms, 7296/28522/14269 Queue-Blöcke mit jeweils 0 Audio-/MIDI-Drops und 0 Unterläufen. Master-RMS 100/50/0/Recall 0,0275934/0,013732/0/0,0137307.
