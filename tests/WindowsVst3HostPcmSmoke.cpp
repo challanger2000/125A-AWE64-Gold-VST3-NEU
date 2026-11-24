@@ -67,6 +67,38 @@ public:
     }
 };
 
+// The actual SDK host contract includes IPlugFrame: VSTGUI requests the
+// enclosing host to resize its HWND and acknowledge via IPlugView::onSize.
+class NativeEditorFrame final : public S::IPlugFrame {
+    std::atomic<S::uint32> refs_{1};
+    HWND parent_;
+public:
+    explicit NativeEditorFrame(HWND parent):parent_(parent){}
+    S::tresult PLUGIN_API queryInterface(const S::TUID iid,void** obj) override {
+        if(!obj)return S::kInvalidArgument;
+        *obj=nullptr;
+        if(S::FUnknownPrivate::iidEqual(iid,S::IPlugFrame::iid)||
+           S::FUnknownPrivate::iidEqual(iid,S::FUnknown::iid)){
+            addRef();*obj=static_cast<S::IPlugFrame*>(this);return S::kResultOk;
+        }
+        return S::kNoInterface;
+    }
+    S::uint32 PLUGIN_API addRef() override {return ++refs_;}
+    S::uint32 PLUGIN_API release() override {return --refs_;}
+    S::tresult PLUGIN_API resizeView(S::IPlugView* view,S::ViewRect* size) override {
+        if(!view||!size)return S::kInvalidArgument;
+        const auto w=size->right-size->left,h=size->bottom-size->top;
+        std::cout<<"EDITOR_HOST_RESIZE_REQUEST "<<w<<"x"<<h<<"\n";
+        if(w<=0||h<=0||w>8192||h>8192)return S::kInvalidArgument;
+        RECT rect{0,0,w,h};
+        if(!AdjustWindowRectEx(&rect,static_cast<DWORD>(GetWindowLongPtrW(parent_,GWL_STYLE)),
+             FALSE,static_cast<DWORD>(GetWindowLongPtrW(parent_,GWL_EXSTYLE))))return S::kResultFalse;
+        if(!SetWindowPos(parent_,nullptr,0,0,rect.right-rect.left,rect.bottom-rect.top,
+                         SWP_NOMOVE|SWP_NOZORDER|SWP_NOACTIVATE))return S::kResultFalse;
+        return view->onSize(size);
+    }
+};
+
 // A real Steinberg-VST3 IEventList: data.inputEvents, not a private MIDI hook.
 // The original DOS guest switches the real MPU-401 into UART and will only
 // turn on its PC speaker after NoteOn ch0/C4/velocity100 reaches DOS ports.
@@ -235,22 +267,34 @@ int main(int argc,char** argv) {
         HWND parent=CreateWindowExW(0,L"STATIC",L"125A editor host",WS_OVERLAPPEDWINDOW,
             0,0,1050,780,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
         if(!parent)return fail("Native editor parent HWND creation failed");
+        NativeEditorFrame frame(parent);
         for(unsigned pass=0;pass<2;++pass) {
             std::cout<<"EDITOR_CREATE_ENTER "<<pass<<"\n";
             S::IPlugView* view=controller->createView(V::ViewType::kEditor);
             if(!view||view->isPlatformTypeSupported(S::kPlatformTypeHWND)!=S::kResultTrue)
                 return fail("Actual VST3 editor does not support HWND");
+            if(view->setFrame(&frame)!=S::kResultOk)return fail("Actual editor setFrame failed");
+            S::ViewRect initial{};
+            const auto initialResult=view->getSize(&initial);
+            std::cout<<"EDITOR_INITIAL_SIZE "<<initial.right-initial.left<<"x"<<initial.bottom-initial.top
+                     <<" result="<<initialResult<<"\n";
             std::cout<<"EDITOR_ATTACH_ENTER "<<pass<<"\n";
             if(view->attached(parent,S::kPlatformTypeHWND)!=S::kResultOk)
                 return fail("Actual P165 editor attach failed");
             std::cout<<"EDITOR_ATTACH_OK "<<pass<<"\n";
             S::ViewRect size{};
-            if(view->getSize(&size)!=S::kResultOk||size.right-size.left!=1000||size.bottom-size.top!=708)
+            const auto sizeResult=view->getSize(&size);
+            RECT client{};
+            GetClientRect(parent,&client);
+            std::cout<<"EDITOR_ACTUAL_SIZE "<<size.right-size.left<<"x"<<size.bottom-size.top
+                     <<" result="<<sizeResult<<" HOST_CLIENT="<<client.right<<"x"<<client.bottom<<"\n";
+            if(sizeResult!=S::kResultOk||size.right-size.left!=1000||size.bottom-size.top!=708)
                 return fail("Actual P165 editor geometry differs from approved 1000x708");
             MSG msg{};
             while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
             std::cout<<"EDITOR_REMOVE_ENTER "<<pass<<"\n";
             if(view->removed()!=S::kResultOk)return fail("Actual P165 editor detach failed");
+            if(view->setFrame(nullptr)!=S::kResultOk)return fail("Actual editor clearFrame failed");
             view->release();
         }
         DestroyWindow(parent);

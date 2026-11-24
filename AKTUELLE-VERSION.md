@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — OLE-/Klangprüfung PASS; fehlendes IPlugFrame im GUI-Testhost ergänzt
+
+- [Windows 45446318739](../../actions/runs/45446318739) insgesamt FAIL ausschließlich beim nativen Editor-Größengate: OLE/InitDll, createView und attached erfolgreich; Größe nicht 1000x708. Sämtliche vorhergehenden Windows-Original-Archiv-, PCM-, Performance-, Stabilitäts- und Negativkontrollschritte SUCCESS. Transport 45446318910 und Version 45446318523 SUCCESS. OLE-Korrektur behebt den früheren Abbruch, aber GUI-Abnahme noch nicht vollständig.
+- Der native Testhost übergab bisher kein IPlugFrame. VSTGUI 4.x `VST3Editor::requestResize` benötigt dieses Interface zur Host-Größenanforderung. Jetzt echtes IPlugFrame mit Win32-Clientgrößenanpassung und onSize-Bestätigung; initiale und tatsächliche Größen, Rückgabecode und Host-Resize-Anforderung werden ausgegeben. Größen-Sollwert 1000x708 unverändert; keine erzwungene Rückgabe, keine Grafik-/Produkt-/DSP-Änderung. Neuer Windows-Nachweis offen; kein Release.
+
 ## 24.11.2026 — Nativer GUI-Test: fehlender Host-OLE-Start und getrennte Diagnose
 
 - [Windows 45442319908](../../actions/runs/45442319908) FAIL: Windows-Kompilierung und DLL-/MPU-/Hardware-Smokes bestanden; neuer gemeinsamer GUI-/Audio-Hosttest brach ohne native Diagnose vor PCM ab. Original-Archivtest wurde deshalb nicht ausgeführt. Transport 45442319845 und Version 45442320269 SUCCESS. Bisherige Klang-/Stabilitätsnachweise bleiben gültig.
