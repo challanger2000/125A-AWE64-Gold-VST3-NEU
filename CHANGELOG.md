@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Steinberg-Validator: Timeout, isolierter Diagnose-Workflow
+
+- [Windows 45459861521](../../actions/runs/45459861521) FAIL ausschließlich wegen 8-Minuten-Timeout im offiziellen Validator-Schritt. Windows-Build, synthetische Positiv-/Negativkontrollen, vollständige Original-Archivtests und P165-GUI-Lifecycle erneut PASS. Der Validator selbst wurde erfolgreich kompiliert; kein Testresultat und keine belegte Absturzursache. Version 45459861708 SUCCESS.
+- Separater schneller Diagnose-Workflow baut denselben gepinnten SDK-Validator und dasselbe VST3 mit synthetischem DOS-Gast, ohne erneute 20-minütige Original-Archivprüfung. Ungefilterter Validator mit fortlaufender statt erst am Ende ausgegebener PowerShell-Protokollierung und separatem 5-Minuten-Timeout; kein künstlicher PASS. Nur dieser neue Workflow wird durch seine eigene Datei ausgelöst. Vollständiger bestehender Integrations- und Validator-Pflichtlauf bleibt unverändert und ist vor Freigabe nötig. Keine Veröffentlichung von Artefakten oder Creative-Daten, keine Produkt-/DSP-/GUI-Änderung. Diagnoseergebnis offen.
+
 ## 24.11.2026 — Validator-Workflow: YAML-Einfügungsfehler korrigiert
 
 - [Windows 45458638773](../../actions/runs/45458638773) FAIL ohne Jobs: Fehler beim Einfügen des neuen Validator-Schritts verdoppelte den YAML-Dateischluss an der Regex-Endmarke. Kein Validator ausgeführt. Transport 45458642821 und Version 45458642659 SUCCESS.
