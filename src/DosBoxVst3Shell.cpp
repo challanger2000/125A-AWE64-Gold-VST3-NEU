@@ -22,6 +22,7 @@ using namespace Steinberg::Vst;
 namespace {
 constexpr ParamID kProgram = 1000u, kMaster = 1001u, kBank = 1002u;
 constexpr ParamID kReverbType=1200u,kChorusType=1201u;
+constexpr ParamID kReverbSend=1110u,kChorusSend=1111u;
 constexpr std::array<const char*,12> kControlLabels{
     "AMP ATTACK","AMP DECAY","AMP SUSTAIN","AMP RELEASE",
     "FILTER ATTACK","FILTER DECAY","FILTER SUSTAIN","FILTER RELEASE",
@@ -259,6 +260,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
             int32 offset=0;ParamValue normalized=0.;
             if(q->getPoint(q->getPointCount()-1,offset,normalized)!=kResultOk)
                 continue;
+            if(!std::isfinite(normalized))continue;
             const double value=std::clamp(normalized,0.,1.);
             switch(q->getParameterId()) {
                 case kProgram: {
@@ -271,6 +273,8 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
                 case kMaster:
                     master_.store(static_cast<float>(value),std::memory_order_release);
                     break;
+                case kReverbSend:reverbSend_.store(static_cast<std::uint8_t>(std::lround(value*255.)),std::memory_order_release);break;
+                case kChorusSend:chorusSend_.store(static_cast<std::uint8_t>(std::lround(value*255.)),std::memory_order_release);break;
                 case kReverbType:reverbType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);break;
                 case kChorusType:chorusType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);break;
                 default:break;
@@ -293,6 +297,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
             initialProgramSent_=true;lastBank_=bank;lastProgram_=program;
         }
     }
+    if(ready)engine.setAbsoluteSends(reverbSend_.load(std::memory_order_acquire),chorusSend_.load(std::memory_order_acquire));
     const auto reverb=reverbType_.load(std::memory_order_acquire);
     const auto chorus=chorusType_.load(std::memory_order_acquire);
     if(ready&&reverb!=lastReverbType_&&engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,false,reverb)))
@@ -353,6 +358,8 @@ ParamValue PLUGIN_API DosBoxVst3Shell::getParamNormalized(ParamID id) {
     if(id==kProgram)return program_.load(std::memory_order_acquire)/127.;
     if(id==kBank)return 0.;
     if(id==kMaster)return master_.load(std::memory_order_acquire);
+    if(id==kReverbSend)return reverbSend_.load(std::memory_order_acquire)/255.;
+    if(id==kChorusSend)return chorusSend_.load(std::memory_order_acquire)/255.;
     if(id==kReverbType)return reverbType_.load(std::memory_order_acquire)/7.;
     if(id==kChorusType)return chorusType_.load(std::memory_order_acquire)/7.;
     return SingleComponentEffect::getParamNormalized(id);
@@ -375,6 +382,10 @@ tresult PLUGIN_API DosBoxVst3Shell::setParamNormalized(ParamID id,ParamValue val
                     std::memory_order_release);
     else if(id==kMaster)
         master_.store(static_cast<float>(value),std::memory_order_release);
+    else if(id==kReverbSend)
+        reverbSend_.store(static_cast<std::uint8_t>(std::lround(value*255.)),std::memory_order_release);
+    else if(id==kChorusSend)
+        chorusSend_.store(static_cast<std::uint8_t>(std::lround(value*255.)),std::memory_order_release);
     else if(id==kReverbType)
         reverbType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);
     else if(id==kChorusType)
@@ -387,7 +398,8 @@ tresult PLUGIN_API DosBoxVst3Shell::getState(IBStream* stream) {
     for(unsigned i=0;i<4;i++)image[i]=kSignature[i];
     const auto selected=requestedSoundFont();
     const std::array<std::uint8_t,2> effects{reverbType_.load(std::memory_order_acquire),chorusType_.load(std::memory_order_acquire)};
-    image[4]=(effects[0]!=4||effects[1]!=2)?3:(selected.empty()?1:2);
+    std::array<std::uint8_t,2> sends{reverbSend_.load(std::memory_order_acquire),chorusSend_.load(std::memory_order_acquire)};
+    image[4]=(sends[0]||sends[1])?4:((effects[0]!=4||effects[1]!=2)?3:(selected.empty()?1:2));
     image[5]=bank_.load(std::memory_order_acquire);
     image[6]=program_.load(std::memory_order_acquire);
     const auto level=static_cast<std::uint32_t>(std::lround(
@@ -398,8 +410,9 @@ tresult PLUGIN_API DosBoxVst3Shell::getState(IBStream* stream) {
     int32 written=0;
     if(stream->write(image.data(),static_cast<int32>(image.size()),&written)!=kResultOk ||
        written!=static_cast<int32>(image.size()))return kResultFalse;
-    if(image[4]==3){
+    if(image[4]>=3){
         if(stream->write(const_cast<std::uint8_t*>(effects.data()),2,&written)!=kResultOk||written!=2)return kResultFalse;
+        if(image[4]==4&&(stream->write(sends.data(),2,&written)!=kResultOk||written!=2))return kResultFalse;
     } else if(selected.empty())return kResultOk;
     const auto n=static_cast<std::uint32_t>(selected.size());
     std::array<std::uint8_t,4> length{std::uint8_t(n),std::uint8_t(n>>8),std::uint8_t(n>>16),std::uint8_t(n>>24)};
@@ -415,14 +428,16 @@ tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
     if(stream->read(image.data(),static_cast<int32>(image.size()),&read)!=kResultOk||
        read!=static_cast<int32>(image.size())||
        !std::equal(kSignature.begin(),kSignature.end(),image.begin())||
-       (image[4]!=1&&image[4]!=2&&image[4]!=3)||image[9]!=0x5a||image[10]!=0xa5||
+       (image[4]<1||image[4]>4)||image[9]!=0x5a||image[10]!=0xa5||
        image[5]!=0||image[6]>127)return kResultFalse;
     const unsigned volume=image[7]|(static_cast<unsigned>(image[8])<<8);
     if(volume>10000)return kResultFalse;
     std::array<std::uint8_t,2> effects{4,2};
-    if(image[4]==3&&(stream->read(effects.data(),2,&read)!=kResultOk||read!=2||effects[0]>7||effects[1]>7))return kResultFalse;
+    if(image[4]>=3&&(stream->read(effects.data(),2,&read)!=kResultOk||read!=2||effects[0]>7||effects[1]>7))return kResultFalse;
+    std::array<std::uint8_t,2> sends{};
+    if(image[4]==4&&(stream->read(sends.data(),2,&read)!=kResultOk||read!=2))return kResultFalse;
     std::string selected;
-    if(image[4]==2||image[4]==3){
+    if(image[4]>=2){
         std::array<std::uint8_t,4> length{};
         if(stream->read(length.data(),4,&read)!=kResultOk||read!=4)return kResultFalse;
         const auto n=std::uint32_t(length[0])|(std::uint32_t(length[1])<<8)|
@@ -438,6 +453,8 @@ tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
     (void)setParamNormalized(kMaster,static_cast<double>(volume)/10000.);
     (void)setParamNormalized(kReverbType,effects[0]/7.);
     (void)setParamNormalized(kChorusType,effects[1]/7.);
+    (void)setParamNormalized(kReverbSend,sends[0]/255.);
+    (void)setParamNormalized(kChorusSend,sends[1]/255.);
     return kResultOk;
 }
 tresult PLUGIN_API DosBoxVst3Shell::setComponentState(IBStream* stream) {

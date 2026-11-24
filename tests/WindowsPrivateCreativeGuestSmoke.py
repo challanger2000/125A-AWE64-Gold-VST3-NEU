@@ -253,7 +253,7 @@ def effect_trace_summary(trace):
     return all(counts)
 
 
-def send_trace_summary(trace):
+def send_trace_summary(trace, expected=None):
     # Register layout from original EMU8000 programmer guide and upstream
     # snd_emu8k.h: PTRX[15:8] reverb, CSL[31:24] chorus. No DSP replacement.
     selected = -1
@@ -283,6 +283,8 @@ def send_trace_summary(trace):
     reverb = max(x[0] for x in latched)
     chorus = max(x[1] for x in latched)
     print(f"DIRECT_SEND_VOICE_COUNT={len(latched)}; REVERB={reverb}; CHORUS={chorus}")
+    if expected is not None and any(pair != expected for pair in latched):
+        raise RuntimeError("Absolute EMU8000 send registers differ from requested endpoints")
     return reverb, chorus
 
 
@@ -477,11 +479,12 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
                 if send_reference is not None:
                     reverb, chorus = send_trace_summary(trace)
                     print(f"DIRECT_SEND_CC_VALUE={send_reference}")
+                    # Original-driver observation is independent of the VST3
+                    # absolute-send gate. A nonzero original send at CC=0 is
+                    # a measured negative control, not a product pass.
                     if send_reference == 0 and (reverb != 0 or chorus != 0):
-                        raise RuntimeError("Original CC91/93 zero does not suppress embedded SF2 sends")
-                    if send_reference == 127 and (reverb == 0 or chorus == 0):
-                        raise RuntimeError("Original CC91/93 maximum did not produce both sends")
-                    print("DIRECT_ORIGINAL_SEND_ENDPOINT_PASS")
+                        print("ORIGINAL_CC_ZERO_NOT_ABSOLUTE_CONFIRMED")
+                    print("DIRECT_ORIGINAL_SEND_ENDPOINT_MEASURED")
                 metrics.report()
                 print('DIRECT_DOSBOX_MIXER_MEASURED; NOT_A_MUSICAL_PASS')
                 return
@@ -503,6 +506,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", type=Path)
     parser.add_argument("--trace-summary", type=Path)
+    parser.add_argument("--send-trace", type=Path)
+    parser.add_argument("--expected-sends", type=int, nargs=2)
     parser.add_argument("--ram-program", type=int, choices=(0, 17))
     parser.add_argument("--effect-reference", action="store_true")
     parser.add_argument("--corrected-sysex", action="store_true")
@@ -512,6 +517,12 @@ def main():
     parser.add_argument("--parent-work", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--reference", action="store_true", help="Measure direct mixer without VST3")
     opt = parser.parse_args()
+    if opt.send_trace is not None:
+        if opt.expected_sends is None or any(not 0 <= n <= 255 for n in opt.expected_sends):
+            parser.error("--send-trace requires --expected-sends REVERB CHORUS")
+        send_trace_summary(opt.send_trace, tuple(opt.expected_sends))
+        print("REAL_VST3_ABSOLUTE_SEND_REGISTER_PASS")
+        return
     if opt.trace_summary is not None:
         summarize_ram_trace(opt.trace_summary)
         return

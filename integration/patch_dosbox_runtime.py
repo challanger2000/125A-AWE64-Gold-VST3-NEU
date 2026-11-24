@@ -13,6 +13,14 @@ PORT_BRIDGE = r'''
 // Emulated CPU thread reads Creative MIDI input port BEE0h..BEEFh.
 using Awe64IORead = unsigned char (__cdecl *)(void*,unsigned short);
 using Awe64IOWrite = void (__cdecl *)(void*,unsigned short,unsigned char);
+// Disabled for unchanged original reference and synthetic tests until the
+// real VST3 host publishes an absolute hardware send setting.
+static std::atomic<unsigned> awe64_absolute_sends{0x10000u};
+extern "C" __declspec(dllexport) void __cdecl AWE64_SetAbsoluteSends(
+    unsigned packed) noexcept {
+    awe64_absolute_sends.store(packed<=0xffffu?packed:0x10000u,
+                               std::memory_order_release);
+}
 static std::atomic<void*> awe64_port_context{nullptr};
 static std::atomic<Awe64IORead> awe64_port_reader{nullptr};
 static std::atomic<Awe64IOWrite> awe64_port_writer{nullptr};
@@ -64,6 +72,77 @@ def patch_emu(s):
     AweHostWrite.Install(0xBEF0u,awe64_write_guest_port,IO_MB,1);
 #endif
 '''+anchor)
+    # The original synth and effects stay untouched. Set only the two
+    # documented send bytes through the actual EMU8000 register writer.
+    s=once(s,'\t/* Emulated time in chip frames (44100 Hz) since the reset. */',r'''#ifdef AWE64_VST3_RUNTIME
+    unsigned appliedSends=0x10000u;
+    void AbsoluteSendWrite(Bitu port,Bitu value) {
+        Trace(port,value);
+        emu8k_outw((uint16_t)port,(uint16_t)value,emu);
+    }
+    void ApplyAbsoluteSends() {
+        const unsigned requested=awe64_absolute_sends.load(std::memory_order_acquire);
+        if(requested==appliedSends)return;
+        appliedSends=requested;
+        if(requested>0xffffu)return;
+        const Bitu saved=(emu->cur_reg<<5)|emu->cur_voice;
+        const unsigned rev=requested&255u,cho=requested>>8;
+        bool changed=false;
+        for(unsigned voice=0;voice<30;++voice) {
+            const auto& v=emu->voice[voice];
+            if(v.ptrx_revb_send!=rev) {
+                AbsoluteSendWrite(base+0x802u,0x20u|voice);
+                AbsoluteSendWrite(base,(v.ptrx&255u)|(rev<<8));
+                changed=true;
+            }
+            if(v.csl_chor_send!=cho) {
+                AbsoluteSendWrite(base+0x802u,0xe0u|voice);
+                AbsoluteSendWrite(base+2,(v.csl>>16&255u)|(cho<<8));
+                changed=true;
+            }
+        }
+        if(changed)AbsoluteSendWrite(base+0x802u,saved);
+    }
+    Bitu AbsoluteSendWord(Bitu port,Bitu word) const {
+        if(appliedSends>0xffffu||emu->cur_voice>=30)return word;
+        if(port==base&&emu->cur_reg==1)
+            return (word&255u)|((appliedSends&255u)<<8);
+        if(port==base+2&&emu->cur_reg==7)
+            return (word&255u)|(appliedSends&0xff00u);
+        return word;
+    }
+#endif
+'''+ '\t/* Emulated time in chip frames (44100 Hz) since the reset. */')
+    a=s.index('void EMU8000_Device::Write(Bitu port, Bitu val, Bitu iolen) {')
+    b=s.index('void EMU8000_Device::Mix(Bitu len) {',a)
+    original=s[a:b]
+    changed=once(original,'\tSync();',r'''\tSync();
+#ifdef AWE64_VST3_RUNTIME
+    ApplyAbsoluteSends();
+    // Only rewrite the send byte of actual register writes, retaining the
+    // exact other fields, including pitch/pan/loop address.
+    if(appliedSends<=0xffffu) {
+        if(iolen>=4) {
+            const Bitu lo=AbsoluteSendWord(port,val&0xffffu);
+            const Bitu hi=AbsoluteSendWord(port+2,(val>>16)&0xffffu);
+            val=lo|(hi<<16);
+        } else if(iolen==2) {
+            val=AbsoluteSendWord(port,val&0xffffu);
+        } else if((port&~(Bitu)1)==base || (port&~(Bitu)1)==base+2) {
+            // Upstream byte writes are exactly zero-extended word writes.
+            const Bitu word=(port&1)?(val&255u)<<8:val&255u;
+            AbsoluteSendWrite(port&~(Bitu)1,AbsoluteSendWord(port&~(Bitu)1,word));
+            return;
+        }
+    }
+#endif'''.replace(r'\t','\t'))
+    s=s[:a]+changed+s[b:]
+    s=once(s,'void EMU8000_Device::Mix(Bitu len) {\n\t/*',r'''void EMU8000_Device::Mix(Bitu len) {
+#ifdef AWE64_VST3_RUNTIME
+    Sync();
+    ApplyAbsoluteSends();
+#endif
+\t/*'''.replace(r'\t','\t'))
     return s
 def patch_mixer(s):
     if 'AWE64_HostRegisterPCM(' in s:raise ValueError('Already patched mixer')

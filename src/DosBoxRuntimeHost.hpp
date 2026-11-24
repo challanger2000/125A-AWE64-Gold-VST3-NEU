@@ -36,6 +36,9 @@ class DosBoxRuntimeHost final {
     AWE64_StartGuestFn startGuest_=nullptr;
     AWE64_RequestStopFn requestStop_=nullptr;
     AWE64_IsGuestMidiReadyFn ready_=nullptr;
+    AWE64_SetAbsoluteSendsFn sends_=nullptr;
+    unsigned lastSends_=0x10000u;
+    bool authenticGuest_=false;
     std::unique_ptr<rt::RealtimeQueues> queues_;
     std::unique_ptr<DosBoxHostAdapter> adapter_;
     std::thread worker_;
@@ -156,7 +159,8 @@ public:
         requestStop_=reinterpret_cast<AWE64_RequestStopFn>(
                           GetProcAddress(module_,"AWE64_RequestStop"));
         ready_=reinterpret_cast<AWE64_IsGuestMidiReadyFn>(GetProcAddress(module_,"AWE64_IsGuestMidiReady"));
-        if(!registerMidi_||!registerPCM_||!startGuest_||!requestStop_||!ready_) {
+        sends_=reinterpret_cast<AWE64_SetAbsoluteSendsFn>(GetProcAddress(module_,"AWE64_SetAbsoluteSends"));
+        if(!registerMidi_||!registerPCM_||!startGuest_||!requestStop_||!ready_||!sends_) {
             stop();return false;
         }
         try {
@@ -174,6 +178,7 @@ public:
                     stop();return false;
                 }
                 guestProgram="D:\\FXDEMO.EXE";
+                authenticGuest_=true;
             }
             if(!externalBank.empty()) {
                 std::vector<std::uint8_t> bytes;
@@ -247,6 +252,7 @@ public:
             }
             // Two output destinations: original MPU-401 guest input and
             // original DOSBox audio mixer. Do NOT register BEE0 MIDI consumer.
+            sends_(0x10000u);lastSends_=0x10000u;
             registerMidi_(adapter_.get(),&DosBoxHostAdapter::pullMidi);
             registerPCM_(adapter_.get(),&DosBoxHostAdapter::receivePCM);
             finished_.store(false,std::memory_order_release);
@@ -267,6 +273,8 @@ public:
             // a permanently blocked guest remains an unresolved risk.
             worker_.join();
         }
+        if(sends_)sends_(0x10000u);
+        authenticGuest_=false;lastSends_=0x10000u;
         if(registerMidi_)registerMidi_(nullptr,nullptr);
         if(registerPCM_)registerPCM_(nullptr,nullptr);
         adapter_.reset();
@@ -274,7 +282,7 @@ public:
         if(module_)FreeLibrary(module_);
         module_=nullptr;
         registerMidi_=nullptr;registerPCM_=nullptr;
-        startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;
+        startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;sends_=nullptr;
         argvStorage_.clear();
         if(!stagedDirectory_.empty()) {
             std::error_code ec;std::filesystem::remove_all(stagedDirectory_,ec);
@@ -295,6 +303,12 @@ public:
     }
     [[nodiscard]] int guestExitCode() const noexcept {
         return guestExitCode_.load(std::memory_order_acquire);
+    }
+    void setAbsoluteSends(unsigned reverb,unsigned chorus) noexcept {
+        const unsigned packed=(reverb&255u)|((chorus&255u)<<8);
+        if(authenticGuest_&&sends_&&packed!=lastSends_) {
+            sends_(packed);lastSends_=packed;
+        }
     }
     bool sendMidi(const rt::MidiEvent& e) noexcept {
         return queues_ && queues_->pushMidi(e);

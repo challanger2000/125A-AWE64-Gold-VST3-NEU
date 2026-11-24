@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Absolute Hardware-Sends statt additiver Creative-CCs
+
+- Die bereits nachgewiesene Nicht-Null des originalen CC93 trotz Wert 0 wird nicht als Produktfunktion ausgegeben. Die P165-Sends 1110/1111 setzen jetzt ausschließlich die beiden originalen EMU8000-Registerbytes PTRX[15:8] und CSL[31:24] für Stimmen 0–29, via originaler Register-Schreibroutine im DOSBox-Gerätewrapper. Keine Änderung der gepinnten Chip-DSP-Implementierung. Der Host publiziert nur ein atomares Wertepaar; kein Chipzugriff vom DAW-Callback. Nach Gastbereitschaft wird 0/0 als Standard gesetzt, bei Live-Änderung auch bestehende Stimmen aktualisiert; Original-Referenz ohne gesetzte Host-Overrides unverändert. Reservierte Stimmen 30/31 und andere Registerfelder bleiben unangetastet.
+- GUI-Kompatkopie aktiviert die beiden bestehenden Sendregler, Prozentwerte, State v4 (v1–3 weiter lesbar, Default dry). Neue Windows-Tests am echten VST3 mit eingebetteten hohen SF2-Sends: 0/0, 255/0, 0/255, jeweils echte RAM-Voice-Register und Controller-State-Recall. Original-CC-Referenz bleibt als separate Beobachtung erhalten. Native Ausführung und Wirkungsprüfung stehen noch aus.
+- Quelltext-Regressionsprüfung nach der bewiesenen SysEx-Korrektur an den tatsächlich dynamisch zusammengesetzten DOS-Aufruf angepasst; vorheriger Stringvergleich war veraltet. Kein Release.
+
 ## 24.11.2026 — Original-SysEx-Korrektur tatsächlich bewiesen und in VST3 integriert
 
 - Windows 45306739416: originale unveränderte Creative DEMO.EXE liefert beide Registersignaturen 0/0, die ausschließlich temporär um ein Byte korrigierte Kopie liefert Plate=1 und Short Delay Feedback=1. Damit ist der konkrete Vergleichsfehler experimentell bestätigt, nicht mehr nur Disassemblierungshypothese. Beide RAM-Programme, 48-kHz-Klang und Sparse-Recall weiter PASS.

@@ -169,6 +169,9 @@ void PresetBrowserView::ChooseRom() {
     if(reverbMenu_)reverbMenu_->setValue(static_cast<float>(std::lround(controller_->getParamNormalized(kReverbType)*7.)));
     if(chorusMenu_)chorusMenu_->setValue(static_cast<float>(std::lround(controller_->getParamNormalized(kChorusType)*7.)));
 ]=] AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  # Two original send knobs now control real EMU8000 voice-send registers.
+  string(REPLACE "for(auto* knob:controls_)if(knob)knob->setMouseEnabled(false);" "for(auto* knob:controls_)if(knob)knob->setMouseEnabled(false);\n    if(controls_[10])controls_[10]->setMouseEnabled(true);\n    if(controls_[11])controls_[11]->setMouseEnabled(true);" AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  string(REPLACE [=[values_[size_t(i)]->setText("--"); // original Creative bridge unimplemented]=] [=[values_[size_t(i)]->setText(i>=10?label:"--");]=] AWE64_GUI_SRC "${AWE64_GUI_SRC}")
   set(AWE64_GUI_COMPAT_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/PresetBrowserViewSdkCompat.cpp")
   file(WRITE "${AWE64_GUI_COMPAT_SOURCE}" "${AWE64_GUI_SRC}")
 

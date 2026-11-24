@@ -145,6 +145,9 @@ int main(int argc,char** argv) {
     const double hostRate=hostRateEnv?std::atof(hostRateEnv):44100.;
     if(hostRate!=44100.&&hostRate!=48000.)return fail("Unsupported native test host rate");
     const bool effectTest=std::getenv("AWE64_TEST_EFFECT_TYPES")!=nullptr;
+    const char* sendTest=std::getenv("AWE64_TEST_SEND_PAIR");
+    const unsigned sendPair=sendTest?static_cast<unsigned>(std::strtoul(sendTest,nullptr,10)):0;
+    if(sendPair>65535)return fail("Invalid send test pair");
     const bool originalMode=(argc==4 && std::strcmp(argv[2],"--original")==0);
     const bool exclusionMode=(argc==3 && std::strcmp(argv[2],"--negative")==0);
     const int originalSeconds=originalMode ? std::atoi(argv[3]) : 0;
@@ -337,7 +340,7 @@ int main(int argc,char** argv) {
         std::cout<<"REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS\n";
     }
     V::IEditController* effectController=nullptr;
-    if(effectTest&&component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&effectController))!=S::kResultOk)
+    if((effectTest||sendTest)&&component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&effectController))!=S::kResultOk)
         return fail("Effect test controller unavailable");
     const auto measurementStart=std::chrono::steady_clock::now();
     for(unsigned block=0;block<maxBlocks;++block){
@@ -346,6 +349,23 @@ int main(int argc,char** argv) {
         // Startup transients cannot satisfy the musical note gate.
         const bool sendNote=originalMode ? block==startNoteBlock : (block>=15 && block%15u==0u);
         const bool sendNoteOff=originalMode && block==stopNoteBlock;
+        if(sendTest&&block==warmupBlocks) {
+            const double rev=(sendPair&255u)/255.,cho=(sendPair>>8)/255.;
+            if(effectController->setParamNormalized(1110,rev)!=S::kResultOk||
+               effectController->setParamNormalized(1111,cho)!=S::kResultOk)
+                return fail("Absolute send edit failed");
+            S::MemoryStream saved;
+            if(component->getState(&saved)!=S::kResultOk)return fail("Send state save failed");
+            if(effectController->setParamNormalized(1110,1.-rev)!=S::kResultOk||
+               effectController->setParamNormalized(1111,1.-cho)!=S::kResultOk)
+                return fail("Send negative edit failed");
+            S::MemoryStream restored(saved.getData(),saved.getSize());
+            if(component->setState(&restored)!=S::kResultOk||
+               std::abs(effectController->getParamNormalized(1110)-rev)>0.00001||
+               std::abs(effectController->getParamNormalized(1111)-cho)>0.00001)
+                return fail("Absolute send state recall failed");
+            std::cout<<"REAL_VST3_ABSOLUTE_SEND_STATE_PASS\n";
+        }
         if(effectTest&&block==warmupBlocks) {
             if(effectController->setParamNormalized(1200,5./7.)!=S::kResultOk||
                effectController->setParamNormalized(1201,1.)!=S::kResultOk)

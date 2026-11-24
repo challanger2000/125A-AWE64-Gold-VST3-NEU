@@ -29,7 +29,10 @@ class TestOriginalAweHardwareProbe(unittest.TestCase):
                   "DosBoxRuntimeHost.hpp").read_text(encoding="utf-8")
         self.assertNotIn('"-silent"', source)
         self.assertIn('"sblaster sbtype=sbawe"', source)
-        self.assertIn('"DEMO.EXE /SBK:SYNTHGM.SF2"', source)
+        self.assertIn('guestBank="SYNTHGM.SF2"', source)
+        self.assertIn('guestProgram+" /SBK:"+guestBank', source)
+        self.assertIn('authenticDemo(image)', source)
+        self.assertIn('repairCreativeSysexCompare(image)', source)
         self.assertIn('"-nogui"', source)
 
     def test_trace_only_original_awe_hardware_word_writes(self):

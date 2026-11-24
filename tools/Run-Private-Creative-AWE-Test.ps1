@@ -232,6 +232,37 @@ try {
         & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds --reference --ram-program 0 --send-reference $cc
         if ($LASTEXITCODE -ne 0) { $sendFailures += "CC91/93=$cc" }
     }
+    # Product absolute sends: adversarial embedded wet generators, both
+    # endpoints independently, plus actual native controller/state roundtrip.
+    $wetFixture = Join-Path $temporary '125A wet send probe.sf2'
+    & python (Join-Path $root 'tests/MakeRamSampleSf2.py') --output $wetFixture --wet
+    if ($LASTEXITCODE -ne 0) { throw 'Wet fixture creation failed.' }
+    $wetHash = (Get-FileHash -Algorithm SHA256 $wetFixture).Hash
+    $previousPair = [Environment]::GetEnvironmentVariable('AWE64_TEST_SEND_PAIR','Process')
+    try {
+        foreach ($pair in @(0,255,65280)) {
+            $sendTrace = Join-Path $temporary ("send_" + $pair + ".trace")
+            $sendBoot = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
+            [Environment]::SetEnvironmentVariable('AWE64_TEST_SEND_PAIR', [string]$pair, 'Process')
+            [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', $wetFixture, 'Process')
+            [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ', '441', 'Process')
+            [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $sendTrace, 'Process')
+            [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', '1', 'Process')
+            [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $sendBoot, 'Process')
+            & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
+            if ($LASTEXITCODE -ne 0) { $sendFailures += "native send pair $pair"; continue }
+            & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --send-trace $sendTrace --expected-sends ($pair -band 255) ($pair -shr 8)
+            if ($LASTEXITCODE -ne 0) { $sendFailures += "native register pair $pair" }
+            if ((Get-FileHash -Algorithm SHA256 $wetFixture).Hash -ne $wetHash) { throw 'Wet source changed.' }
+        }
+    } finally {
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_SEND_PAIR', $previousPair, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2', $previousExternal, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ', $previousRamHz, 'Process')
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', $previousOriginal, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $previousBootLog, 'Process')
+    }
     # Direct reference: use exactly the same original GS macros without VST3.
     & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --bundle $bundlePath --seconds $Seconds --reference --effect-reference
     $directEffectExit = $LASTEXITCODE

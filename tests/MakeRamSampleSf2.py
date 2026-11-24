@@ -81,6 +81,7 @@ def build(wet=False):
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--wet", action="store_true")
     args = p.parse_args()
     with args.output.open("xb") as fp:
-        fp.write(build())
+        fp.write(build(wet=args.wet))
