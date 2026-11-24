@@ -223,7 +223,8 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         guestStatus_.store(-2,std::memory_order_release);
         return kResultFalse; // original DOS guest exited; no fake playback
     }
-    if(engine.running())guestStatus_.store(2,std::memory_order_release);
+    const bool ready=engine.ready();
+    if(ready)guestStatus_.store(2,std::memory_order_release);
 
     if(data.inputParameterChanges) {
         for(int32 i=0;i<data.inputParameterChanges->getParameterCount();++i) {
@@ -233,7 +234,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
                 // Preserve every mapped controller change in this block.
                 for(int32 n=0;n<q->getPointCount();++n) {
                     int32 offset=0;ParamValue v=0.;rt::MidiEvent midi{};
-                    if(q->getPoint(n,offset,v)==kResultOk &&
+                    if(ready&&q->getPoint(n,offset,v)==kResultOk &&
                        rt::makeMappedController(q->getParameterId(),v,
                            absoluteSamplePosition_+static_cast<std::uint64_t>(
                                std::clamp(offset,0,data.numSamples)),midi))
@@ -263,7 +264,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     }
     const auto bank=bank_.load(std::memory_order_acquire);
     const auto program=program_.load(std::memory_order_acquire);
-    if(!initialProgramSent_||lastBank_!=bank||lastProgram_!=program) {
+    if(ready&&(!initialProgramSent_||lastBank_!=bank||lastProgram_!=program)) {
         // The original Creative DOS demo uses CC0 (BANK MSB), not CC32
         // (BANK LSB), to select an AWE SF2 bank. Keep MIDI routed through
         // the original MPU-401, never synthesize or write EMU registers here.
@@ -279,11 +280,11 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     }
     const auto reverb=reverbType_.load(std::memory_order_acquire);
     const auto chorus=chorusType_.load(std::memory_order_acquire);
-    if(reverb!=lastReverbType_&&engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,false,reverb)))
+    if(ready&&reverb!=lastReverbType_&&engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,false,reverb)))
         lastReverbType_=reverb;
-    if(chorus!=lastChorusType_&&engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,true,chorus)))
+    if(ready&&chorus!=lastChorusType_&&engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,true,chorus)))
         lastChorusType_=chorus;
-    if(data.inputEvents){
+    if(ready&&data.inputEvents){
         const int32 count=data.inputEvents->getEventCount();
         for(int32 i=0;i<count;++i){
             Event event{};
@@ -318,7 +319,8 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         if(left&&right){
             // Preserve native mixer samples at 44.1 kHz. For higher host
             // rates convert the original final PCM, not the chip clock.
-            if(rateConverter_.bypass())engine.readAudio(left,right,static_cast<std::size_t>(data.numSamples));
+            if(!ready){std::fill_n(left,data.numSamples,0.f);std::fill_n(right,data.numSamples,0.f);}
+            else if(rateConverter_.bypass())engine.readAudio(left,right,static_cast<std::size_t>(data.numSamples));
             else rateConverter_.render(left,right,static_cast<std::size_t>(data.numSamples),[&engine]() noexcept {
                 rt::StereoFrame f{};engine.readAudio(&f.left,&f.right,1);return f;
             });
@@ -423,7 +425,7 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
             const auto selection=soundFontStatus();
             if(!selection.empty())return selection;
             const int s=guestStatus_.load(std::memory_order_acquire);
-            return s==2 ? std::string("DOSBOX-X: EMULATOR AKTIV, CREATIVE-STATUS UNGEPRUEFT") :
+            return s==2 ? std::string("DOSBOX-X: MIDI-GAST BEREIT") :
                    s==1 ? std::string("DOSBOX-X: ORIGINALER CREATIVE-DOS-GAST STARTET") :
                    s==-1 ? std::string("DOSBOX-X: ORIGINAL-DATEIEN ODER DLL FEHLEN") :
                    s==-2 ? std::string("DOSBOX-X: GAST IST BEENDET") :
@@ -431,7 +433,7 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
         },
         [this](){
             const int s=guestStatus_.load(std::memory_order_acquire);
-            return s==2 ? std::string("ORIGINAL DOSBOX-X AKTIV | CREATIVE NICHT VERIFIZIERT") :
+            return s==2 ? std::string("ORIGINAL DOSBOX-X | MIDI-GAST BEREIT") :
                    s==1 ? std::string("ORIGINAL DOSBOX-X STARTET") :
                            std::string("AWE64 GOLD | KEIN AUDIO-GAST");
         },

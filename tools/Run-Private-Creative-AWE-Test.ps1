@@ -254,6 +254,7 @@ try {
                 }
             }
         }
+        Write-Host "EFFECT_TRACE_PLATE=$plate; EFFECT_TRACE_FEEDBACK=$feedback"
         if (-not ($plate -and $feedback)) { throw 'Original DOS driver did not write expected plate/short-delay-feedback EMU8000 registers.' }
         Write-Host 'ORIGINAL_CREATIVE_EFFECT_TYPES_REGISTER_PASS; PLATE; SHORT_DELAY_FEEDBACK'
     } finally {

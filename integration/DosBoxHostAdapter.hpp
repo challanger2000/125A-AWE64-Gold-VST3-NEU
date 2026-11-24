@@ -2,6 +2,7 @@
 // Same-process DOSBox-X C ABI -> original Creative DOS mailbox / real mixer PCM.
 #include "CreativeDosMailbox.hpp"
 #include "CreativeEffectMidi.hpp"
+#include "AWE64_DOSBOX_ABI.h"
 #include <cstdint>
 #if defined(_WIN32)
 #define AWE64_ABI_CALL __cdecl
@@ -12,9 +13,10 @@ namespace awe64::integration {
 class DosBoxHostAdapter final {
     rt::RealtimeQueues& queues_;
     guest::CreativeDosMailbox mailbox_;
+    AWE64_IsGuestMidiReadyFn ready_=nullptr;
 public:
-    explicit DosBoxHostAdapter(rt::RealtimeQueues& q) noexcept:
-        queues_(q),mailbox_(q){}
+    explicit DosBoxHostAdapter(rt::RealtimeQueues& q,AWE64_IsGuestMidiReadyFn ready=nullptr) noexcept:
+        queues_(q),mailbox_(q),ready_(ready){}
     DosBoxHostAdapter(const DosBoxHostAdapter&)=delete;
     DosBoxHostAdapter& operator=(const DosBoxHostAdapter&)=delete;
     guest::CreativeDosMailbox& mailbox() noexcept{return mailbox_;}
@@ -55,7 +57,10 @@ public:
     static void AWE64_ABI_CALL receivePCM(void* ctx,const std::int16_t* s,
                                            unsigned int frames) noexcept {
         if(!ctx||!s)return;
-        auto& ring=static_cast<DosBoxHostAdapter*>(ctx)->queues_;
+        auto* self=static_cast<DosBoxHostAdapter*>(ctx);
+        // Discard hardware startup PCM before it reaches the audio ring.
+        if(self->ready_&&!self->ready_())return;
+        auto& ring=self->queues_;
         constexpr float scale=1.f/32768.f;
         for(unsigned int i=0;i<frames;i++)
             (void)ring.pushAudio({float(s[2u*i])*scale,float(s[2u*i+1u])*scale});

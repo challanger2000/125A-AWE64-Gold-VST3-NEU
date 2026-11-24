@@ -33,6 +33,7 @@ class DosBoxRuntimeHost final {
     AWE64_RegisterPCMFn registerPCM_=nullptr;
     AWE64_StartGuestFn startGuest_=nullptr;
     AWE64_RequestStopFn requestStop_=nullptr;
+    AWE64_IsGuestMidiReadyFn ready_=nullptr;
     std::unique_ptr<rt::RealtimeQueues> queues_;
     std::unique_ptr<DosBoxHostAdapter> adapter_;
     std::thread worker_;
@@ -124,7 +125,8 @@ public:
                           GetProcAddress(module_,"AWE64_StartGuest"));
         requestStop_=reinterpret_cast<AWE64_RequestStopFn>(
                           GetProcAddress(module_,"AWE64_RequestStop"));
-        if(!registerMidi_||!registerPCM_||!startGuest_||!requestStop_) {
+        ready_=reinterpret_cast<AWE64_IsGuestMidiReadyFn>(GetProcAddress(module_,"AWE64_IsGuestMidiReady"));
+        if(!registerMidi_||!registerPCM_||!startGuest_||!requestStop_||!ready_) {
             stop();return false;
         }
         try {
@@ -151,7 +153,7 @@ public:
                 guestBank="D:\\BANK.SF2";
             }
             queues_=std::make_unique<rt::RealtimeQueues>();
-            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_);
+            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_);
             // Original DOSBox-X sblaster.cpp forces SBT_NONE if opt_silent.
             // A sounding AWE64 must NEVER include the -silent flag.
             // -nogui and -nomenu suppress UI without disabling hardware.
@@ -237,7 +239,7 @@ public:
         if(module_)FreeLibrary(module_);
         module_=nullptr;
         registerMidi_=nullptr;registerPCM_=nullptr;
-        startGuest_=nullptr;requestStop_=nullptr;
+        startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;
         argvStorage_.clear();
         if(!stagedDirectory_.empty()) {
             std::error_code ec;std::filesystem::remove_all(stagedDirectory_,ec);
@@ -249,6 +251,7 @@ public:
             owns_=false;
         }
     }
+    [[nodiscard]] bool ready() const noexcept {return ready_&&ready_()!=0;}
     [[nodiscard]] bool running() const noexcept {
         return running_.load(std::memory_order_acquire);
     }

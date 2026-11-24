@@ -202,7 +202,7 @@ class MixerWindowMetrics:
 
 
 def run_child(bundle: Path, seconds: float, reference: bool = False,
-              ram_program: int | None = None):
+              ram_program: int | None = None, parent_work: Path | None = None):
     if os.name != "nt":
         raise RuntimeError("This test must run on Windows x64")
     dll_file, assets = find_private_bundle(bundle)
@@ -211,7 +211,10 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
     os.environ["SDL_VIDEODRIVER"] = "dummy"
     # Original mixer must choose its own isolated internal SDL2 dummy driver.
     os.environ.pop("SDL_AUDIODRIVER", None)
-    with tempfile.TemporaryDirectory(prefix="awe64_private_trace_") as work:
+    from contextlib import nullcontext
+    # Windows DOS redirection retains a handle until process exit. Parent
+    # owns this directory and deletes it only after the isolated child exits.
+    with (nullcontext(str(parent_work)) if parent_work else tempfile.TemporaryDirectory(prefix="awe64_private_trace_")) as work:
         trace = Path(work) / "emu8k.trace"
         ram_dir = None
         if ram_program is not None:
@@ -378,6 +381,7 @@ def main():
     parser.add_argument("--ram-program", type=int, choices=(0, 17))
     parser.add_argument("--seconds", type=float, default=30.)
     parser.add_argument("--child", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--parent-work", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--reference", action="store_true", help="Measure direct mixer without VST3")
     opt = parser.parse_args()
     if opt.trace_summary is not None:
@@ -390,7 +394,7 @@ def main():
     if not (5 <= opt.seconds <= 120):
         parser.error("--seconds must be 5..120")
     if opt.child:
-        run_child(opt.bundle, opt.seconds, opt.reference, opt.ram_program)
+        run_child(opt.bundle, opt.seconds, opt.reference, opt.ram_program, opt.parent_work)
         return
     # A native crash or hang must not terminate the controlling test process.
     command = [sys.executable, str(Path(__file__).resolve()), "--child",
@@ -401,9 +405,11 @@ def main():
         command.append('--reference')
     if opt.ram_program is not None:
         command.extend(('--ram-program', str(opt.ram_program)))
-    completed = subprocess.run(
-        command, capture_output=True, text=True, check=False,
-        timeout=opt.seconds + 25)
+    with tempfile.TemporaryDirectory(prefix="awe64_private_trace_") as work:
+        command.extend(("--parent-work", work))
+        completed = subprocess.run(
+            command, capture_output=True, text=True, check=False,
+            timeout=opt.seconds + 25)
     marker = ("DIRECT_DOSBOX_MIXER_MEASURED; NOT_A_MUSICAL_PASS" if opt.reference
               else "PRIVATE_CREATIVE_DOS_AWE_PCM_PASS")
     if completed.returncode != 0 or marker not in completed.stdout:

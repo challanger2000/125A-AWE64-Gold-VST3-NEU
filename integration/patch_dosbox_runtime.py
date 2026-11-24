@@ -114,6 +114,10 @@ MPU_BRIDGE = r'''
 using Awe64PullMidi = unsigned int (__cdecl *)(void*,unsigned char*,unsigned int);
 static std::atomic<void*> awe64_mpu_ctx{nullptr};
 static std::atomic<Awe64PullMidi> awe64_mpu_pull{nullptr};
+static std::atomic<bool> awe64_guest_midi_ready{false};
+extern "C" __declspec(dllexport) int __cdecl AWE64_IsGuestMidiReady() noexcept {
+    return awe64_guest_midi_ready.load(std::memory_order_acquire)?1:0;
+}
 extern "C" __declspec(dllexport) void __cdecl AWE64_HostRegisterMidi(
     void* p,Awe64PullMidi fn) noexcept {
     awe64_mpu_pull.store(nullptr,std::memory_order_release);
@@ -131,7 +135,17 @@ def patch_mpu(s):
     anchor='static void ClrQueue(void) {'
     pump='''#ifdef AWE64_VST3_RUNTIME
 static void AWE64_PumpGuestMidi() {
-    if(mpu.mode!=M_UART)return;
+    if(mpu.mode!=M_UART) {
+        awe64_guest_midi_ready.store(false,std::memory_order_release);
+        return;
+    }
+    // The untouched Creative DEMO consumes its UART ACK before SF2 load.
+    // Only its subsequent status poll signals entry into the MIDI loop.
+    // Do not let host MIDI contaminate the initialization ACK.
+    if(!awe64_guest_midi_ready.load(std::memory_order_relaxed)) {
+        if(mpu.queue_used!=0)return;
+        awe64_guest_midi_ready.store(true,std::memory_order_release);
+    }
     auto pull=awe64_mpu_pull.load(std::memory_order_acquire);
     if(!pull)return;
     // The original UART FIFO holds 32 bytes. Queue complete messages only.

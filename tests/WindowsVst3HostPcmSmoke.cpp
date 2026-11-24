@@ -370,8 +370,10 @@ int main(int argc,char** argv) {
                 er+=x*std::cos(a);ei+=x*std::sin(a);
                 orr+=x*std::cos(b);oi+=x*std::sin(b);
             }
-            if(!std::isfinite(v)||v>1.01f)
+            if(!std::isfinite(l[i])||!std::isfinite(r[i])||v>1.01f) {
+                std::cerr<<"PCM_LIMIT_FAILURE_BLOCK="<<block<<" SAMPLE="<<i<<" PEAK="<<v<<" HOST_RATE="<<hostRate<<"\n";
                 return fail("Actual VST3 audio contained non-finite or clipped signal");
+            }
             if(!originalMode && block<15 && v>0.001f)
                 return fail("Audio produced BEFORE first VST3 MIDI NoteOn event");
             if(originalMode) {
