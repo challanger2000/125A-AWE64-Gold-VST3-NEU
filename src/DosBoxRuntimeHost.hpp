@@ -24,6 +24,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <chrono>
 #include <vector>
 #include <utility>
 
@@ -156,6 +157,13 @@ public:
         if(!ownership_.compare_exchange_strong(none,true,
                 std::memory_order_acq_rel))return false;
         owns_=true;
+        // A previous early shutdown must never re-enter a still-mapped
+        // DOSBox image with stale globals. Full absolute path; no extra ref.
+        if(GetModuleHandleW(dll.wstring().c_str())) {
+            std::fprintf(stderr,"AWE64_RUNTIME_RESTART_REFUSED_STALE_MODULE\n");
+            std::fflush(stderr);
+            stop();return false;
+        }
         module_=LoadLibraryExW(dll.wstring().c_str(),nullptr,
                    LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
         if(!module_){stop();return false;}
@@ -284,10 +292,23 @@ public:
     void stop() noexcept {
         // Called ONLY during non-RT VST3 deactivation or destruction.
         if(worker_.joinable()) {
+            // An immediate host deactivate (SDK state transition) can arrive
+            // before BIOS/DOS initialization. Prefer the actual UART-ready
+            // boundary rather than aborting a half-booted emulated PC.
+            // Bounded non-RT wait; no added delay for an already ready guest.
+            const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(3);
+            while(ready_&&!ready_()&&!finished_.load(std::memory_order_acquire)&&
+                  std::chrono::steady_clock::now()<deadline)
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
             if(requestStop_)requestStop_();
             // Cooperative join requires original DOSBox to poll GFX_Events;
             // a permanently blocked guest remains an unresolved risk.
             worker_.join();
+            const int code=guestExitCode_.load(std::memory_order_acquire);
+            if(code!=0) {
+                std::fprintf(stderr,"AWE64_RUNTIME_GUEST_EXIT=%d\n",code);
+                std::fflush(stderr);
+            }
         }
         if(performanceStats_&&measurementStarted_&&measuredBlocks_) {
             // Snapshot was taken at the last audio callback, before the
@@ -319,7 +340,7 @@ public:
             if(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|
                     GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                     reinterpret_cast<LPCWSTR>(handle),&stillLoaded)) {
-                std::fprintf(stderr,"AWE64_RUNTIME_MODULE_STILL_MAPPED_AFTER_STOP\\n");
+                std::fprintf(stderr,"AWE64_RUNTIME_MODULE_STILL_MAPPED_AFTER_STOP\n");
                 std::fflush(stderr);
             }
         }

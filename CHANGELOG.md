@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Verbliebene DOSBox-DLL bei sofortiger Deaktivierung; frühe Validator-Pflichtprüfung
+
+- [Kurzdiagnose 45477175960](../../actions/runs/45477175960) FAIL: `AWE64_RUNTIME_MODULE_STILL_MAPPED_AFTER_STOP` unmittelbar vor erneutem `DOSBoxMenu::alloc_item() name '_separator_' already taken` in Valid State Transition 32bits. Damit ist der verbliebene Modulzustand bestätigt; genaue Ursache der zusätzlichen Loader-Referenz weiterhin offen. Die vorige Abbruchgrenzen-Korrektur allein reicht nicht.
+- VST3-Host wartet bei vorzeitiger Deaktivierung außerhalb RT maximal drei Sekunden auf den tatsächlichen UART-Ready-Zustand oder Guest-Ende, bevor er den regulären Shutdown anfordert. Bereits bereite Gäste ohne Zusatzwartezeit. Fehlercode des Guest-Endes protokolliert; Start eines nachweislich noch gemappten DLL-Pfads wird ausdrücklich abgelehnt, statt die globalen DOSBox-Strukturen erneut zu initialisieren. Keine erzwungene Entladung und keine Änderung an EMU8000/P165. Windows-Wirkung noch nicht nachgewiesen.
+- Vollständiger unveränderter Steinberg-SDK-Test wird jetzt vor der zeitaufwendigen Original-Archivprüfung ausgeführt, Live-Protokoll statt Ausgabe erst nach Abschluss. Kein Pflichtgate entfernt oder abgeschwächt; erst bei Validator-PASS folgt wieder der vollständige Creative-Klangnachweis. Release weiter NO-GO.
+
 ## 24.11.2026 — Validator nach Stop-Korrektur erneut Timeout; Kurzdiagnose statt Gesamtwiederholung
 
 - [Windows 45470071317](../../actions/runs/45470071317) FAIL auf ad4b2905 ausschließlich wegen erneutem 8-Minuten-Validator-Timeout. Neu kompilierte DLL, Stop/Join, MPU/PCM, Negativkontrolle, vollständige Creative-Archivprüfung und P165-Lifecycle jeweils SUCCESS. Transport 45470071331 und Version 45470071262 SUCCESS. Die Korrektur hat den Gesamt-Validator noch nicht nachweislich repariert; das gepufferte Protokoll zeigt nicht, ob derselbe oder ein anderer Fehler vorliegt.

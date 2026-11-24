@@ -214,6 +214,23 @@ jobs:
           # Real Windows VST3 must respond with silence and no fake PASS.
           python tests/WindowsVst3CreativeOnlyNegative.py --exe $hostTestExe --plugin $plugin
           if ($LASTEXITCODE -ne 0) { throw 'Private-only original-Creative anti-spoof negative control FAILED' }
+      - name: Full pinned Steinberg SDK validator (synthetic assets, no Creative data)
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          cmake --build build-vst3 --config Release --target validator --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'Official Steinberg validator build failed' }
+          $validators=@(Get-ChildItem -LiteralPath 'build-vst3' -Filter 'validator.exe' -Recurse -File)
+          if ($validators.Count -ne 1) { throw 'Missing or ambiguous official SDK validator binary' }
+          $bundle=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3').Path
+          $env:SDL_AUDIODRIVER='dummy'
+          $summary=@()
+          & $validators[0].FullName $bundle 2>&1 | ForEach-Object {
+              Write-Host $_
+              if ("$_" -match '^Result: [1-9][0-9]* tests passed, 0 tests failed$') { $summary += "$_" }
+          }
+          $code=$LASTEXITCODE
+          if ($code -ne 0 -or $summary.Count -ne 1) { throw "Full SDK validator failed; exit=$code" }
       - name: Original Creative archival-reference research in actual Windows VST3 (no private owner files)
         shell: pwsh
         timeout-minutes: 28
@@ -251,21 +268,6 @@ jobs:
           $hostTestExe=(Resolve-Path 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe').Path
           & $hostTestExe $plugin --editor
           if ($LASTEXITCODE -ne 0) { throw "Native editor lifecycle FAILED; exit=$LASTEXITCODE" }
-      - name: Full pinned Steinberg SDK validator (synthetic assets, no Creative data)
-        shell: pwsh
-        timeout-minutes: 8
-        run: |
-          cmake --build build-vst3 --config Release --target validator --parallel 2
-          if ($LASTEXITCODE -ne 0) { throw 'Official Steinberg validator build failed' }
-          $validators=@(Get-ChildItem -LiteralPath 'build-vst3' -Filter 'validator.exe' -Recurse -File)
-          if ($validators.Count -ne 1) { throw 'Missing or ambiguous official SDK validator binary' }
-          $bundle=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3').Path
-          $env:SDL_AUDIODRIVER='dummy'
-          $output=@(& $validators[0].FullName $bundle 2>&1)
-          $code=$LASTEXITCODE
-          $output | ForEach-Object { Write-Host $_ }
-          $summary=@($output | Where-Object { "$_" -match '^Result: [1-9][0-9]* tests passed, 0 tests failed$' })
-          if ($code -ne 0 -or $summary.Count -ne 1) { throw "Full SDK validator failed; exit=$code" }
       # The source repo is public. Never publish the developer binaries until
       # distribution permissions are cleared. A private-repo runner can
       # deliver the prebuilt asset-free package after BOTH existing gates.
