@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Master-Volume: echter PCM-/Projekt-Recall-Test ergänzt
+
+- Windows 45430630922 zum Änderungszeitpunkt noch im Original-Archivtest; Transport 45430630997 und Version 45430631151 bereits SUCCESS. Kein vorweggenommener 60-Sekunden-PASS.
+- Neue unabhängige Master-Prüfung im 44,1-kHz-VST3-Host nach den unveränderten CPU-/Latenzmessungen: gehaltene originale RAM-Stimme bei 100 %, 50 % (halbe PCM-Amplitude), 0 % (exakt stumm), anschließend echter IComponent-State-Recall auf 50 % und erneute PCM-Messung. NoteOn/Off-Zähler werden mitgezählt. Keine Änderung an Produktcode, Originalkern oder P165-Grafik. Windows-Nachweis offen; kein GUI-Klick- oder Release-Nachweis.
+
 ## 24.11.2026 — 96-kHz-Abnahme PASS; erweiterter 48-kHz-Stabilitätstest
 
 - [Windows 45425096309](../../actions/runs/45425096309) SUCCESS auf 2d711cac; tatsächlicher RAM-735-Hz-Klang bei 96 kHz nachgewiesen. [Transport 45425096302](../../actions/runs/45425096302) und [Version 45425096276](../../actions/runs/45425096276) SUCCESS. Alle 128 Cheezoids-Programme und bisherigen Klanggates erneut bestanden.

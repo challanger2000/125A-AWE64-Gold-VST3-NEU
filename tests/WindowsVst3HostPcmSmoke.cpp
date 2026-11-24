@@ -476,6 +476,48 @@ int main(int argc,char** argv) {
                  <<"PERF_HELD_SILENT_BLOCKS="<<silentHeldBlocks<<" POLY_SILENT_BLOCKS="<<chordSilent
                  <<" POLY_ENERGY="<<chordEnergy<<" POLY_HOLD_SECONDS="<<chordHoldSeconds<<"\n"
                  <<"PERF_REPORTED_VST3_LATENCY_SAMPLES="<<processor->getLatencySamples()<<"\n";
+        // Master gain and project recall are tested separately from CPU/latency
+        // statistics using a stable, looping original RAM voice.
+        if(hostRate==44100.) {
+            measure=false;
+            for(unsigned i=0;i<nblocks(1.);++i)if(!tick(false,false))return fail("Master test idle failed");
+            midiEvents.setChord(1,60,100.f/127.f);
+            V::IEditController* master=nullptr;
+            if(component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&master))!=S::kResultOk||!master)
+                return fail("Master controller unavailable");
+            if(master->setParamNormalized(1001,1.)!=S::kResultOk)return fail("Master unity edit failed");
+            if(!tick(true,false))return fail("Master test note failed");
+            actualOn+=midiEvents.getEventCount();
+            for(unsigned i=0;i<nblocks(.3);++i)if(!tick(false,false))return fail("Master attack failed");
+            auto rmsWindow=[&](double& rms) {
+                double energy=0.;std::uint64_t samples=0;
+                for(unsigned i=0;i<nblocks(.2);++i){
+                    if(!tick(false,false))return false;
+                    for(unsigned k=0;k<buffer;++k){energy+=(double(l[k])*l[k]+double(r[k])*r[k])*.5;++samples;}
+                }
+                rms=std::sqrt(energy/samples);return true;
+            };
+            double unity=0.,half=0.,muted=0.,restored=0.;
+            if(!rmsWindow(unity)||unity<.001)return fail("Master unity PCM missing");
+            if(master->setParamNormalized(1001,.5)!=S::kResultOk||
+               !rmsWindow(half)||half/unity<.45||half/unity>.55)
+                return fail("Master 50 percent is not half PCM amplitude");
+            S::MemoryStream savedMaster;
+            if(component->getState(&savedMaster)!=S::kResultOk)return fail("Master state save failed");
+            if(master->setParamNormalized(1001,0.)!=S::kResultOk||!rmsWindow(muted)||muted!=0.)
+                return fail("Master zero does not mute PCM");
+            S::MemoryStream restoreMaster(savedMaster.getData(),savedMaster.getSize());
+            if(component->setState(&restoreMaster)!=S::kResultOk||
+               std::abs(master->getParamNormalized(1001)-.5)>1.e-6||
+               !rmsWindow(restored)||restored/unity<.45||restored/unity>.55)
+                return fail("Master state recall did not restore half PCM amplitude");
+            if(master->setParamNormalized(1001,1.)!=S::kResultOk||!tick(false,true))
+                return fail("Master test release failed");
+            actualOff+=midiEvents.getEventCount();
+            master->release();
+            std::cout<<"REAL_VST3_MASTER_PCM_RECALL_PASS; UNITY_RMS="<<unity<<" HALF_RMS="<<half
+                     <<" MUTED_RMS="<<muted<<" RESTORED_RMS="<<restored<<"\n";
+        }
         if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
            component->terminate()!=S::kResultOk)return fail("Performance shutdown failed");
         processor->release();component->release();factory->release();FreeLibrary(module);
