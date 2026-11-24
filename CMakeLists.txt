@@ -201,7 +201,7 @@ void PresetBrowserView::ChooseRom() {
   add_executable(awe64_vst3_host_pcm_smoke tests/WindowsVst3HostPcmSmoke.cpp
     "${AWE64_VST3SDK}/public.sdk/source/common/memorystream.cpp")
   target_include_directories(awe64_vst3_host_pcm_smoke PRIVATE "${AWE64_VST3SDK}")
-  target_link_libraries(awe64_vst3_host_pcm_smoke PRIVATE sdk base user32 ole32)
+  target_link_libraries(awe64_vst3_host_pcm_smoke PRIVATE sdk sdk_hosting base user32 ole32)
   target_compile_features(awe64_vst3_host_pcm_smoke PRIVATE cxx_std_20)
 
   smtg_target_configure_version_file(AWE64GoldDOSBoxDev)

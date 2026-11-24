@@ -21,6 +21,7 @@
 #include "pluginterfaces/vst/ivsteditcontroller.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstevents.h"
+#include "public.sdk/source/vst/hosting/parameterchanges.h"
 #include "pluginterfaces/vst/ivsthostapplication.h"
 #include "pluginterfaces/vst/vstspeaker.h"
 #include <algorithm>
@@ -616,6 +617,46 @@ int main(int argc,char** argv) {
             master->release();
             std::cout<<"REAL_VST3_MASTER_PCM_RECALL_PASS; UNITY_RMS="<<unity<<" HALF_RMS="<<half
                      <<" MUTED_RMS="<<muted<<" RESTORED_RMS="<<restored<<"\n";
+            // Sustain must change the actual original Creative voice, not
+            // merely report a successful IMidiMapping assignment.
+            V::ParameterChanges changes(1);
+            auto pedal=[&](double value) {
+                S::int32 queueIndex=0,pointIndex=0;
+                auto* queue=changes.addParameterData(sustain0,queueIndex);
+                if(!queue||queue->addPoint(0,value,pointIndex)!=S::kResultOk)return false;
+                data.inputParameterChanges=&changes;
+                const bool ok=tick(false,false);
+                data.inputParameterChanges=nullptr;
+                changes.clearQueue();
+                return ok;
+            };
+            auto settle=[&](double seconds) {
+                for(unsigned i=0;i<nblocks(seconds);++i)if(!tick(false,false))return false;
+                return true;
+            };
+            if(!pedal(0.)||!settle(1.))return fail("Sustain baseline settle failed");
+            double baseline=0.,dryHeld=0.,dryReleased=0.,pedalHeld=0.,pedalReleased=0.;
+            if(!rmsWindow(baseline)||baseline>=.001)return fail("Sustain baseline not silent");
+            if(!tick(true,false)||!settle(.3)||!rmsWindow(dryHeld)||dryHeld<.001)
+                return fail("Sustain negative-control note missing");
+            ++actualOn;
+            if(!tick(false,true)||!settle(1.)||!rmsWindow(dryReleased)||dryReleased>=dryHeld*.1)
+                return fail("No-pedal negative control did not release");
+            ++actualOff;
+            if(!pedal(1.)||!settle(.05)||!tick(true,false)||!settle(.3))
+                return fail("Sustain pedal-on note failed");
+            ++actualOn;
+            if(!tick(false,true)||!settle(1.)||!rmsWindow(pedalHeld))
+                return fail("Sustain pedal-held measurement failed");
+            ++actualOff;
+            if(!pedal(0.)||!settle(1.)||!rmsWindow(pedalReleased))
+                return fail("Sustain pedal-off measurement failed");
+            std::cout<<"REAL_VST3_SUSTAIN_PCM; BASELINE="<<baseline<<" HELD="<<dryHeld
+                     <<" NO_PEDAL_RELEASED="<<dryReleased<<" PEDAL_HELD="<<pedalHeld
+                     <<" PEDAL_RELEASED="<<pedalReleased<<"\n";
+            if(pedalHeld<dryHeld*.5||pedalReleased>=dryHeld*.1)
+                return fail("Original Creative CC64 sustain/release PCM gate failed");
+            std::cout<<"REAL_VST3_SUSTAIN_PCM_PASS\n";
         }
         if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
            component->terminate()!=S::kResultOk)return fail("Performance shutdown failed");

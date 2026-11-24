@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Steinberg 47/47 und vollständiger Original-Klanglauf PASS; Sustain-PCM-Gate
+
+- [Windows 45479848893](../../actions/runs/45479848893) vollständig SUCCESS auf 1a009a4d; Version 45479848909 SUCCESS. Ungefilterter Original-Steinberg-Validator: 47 bestanden, 0 fehlgeschlagen. Kein Stale-Module-/Guest-Exit-/Restart-Refused-Marker im Joblog. Original-Creative-Archivvergleich Cheezoids 128/128, alle PCM-/Effekt-/Recall-Gates und nativer P165-Editor erneut PASS. p95 bei 44,1/48/96 kHz 13,288/14,9583/13,2812 ms, 7296/28522/14269 Queue-Blöcke mit jeweils 0 Audio-/MIDI-Drops und 0 Unterläufen. Master-RMS 100/50/0/Recall 0,0275934/0,013732/0/0,0137307.
+- Nächster echter musikalischer Controller-Nachweis im 44,1-kHz-RAM-Test: Original-Steinberg `ParameterChanges` für gemapptes CC64, reale NoteOn/Off, unabhängige PCM-Fenster. Negativkontrolle ohne Pedal muss abklingen; mit Pedal muss nach NoteOff weiterhin mindestens halber RMS gehalten werden, Pedal-Off muss abklingen. Kein bloßer Parameter-Mapping-PASS. Test neu implementiert, Windows-Nachweis offen; keine Produkt-/DSP-/GUI-Änderung. AMP-/FILTER-ADSR und Cutoff/Resonance bleiben offen (Original-DOS-SF2LIB unterstützt NRPN nicht), Mehrfachinstanzen und Installer-/Besitzer-DAW-Abnahme ebenfalls offen. Keine Releasefreigabe.
+
 ## 24.11.2026 — Verbliebene DOSBox-DLL bei sofortiger Deaktivierung; frühe Validator-Pflichtprüfung
 
 - [Kurzdiagnose 45477175960](../../actions/runs/45477175960) FAIL: `AWE64_RUNTIME_MODULE_STILL_MAPPED_AFTER_STOP` unmittelbar vor erneutem `DOSBoxMenu::alloc_item() name '_separator_' already taken` in Valid State Transition 32bits. Damit ist der verbliebene Modulzustand bestätigt; genaue Ursache der zusätzlichen Loader-Referenz weiterhin offen. Die vorige Abbruchgrenzen-Korrektur allein reicht nicht.

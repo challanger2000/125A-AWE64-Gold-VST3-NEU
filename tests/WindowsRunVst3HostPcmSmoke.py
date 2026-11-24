@@ -102,6 +102,8 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
             "REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS" not in proc.stdout:
         raise RuntimeError("Active external SF2 guest restart missing")
     if original and os.environ.get("AWE64_TEST_PERFORMANCE") == "1":
+        if "PERF_HOST_RATE=44100 " in proc.stdout and "REAL_VST3_SUSTAIN_PCM_PASS" not in proc.stdout:
+            raise RuntimeError("Original Creative CC64 sustain PCM gate missing")
         rows = [re.fullmatch(r"PERF_QUEUE_BLOCKS=(\d+) AUDIO_DROPPED_FRAMES=(\d+) MIDI_DROPPED_EVENTS=(\d+) UNDERRUN_FRAMES=(\d+)", line) for line in proc.stdout.splitlines()]
         rows = [match.groups() for match in rows if match is not None]
         if len(rows) != 1:
