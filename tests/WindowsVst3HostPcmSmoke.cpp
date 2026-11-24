@@ -543,9 +543,33 @@ int main(int argc,char** argv) {
         if(peak<.002)return fail("Voice overlay fixture has no original PCM");
         std::array<Profile,10> midpoint{},maximum{};
         for(int i=0;i<10;++i){
+            if(i>=5&&i<=7)continue;
             if(!trial(i,.5,midpoint[i])||!trial(i,1.,maximum[i]))return fail("Voice control PCM trial failed");
         }
         if(!trial(-1,0.,neutralC))return fail("Voice neutral restore failed");
+        // Program 0 reproduces the seven passed gates unchanged. Program
+        // 17 exposes stronger mod-envelope motion and a long amp release,
+        // so DCYSUS changes cannot be hidden by amplitude attenuation.
+        V::IEditController* select=nullptr;
+        if(component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&select))!=S::kResultOk||!select)
+            return fail("Filter probe program controller missing");
+        if(!edit(-1,0.,true)||select->setParamNormalized(1000,17./127.)!=S::kResultOk||
+           !settle(.4))return fail("Filter probe program selection failed");
+        if(std::abs(select->getParamNormalized(1000)-17./127.)>1.e-6)
+            return fail("Filter probe program selection mismatch");
+        std::cout<<"VOICE_PCM_FILTER_PROBE_PROGRAM=17\n";
+        Profile filterA{},filterB{},filterC{};
+        if(!trial(-1,0.,filterA)||!trial(-1,0.,filterB))return fail("Filter neutral reference failed");
+        const double filterPeak=*std::max_element(filterA.rms.begin(),filterA.rms.end());
+        if(filterPeak<.002)return fail("Filter probe has no original PCM");
+        // Negative control: amplitude must remain measurable during late
+        // sustain and after NoteOff; otherwise a release gate is invalid.
+        if(filterA.rms[14]<filterPeak*.2||filterA.rms[heldBins+4]<filterPeak*.1)
+            return fail("Filter probe amplitude masks modulation sustain or release");
+        for(int i=5;i<=7;++i)
+            if(!trial(i,.5,midpoint[i])||!trial(i,1.,maximum[i]))return fail("Filter probe PCM trial failed");
+        if(!trial(-1,0.,filterC))return fail("Filter probe neutral restore failed");
+        select->release();
         // Phase-independent envelope / first-difference RMS. Use exactly
         // the relevant portion of the note for each parameter; a release
         // control cannot pass merely by changing the attack.
@@ -567,16 +591,22 @@ int main(int argc,char** argv) {
         };
         unsigned passed=0;
         for(int i=0;i<10;++i){
-            const double noise=std::max({distance(neutralA,neutralB,i),distance(neutralA,neutralC,i),distance(neutralB,neutralC,i)});
-            const double threshold=std::max(peak*.01,noise*2.);
-            const auto mid=std::min(distance(neutralA,midpoint[i],i),distance(neutralB,midpoint[i],i));
-            const auto max=std::min(distance(neutralA,maximum[i],i),distance(neutralB,maximum[i],i));
+            const bool filterProbe=i>=5&&i<=7;
+            const auto& a=filterProbe?filterA:neutralA;
+            const auto& b=filterProbe?filterB:neutralB;
+            const auto& c=filterProbe?filterC:neutralC;
+            const double referencePeak=filterProbe?filterPeak:peak;
+            const double noise=std::max({distance(a,b,i),distance(a,c,i),distance(b,c,i)});
+            const double threshold=std::max(referencePeak*.01,noise*2.);
+            const auto mid=std::min(distance(a,midpoint[i],i),distance(b,midpoint[i],i));
+            const auto max=std::min(distance(a,maximum[i],i),distance(b,maximum[i],i));
             const bool pass=mid>threshold&&max>threshold;
             passed+=pass;
             std::cout<<"VOICE_PCM_RESULT ID="<<1100+i<<" MID_DELTA="<<mid<<" MAX_DELTA="<<max
-                     <<" NEUTRAL_DELTA="<<noise<<" THRESHOLD="<<threshold<<" "<<(pass?"PASS":"FAIL")<<"\n";
+                     <<" NEUTRAL_DELTA="<<noise<<" THRESHOLD="<<threshold<<" PROGRAM="<<(filterProbe?17:0)<<" "<<(pass?"PASS":"FAIL")<<"\n";
         }
-        const bool neutralOk=distance(neutralA,neutralC,8)<=std::max(peak*.04,distance(neutralA,neutralB,8)*2.);
+        const bool neutralOk=distance(neutralA,neutralC,8)<=std::max(peak*.04,distance(neutralA,neutralB,8)*2.)&&
+            distance(filterA,filterC,8)<=std::max(filterPeak*.04,distance(filterA,filterB,8)*2.);
         if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
            component->terminate()!=S::kResultOk)return fail("Voice overlay shutdown failed");
         processor->release();component->release();factory->release();

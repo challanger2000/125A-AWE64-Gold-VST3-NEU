@@ -247,9 +247,12 @@ try {
         [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY','1','Process')
         [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG',$overlayBoot,'Process')
         & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds 120
-        if ($LASTEXITCODE -ne 0) { throw 'Ten-control original PCM gate failed.' }
+        $overlayExit = $LASTEXITCODE
         if ((Get-FileHash -Algorithm SHA256 $overlayFixture).Hash -ne $overlayHash) { throw 'Overlay fixture modified.' }
         if (-not (Test-Path -PathType Leaf $overlayTrace)) { throw 'Voice register trace missing.' }
+        & python (Join-Path $root 'tests/WindowsPrivateCreativeGuestSmoke.py') --filter-envelope-trace $overlayTrace
+        if ($LASTEXITCODE -ne 0) { throw 'Filter envelope trace diagnostic failed.' }
+        if ($overlayExit -ne 0) { throw 'Ten-control original PCM gate failed.' }
     } finally {
         [Environment]::SetEnvironmentVariable('AWE64_TEST_VOICE_OVERLAYS',$previousOverlay,'Process')
         [Environment]::SetEnvironmentVariable('AWE64_TEST_HOST_RATE',$previousHostRate,'Process')

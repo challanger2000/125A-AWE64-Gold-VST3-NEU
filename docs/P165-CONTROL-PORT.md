@@ -46,3 +46,7 @@ Alle zehn Parameter sind gemeinsam über den Host, ABI und ursprünglichen EMU80
 ## Windows-Zwischenabnahme und neuer PCM-Gate
 
 45494869093 SUCCESS: komplette bisherige Regression bei neutralen Reglern, echte v5-Parameter-Recall-Prüfung, 47/47 Validator. Noch keine Klangabnahme nichtneutraler Werte. Ein zusätzliches Windows-Host-Szenario spielt dieselbe selbst erzeugte SF2-Welle mit 23 NoteOn/Off-Paaren (drei neutrale Referenzen, zehnmal Mitte/Maximum), echte ParameterChanges. Per-Regler-PCM-Differenz und Neutralrestore Pflicht; keine Aussage über genaue musikalische Richtung oder isolierte Registerwirkung vor ergänzendem Registervergleich. Alle Trace-Dateien temporär, keine Originaldateien veröffentlicht.
+
+## Erster nichtneutraler Klanglauf
+
+45502431315: 7/10 PASS, Neutralrestore PASS. Filter Decay/Sustain/Release unter den vorab definierten PCM-Schwellen. Neue getrennte Program-17-Fixture isoliert Filterbewegung von Amp-Hüllkurve; Original-Program 0 für sieben bisher bestandene Regler unverändert. Keine Produktänderung, keine gelockerten Schwellen. Erneuter Nachweis ausstehend; falls drei Regler weiter scheitern, Original-DCYSUS-Registerkontext und SF2-Generatorübersetzung untersuchen statt Grenzen zu senken.

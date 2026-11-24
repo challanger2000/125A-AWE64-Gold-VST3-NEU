@@ -77,6 +77,12 @@ def build(wet=False, overlay=False):
              if overlay else [(38,-2400)])
     voice = send + b"".join(gen(op, val) for op,val in shape) + gen(54,1)
     instruments = len(voice)//4 + 1
+    filter_shape = [(8,6600),(9,30),(11,4800),
+                    (25,-12000),(26,-3600),(27,-3600),(28,0),(29,500),(30,0),
+                    (33,-12000),(34,-4800),(35,-12000),(36,-1200),(37,0),(38,2400)]
+    voice2 = (b"".join(gen(op,val) for op,val in filter_shape) + gen(54,1)
+              if overlay else voice)
+    instruments2 = len(voice2)//4 + 1
     pdta = list_chunk(
         b"pdta",
         chunk(b"phdr", phdr("RAM 441 Hz", 0, 0) +
@@ -85,9 +91,9 @@ def build(wet=False, overlay=False):
         chunk(b"pmod", bytes(10)),
         chunk(b"pgen", gen(41, 0) + gen(41, 1) + gen(0, 0)),
         chunk(b"inst", inst("RAM 441 Hz", 0) + inst("RAM 735 Hz", 1) + inst("EOI", 2)),
-        chunk(b"ibag", struct.pack("<6H", 0, 0, instruments, 0, instruments*2, 0)),
+        chunk(b"ibag", struct.pack("<6H", 0, 0, instruments, 0, instruments+instruments2, 0)),
         chunk(b"imod", bytes(10)),
-        chunk(b"igen", voice + gen(53,0) + voice + gen(53,1) + gen(0,0)),
+        chunk(b"igen", voice + gen(53,0) + voice2 + gen(53,1) + gen(0,0)),
         chunk(b"shdr", b"".join(headers) +
               shdr("EOS", len(samples), len(samples), len(samples),
                    len(samples), 0, 0, 0)))

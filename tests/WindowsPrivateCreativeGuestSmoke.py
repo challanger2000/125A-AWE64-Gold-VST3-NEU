@@ -124,6 +124,43 @@ def inspect_trace(trace: Path) -> tuple[int, int]:
 
 
 
+def summarize_filter_envelope_trace(trace: Path):
+    """Aggregate only musical-range DCYSUS writes from temporary local trace.
+
+    The original trace is unlabelled by host trial. Counts are diagnostic,
+    not a per-control causality or PCM pass. Never emit raw trace or PCM.
+    """
+    pattern = re.compile(r"^(\d+) ([0-9A-Fa-f]{3,4}) ([0-9A-Fa-f]{4})$")
+    selector = -1
+    held, release, routes = set(), set(), set()
+    counts = [0, 0, 0]
+    with trace.open(encoding="utf-8", errors="replace") as fp:
+        for line in fp:
+            m = pattern.fullmatch(line.strip())
+            if not m:
+                continue
+            frame, port, word = int(m[1]), int(m[2],16), int(m[3],16)
+            if port == 0xe22:
+                selector = word & 255
+                continue
+            if frame < 44100*8 or selector < 0 or (selector & 31) >= 30:
+                continue
+            reg = selector >> 5
+            if port == 0xa20 and reg == 7:
+                if word & 0x8000:
+                    release.add(word & 127)
+                    counts[1] += 1
+                else:
+                    held.add((word >> 8 & 127, word & 127))
+                    counts[0] += 1
+            elif port == 0xe20 and reg == 2 and word & 255:
+                routes.add(word & 255)
+                counts[2] += 1
+    print(f"FILTER_TRACE_DIAGNOSTIC HELD_WRITES={counts[0]} RELEASE_WRITES={counts[1]} "
+          f"NONZERO_PEFE_WRITES={counts[2]} HELD_VARIANTS={len(held)} "
+          f"RELEASE_RATE_VARIANTS={len(release)} ROUTE_VARIANTS={len(routes)}")
+
+
 def summarize_ram_trace(trace: Path):
     """Print aggregate DRAM write evidence; never print trace data or PCM.
 
@@ -506,6 +543,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", type=Path)
     parser.add_argument("--trace-summary", type=Path)
+    parser.add_argument("--filter-envelope-trace", type=Path)
     parser.add_argument("--send-trace", type=Path)
     parser.add_argument("--expected-sends", type=int, nargs=2)
     parser.add_argument("--ram-program", type=int, choices=(0, 17))
@@ -522,6 +560,9 @@ def main():
             parser.error("--send-trace requires --expected-sends REVERB CHORUS")
         send_trace_summary(opt.send_trace, tuple(opt.expected_sends))
         print("REAL_VST3_ABSOLUTE_SEND_REGISTER_PASS")
+        return
+    if opt.filter_envelope_trace is not None:
+        summarize_filter_envelope_trace(opt.filter_envelope_trace)
         return
     if opt.trace_summary is not None:
         summarize_ram_trace(opt.trace_summary)
