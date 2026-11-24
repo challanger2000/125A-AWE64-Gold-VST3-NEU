@@ -45,5 +45,23 @@ class RamFixtureTest(unittest.TestCase):
         self.assertEqual(struct.unpack_from("<4H",igen,0),(15,1000,16,1000))
         self.assertEqual(struct.unpack_from("<4H",igen,20),(15,1000,16,1000))
 
+    def test_overlay_fixture_has_distinct_envelopes_and_harmonics(self):
+        data = build(overlay=True)
+        lists = dict((body[:4], dict(children(body, 4, len(body))))
+                     for tag, body in children(data, 12, len(data)) if tag == b"LIST")
+        pdta = lists[b"pdta"]
+        first, second, end = struct.unpack_from("<6H",pdta[b"ibag"])[::2]
+        self.assertEqual(first, 0)
+        self.assertEqual(end, second*2)
+        values = dict(struct.iter_unpack("<Hh",pdta[b"igen"][:second*4]))
+        self.assertEqual(set(values), {8,9,11,25,26,27,28,29,30,33,34,35,36,37,38,54,53})
+        self.assertEqual(values[11],2400)
+        self.assertEqual(values[38],1200)
+        self.assertEqual(values[54],1)
+        self.assertNotEqual(build(),data)
+        self.assertNotEqual(build(wet=True),data)
+        with self.assertRaises(ValueError):
+            build(wet=True, overlay=True)
+
 if __name__ == "__main__":
     unittest.main()

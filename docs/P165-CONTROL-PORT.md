@@ -42,3 +42,7 @@ Noch offen: sichere konkrete Note-/Voice-Schreibgrenze, alle zehn Implementierun
 ## Produktport (noch nicht abgenommen)
 
 Alle zehn Parameter sind gemeinsam über den Host, ABI und ursprünglichen EMU8000-Registerwriter angebunden. Das FIFO-Tag wird erst beim letzten konsumierten Byte aktiv und beim nächsten Statuspoll beendet. Das ist eine aus dem synchronen Original-DEMO-Quellcode abgeleitete, noch zu verifizierende Schreibgrenze; kein Nachweis durch echte Trace-/PCM-Tests. Neue v5-State- und Altzustands-Recall-Gates. Originale MOD RESET-Funktion setzt zwölf Parameter auf 0. Windows-Klanggegenproben aller Regler, Automation, GUI-Reset und gehaltene/stimmbasierte Grenzfälle bleiben Pflicht vor Freigabe.
+
+## Windows-Zwischenabnahme und neuer PCM-Gate
+
+45494869093 SUCCESS: komplette bisherige Regression bei neutralen Reglern, echte v5-Parameter-Recall-Prüfung, 47/47 Validator. Noch keine Klangabnahme nichtneutraler Werte. Ein zusätzliches Windows-Host-Szenario spielt dieselbe selbst erzeugte SF2-Welle mit 23 NoteOn/Off-Paaren (drei neutrale Referenzen, zehnmal Mitte/Maximum), echte ParameterChanges. Per-Regler-PCM-Differenz und Neutralrestore Pflicht; keine Aussage über genaue musikalische Richtung oder isolierte Registerwirkung vor ergänzendem Registervergleich. Alle Trace-Dateien temporär, keine Originaldateien veröffentlicht.

@@ -227,6 +227,39 @@ try {
         [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
         [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
     }
+    # The completed neutral regressions do not prove that edited knobs
+    # change the actual sound. One guest, one generated rich SF2, all ten
+    # original register overlays at midpoint/max and repeated zero.
+    $overlayFixture = Join-Path $temporary '125A Voice overlay probe.sf2'
+    & python (Join-Path $root 'tests/MakeRamSampleSf2.py') --output $overlayFixture --overlay
+    if ($LASTEXITCODE -ne 0) { throw 'Voice overlay fixture creation failed.' }
+    $overlayHash = (Get-FileHash -Algorithm SHA256 $overlayFixture).Hash
+    $previousOverlay = [Environment]::GetEnvironmentVariable('AWE64_TEST_VOICE_OVERLAYS','Process')
+    $overlayBoot = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
+    $overlayTrace = Join-Path $temporary 'voice_overlay.trace'
+    try {
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_VOICE_OVERLAYS','1','Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_HOST_RATE','44100','Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2',$overlayFixture,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ','441','Process')
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE',$overlayTrace,'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER','dummy','Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY','1','Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG',$overlayBoot,'Process')
+        & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds 120
+        if ($LASTEXITCODE -ne 0) { throw 'Ten-control original PCM gate failed.' }
+        if ((Get-FileHash -Algorithm SHA256 $overlayFixture).Hash -ne $overlayHash) { throw 'Overlay fixture modified.' }
+        if (-not (Test-Path -PathType Leaf $overlayTrace)) { throw 'Voice register trace missing.' }
+    } finally {
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_VOICE_OVERLAYS',$previousOverlay,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_HOST_RATE',$previousHostRate,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_EXTERNAL_SF2',$previousExternal,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_TEST_RAM_TONE_HZ',$previousRamHz,'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER',$previousSdl,'Process')
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE',$previousTrace,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY',$previousOriginal,'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG',$previousBootLog,'Process')
+    }
     # First measure performance without trace I/O or competing test processes.
     $perfExit = 0
     $prevPerf = [Environment]::GetEnvironmentVariable('AWE64_TEST_PERFORMANCE','Process')

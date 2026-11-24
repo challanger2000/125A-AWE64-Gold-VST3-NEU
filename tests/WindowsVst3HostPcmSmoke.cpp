@@ -188,6 +188,7 @@ int main(int argc,char** argv) {
     if(hostRate!=44100.&&hostRate!=48000.&&hostRate!=96000.)return fail("Unsupported native test host rate");
     const bool sweep=std::getenv("AWE64_TEST_CHEEZOIDS_SWEEP")!=nullptr;
     const bool performance=std::getenv("AWE64_TEST_PERFORMANCE")!=nullptr;
+    const bool overlayTest=std::getenv("AWE64_TEST_VOICE_OVERLAYS")!=nullptr;
     const bool effectTest=std::getenv("AWE64_TEST_EFFECT_TYPES")!=nullptr;
     const char* sendTest=std::getenv("AWE64_TEST_SEND_PAIR");
     const unsigned sendPair=sendTest?static_cast<unsigned>(std::strtoul(sendTest,nullptr,10)):0;
@@ -361,10 +362,11 @@ int main(int argc,char** argv) {
     V::IMidiMapping* mapping=nullptr;
     if(component->queryInterface(V::IMidiMapping::iid,reinterpret_cast<void**>(&mapping))!=S::kResultOk||!mapping)
         return fail("Actual VST3 IMidiMapping missing");
-    V::ParamID sustain0=0,sustain15=0,bend=0;
+    V::ParamID sustain0=0,sustain15=0,bend=0,allSoundOff=0;
     if(mapping->getMidiControllerAssignment(0,0,64,sustain0)!=S::kResultTrue ||
        mapping->getMidiControllerAssignment(0,15,64,sustain15)!=S::kResultTrue ||
        mapping->getMidiControllerAssignment(0,0,129,bend)!=S::kResultTrue ||
+       mapping->getMidiControllerAssignment(0,0,120,allSoundOff)!=S::kResultTrue||
        sustain0==sustain15||sustain0==bend||
        mapping->getMidiControllerAssignment(1,0,64,bend)==S::kResultTrue)
         return fail("Actual VST3 controller assignment failed");
@@ -471,6 +473,122 @@ int main(int argc,char** argv) {
            std::memcmp(saved.getData(),externalState.data(),externalState.size())!=0)
             return fail("Active external SF2 state did not roundtrip");
         std::cout<<"REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS\n";
+    }
+    if(overlayTest) {
+        if(!originalMode||externalState.empty()||hostRate!=44100.||ramHz!=441.||performance||sweep)
+            return fail("Voice overlay test requires isolated original RAM fixture at 44.1kHz");
+        constexpr unsigned buffer=128, bins=30, heldBins=16;
+        data.numSamples=buffer;
+        using Clock=std::chrono::steady_clock;
+        const auto start=Clock::now();
+        unsigned block=0,ons=0,offs=0;
+        const auto nblocks=[&](double seconds){return static_cast<unsigned>(std::ceil(seconds*hostRate/buffer));};
+        auto tick=[&](bool on=false,bool off=false) {
+            midiEvents.setEnabled(on||off,off);
+            l.fill(0);r.fill(0);
+            std::this_thread::sleep_until(start+std::chrono::duration_cast<Clock::duration>(
+                std::chrono::duration<double>(block*buffer/hostRate)));
+            if(processor->process(data)!=S::kResultOk)return false;
+            ++block;ons+=on;offs+=off;
+            for(unsigned k=0;k<buffer;++k)if(!std::isfinite(l[k])||!std::isfinite(r[k]))return false;
+            return true;
+        };
+        auto settle=[&](double sec){
+            for(unsigned i=0;i<nblocks(sec);++i)if(!tick())return false;
+            return true;
+        };
+        V::ParameterChanges changes(11);
+        auto edit=[&](int index,double value,bool kill) {
+            S::int32 qi=0,pi=0;
+            for(unsigned i=0;i<10;++i){
+                auto* q=changes.addParameterData(1100u+i,qi);
+                if(!q||q->addPoint(0,int(i)==index?value:0.,pi)!=S::kResultOk)return false;
+            }
+            if(kill){
+                auto* q=changes.addParameterData(allSoundOff,qi);
+                if(!q||q->addPoint(0,0.,pi)!=S::kResultOk)return false;
+            }
+            data.inputParameterChanges=&changes;
+            const bool ok=tick();
+            data.inputParameterChanges=nullptr;changes.clearQueue();
+            return ok;
+        };
+        struct Profile {std::array<double,bins> rms{},diff{};};
+        auto trial=[&](int id,double value,Profile& p){
+            // Send actual host automation before the next NoteOn, isolate
+            // the previous release using the original driver's CC120.
+            if(!edit(-1,0.,true)||!settle(.18)||!edit(id,value,false)||!settle(.06))return false;
+            std::cout<<"VOICE_PCM_CASE ID="<<id<<" VALUE="<<value<<"\n";
+            const unsigned count=nblocks(.1);
+            float prevL=0,prevR=0;
+            for(unsigned bin=0;bin<bins;++bin){
+                double energy=0,high=0;
+                for(unsigned i=0;i<count;++i){
+                    if(!tick(bin==0&&i==0,bin==heldBins&&i==0))return false;
+                    for(unsigned k=0;k<buffer;++k){
+                        const double x=l[k],y=r[k],dx=x-prevL,dy=y-prevR;
+                        energy+=x*x+y*y;high+=dx*dx+dy*dy;
+                        prevL=l[k];prevR=r[k];
+                    }
+                }
+                p.rms[bin]=std::sqrt(energy/(2.*count*buffer));
+                p.diff[bin]=std::sqrt(high/(2.*count*buffer));
+            }
+            return true;
+        };
+        if(!settle(12.))return fail("Voice overlay guest warmup failed");
+        Profile neutralA{},neutralB{},neutralC{};
+        if(!trial(-1,0.,neutralA)||!trial(-1,0.,neutralB))return fail("Voice neutral reference failed");
+        const double peak=*std::max_element(neutralA.rms.begin(),neutralA.rms.end());
+        if(peak<.002)return fail("Voice overlay fixture has no original PCM");
+        std::array<Profile,10> midpoint{},maximum{};
+        for(int i=0;i<10;++i){
+            if(!trial(i,.5,midpoint[i])||!trial(i,1.,maximum[i]))return fail("Voice control PCM trial failed");
+        }
+        if(!trial(-1,0.,neutralC))return fail("Voice neutral restore failed");
+        // Phase-independent envelope / first-difference RMS. Use exactly
+        // the relevant portion of the note for each parameter; a release
+        // control cannot pass merely by changing the attack.
+        auto distance=[&](const Profile& x,const Profile& y,int id){
+            unsigned first=0,last=heldBins;
+            switch(id){
+                case 0:case 4:last=8;break;
+                case 1:case 5:first=4;break;
+                case 2:case 6:first=10;break;
+                case 3:case 7:first=heldBins;last=bins;break;
+                default:break;
+            }
+            double result=0.;
+            for(unsigned n=first;n<last;++n){
+                result=std::max(result,std::abs(x.rms[n]-y.rms[n]));
+                if(id>=4)result=std::max(result,std::abs(x.diff[n]-y.diff[n]));
+            }
+            return result;
+        };
+        unsigned passed=0;
+        for(int i=0;i<10;++i){
+            const double noise=std::max({distance(neutralA,neutralB,i),distance(neutralA,neutralC,i),distance(neutralB,neutralC,i)});
+            const double threshold=std::max(peak*.01,noise*2.);
+            const auto mid=std::min(distance(neutralA,midpoint[i],i),distance(neutralB,midpoint[i],i));
+            const auto max=std::min(distance(neutralA,maximum[i],i),distance(neutralB,maximum[i],i));
+            const bool pass=mid>threshold&&max>threshold;
+            passed+=pass;
+            std::cout<<"VOICE_PCM_RESULT ID="<<1100+i<<" MID_DELTA="<<mid<<" MAX_DELTA="<<max
+                     <<" NEUTRAL_DELTA="<<noise<<" THRESHOLD="<<threshold<<" "<<(pass?"PASS":"FAIL")<<"\n";
+        }
+        const bool neutralOk=distance(neutralA,neutralC,8)<=std::max(peak*.04,distance(neutralA,neutralB,8)*2.);
+        if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
+           component->terminate()!=S::kResultOk)return fail("Voice overlay shutdown failed");
+        processor->release();component->release();factory->release();
+        if(!exitDll())return fail("Voice overlay module deinitialization failed");
+        FreeLibrary(module);
+        std::cout<<"REAL_VST3_VOICE_PCM_SUMMARY="<<passed<<"/10 NEUTRAL_RESTORE="<<(neutralOk?"PASS":"FAIL")<<"\n";
+        if(passed!=10||!neutralOk)return fail("Voice overlay musical PCM gate failed");
+        std::cout<<"REAL_VST3_VOICE_CONTROLS_PCM_PASS\n"
+                 <<"PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED\n"
+                 <<"VST3_HOST_NOTE_ON_EVENTS_SENT="<<ons<<"\n"
+                 <<"VST3_HOST_NOTE_OFF_EVENTS_SENT="<<offs<<"\n";
+        return 0;
     }
     if(performance) {
         // Real-time native host benchmark; no trace logging in this run.

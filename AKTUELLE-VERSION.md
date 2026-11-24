@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Windows-Gesamtlauf PASS; gebündelter echter Regler-PCM-Test ergänzt
+
+- [Windows 45494869093](../../actions/runs/45494869093) auf e2babc20 vollständig SUCCESS: portable Rohregistermathematik 65.536 Wörter, VST3-v5-Recall aller zehn Parameter inkl. v1–v4-Neutralrestore, Steinberg 47/47, alle vier RAM-Spektralgates, Cheezoids 128/128, Master/Sustain und P165-Editor PASS. Alle drei Performance-Raten 44,1/48/96 kHz wieder ohne Audio-/MIDI-Drops und Unterläufe (9254/28522/14269 Blöcke), p95 13,5601/13,6667/12,9583 ms. Transport 45494869096 und Version 45494868984 ebenfalls SUCCESS. Dies belegt Neutralverhalten und Recall, nicht individuelle Regler-Klangwirkung.
+- Neue separate `--overlay`-SF2-Fixture mit eigener obertonreicher PCM-Welle, nichttrivialen AMP- und Filterhüllkurven, echter Modulationsroute. Bisherige trockene/nasse Fixture unverändert. Ein nativer Hostlauf prüft alle zehn Regler einzeln bei 50/100 %, über echte VST3-Automation, mit zwei Neutralreferenzen und Rückkehr auf null. Phasenunabhängige RMS- und Differenz-RMS-Zeitfenster, Release-Regler nur im Release-Fenster, Differenz muss über Wiederholungsabweichung und 1 % Referenzpeak liegen. Alle zehn müssen nachweislich PCM verändern; Neutralrestore separat. Original-Registertrace vorhanden und temporär, aber noch kein automatisierter per-Regler-Registervergleich. Neuer Klangtest liegt vor teurem Cheezoids-Sweep, ein Windows-Build, kein Produktcode geändert. **Neuer Test noch nicht ausgeführt, keine Regler-Klangabnahme, kein Release.**
+
 ## 24.11.2026 — Windows-Compilerfehler der Regleranbindung korrigiert
 
 - Windows 45493826921 FAIL beim DLL-Build, vor Klang-/Reglerprüfung: erzeugter MPU-/EMU-Code enthielt literale Escape-Sequenzen statt Zeilenumbrüchen; gemeinsamer Header verwendete C++17-Namespace-Syntax im älteren DOSBox-MSVC-Projekt sowie min/max-Aufrufe, die mit Windows-Makros kollidieren. Portable Vorprüfung und Transport 45493826793, Version 45493826836 bestanden; Editor-Folgefehler mangels gebauter Binärdatei kein GUI-Funktionsbefund.
