@@ -252,7 +252,8 @@ try {
             [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER','dummy','Process')
             [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY','1','Process')
             [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG',$perfBoot,'Process')
-            & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
+            $perfSeconds = if ($rate -eq '48000') { 120 } else { $Seconds }
+            & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $perfSeconds
             if ($LASTEXITCODE -ne 0) { $perfExit = 1 }
         }
     } finally {

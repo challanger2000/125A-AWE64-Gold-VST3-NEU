@@ -433,7 +433,9 @@ int main(int argc,char** argv) {
         const auto polyCpuStart=cpu100ns();
         const auto polyWallStart=Clock::now();
         double chordEnergy=0.;unsigned chordSilent=0;
-        for(unsigned i=0;i<nblocks(5.);++i){
+        // One extended real-time soak at 48 kHz; keep other rate probes short.
+        const double chordHoldSeconds=hostRate==48000.?60.:5.;
+        for(unsigned i=0;i<nblocks(chordHoldSeconds);++i){
             if(!tick(i==0,false))return fail("Polyphonic callback failed");
             if(i==0)actualOn+=midiEvents.getEventCount();
             double e=0.;
@@ -447,6 +449,13 @@ int main(int argc,char** argv) {
         const double polySeconds=std::chrono::duration<double>(Clock::now()-polyWallStart).count();
         if(!tick(false,true))return fail("Chord release failed");
         actualOff+=midiEvents.getEventCount();
+        if(hostRate==48000.) {
+            for(unsigned i=0;i<nblocks(2.);++i)if(!tick(false,false))return fail("Soak release callback failed");
+            double finalPeak=0.;
+            for(unsigned k=0;k<buffer;++k)finalPeak=std::max(finalPeak,double(std::max(std::abs(l[k]),std::abs(r[k]))));
+            if(finalPeak>=.002)return fail("Soak release did not settle; possible stuck voice");
+            std::cout<<"PERF_SOAK_RELEASE_PEAK="<<finalPeak<<"\n";
+        }
         const auto cpuEnd=cpu100ns();
         const double wallSeconds=std::chrono::duration<double>(Clock::now()-wallStart).count();
         if(cpuEnd<cpuStart||polyCpuEnd<polyCpuStart||polySeconds<=0||wallSeconds<=0)
@@ -465,7 +474,7 @@ int main(int argc,char** argv) {
                  <<"PERF_CALLBACK_MAX_MS="<<maxCallbackMs<<" CALLBACK_DEADLINE_OVERRUNS="<<lateCallbacks
                  <<" HOST_WAKE_MAX_LATE_MS="<<maxLateMs<<"\n"
                  <<"PERF_HELD_SILENT_BLOCKS="<<silentHeldBlocks<<" POLY_SILENT_BLOCKS="<<chordSilent
-                 <<" POLY_ENERGY="<<chordEnergy<<"\n"
+                 <<" POLY_ENERGY="<<chordEnergy<<" POLY_HOLD_SECONDS="<<chordHoldSeconds<<"\n"
                  <<"PERF_REPORTED_VST3_LATENCY_SAMPLES="<<processor->getLatencySamples()<<"\n";
         if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
            component->terminate()!=S::kResultOk)return fail("Performance shutdown failed");

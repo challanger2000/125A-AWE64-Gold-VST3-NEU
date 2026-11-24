@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 24.11.2026 — 96-kHz-Abnahme PASS; erweiterter 48-kHz-Stabilitätstest
+
+- [Windows 45425096309](../../actions/runs/45425096309) SUCCESS auf 2d711cac; tatsächlicher RAM-735-Hz-Klang bei 96 kHz nachgewiesen. [Transport 45425096302](../../actions/runs/45425096302) und [Version 45425096276](../../actions/runs/45425096276) SUCCESS. Alle 128 Cheezoids-Programme und bisherigen Klanggates erneut bestanden.
+- Native 128-Sample-Latenz p95/max bei 44,1/48/96 kHz: 12,9478/13,875/13,9479 ms; 6569/7147/14269 gemessene Queue-Blöcke, jeweils null Unterläufe, Audio-/MIDI-Drops, stumme gehaltene Blöcke und Callback-Fristüberschreitungen. 32-MIDI-Noten-Last 1,24976/2,50002/5,31309 % eines logischen CI-Kerns, nicht Besitzer-CPU.
+- Nächster Prüfpunkt: 48-kHz-Polyphonietest von 5 auf 60 Sekunden mit 32 gehaltenen MIDI-Noten verlängert; nach NoteOff zwei Sekunden Release und abschließender Peak <0,002 verlangt. Vorhandene Queue-, Stille- und Latenzgates bleiben unverändert. Timeout für diesen Einzeltest erhöht, 44,1/96-kHz-Proben unverändert. Keine Produkt-/DSP-Änderung, keine erneute Optimierung auf Verdacht. Neuer Windows-Nachweis offen; kein Release.
+
 ## 24.11.2026 — 96-kHz-End-to-End-Abnahme erweitert (Windows-Ergebnis offen)
 
 - Nativer VST3-Hosttest akzeptiert nun 96 kHz zusätzlich zu 44,1/48 kHz. Die vorhandene RAM-735-Hz-Spektralprüfung und die unveränderte 128-Sample-Performance-/Queue-Prüfung werden auch bei 96 kHz ausgeführt. Keine Änderung an Produktcode, EMU8000, P165-GUI, Puffern oder bisherigen Grenzwerten.
