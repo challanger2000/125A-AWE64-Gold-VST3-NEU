@@ -264,19 +264,7 @@ jobs:
           $output=@(& $validators[0].FullName $bundle 2>&1)
           $code=$LASTEXITCODE
           $output | ForEach-Object { Write-Host $_ }
-          $summary=@($output | Where-Object { "$_" -match '^Result: [1-9][0-9]* tests passed, 0 tests failed
-      # distribution permissions are cleared. A private-repo runner can
-      # deliver the prebuilt asset-free package after BOTH existing gates.
-      - name: Upload prebuilt developer-only test package (private repositories only)
-        if: ${{ github.event.repository.private == true }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: AWE64-private-test-preparation-${{ github.sha }}
-          path: ${{ runner.temp }}/AWE64-private-test-preparation
-          if-no-files-found: error
-          retention-days: 3
-      # No public release artifact or private ROM/SF2/Creative bytes uploaded.
- })
+          $summary=@($output | Where-Object { "$_" -match '^Result: [1-9][0-9]* tests passed, 0 tests failed$' })
           if ($code -ne 0 -or $summary.Count -ne 1) { throw "Full SDK validator failed; exit=$code" }
       # The source repo is public. Never publish the developer binaries until
       # distribution permissions are cleared. A private-repo runner can

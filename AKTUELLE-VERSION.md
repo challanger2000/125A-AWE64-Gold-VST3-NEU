@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 24.11.2026 — Validator-Workflow: YAML-Einfügungsfehler korrigiert
+
+- [Windows 45458638773](../../actions/runs/45458638773) FAIL ohne Jobs: Fehler beim Einfügen des neuen Validator-Schritts verdoppelte den YAML-Dateischluss an der Regex-Endmarke. Kein Validator ausgeführt. Transport 45458642821 und Version 45458642659 SUCCESS.
+- Workflow exakt aus dem letzten erfolgreichen b6975b8a rekonstruiert, ausschließlich um denselben Validator-Schritt ergänzt; unveränderte übrige Schritte und einmaliger Upload-Block geprüft. Keine Produkt-/GUI-/DSP-Änderungen. Neuer Windows-Nachweis offen.
+
 ## 24.11.2026 — P165-GUI-Lifecycle PASS; vollständiger Steinberg-Validator als Pflichtgate
 
 - [Windows 45453837727](../../actions/runs/45453837727) SUCCESS auf b6975b8a; Transport 45453837608 und Version 45453837600 SUCCESS. Tatsächlicher nativer Editor zweimal erstellt/angehängt/entfernt, jeweils anfänglich und nach Attach 1000x708, Win32-Client ebenfalls 1000x708. Das fehlende IPlugFrame war eine Abweichung des Testhosts; P165-Produktgrafik unverändert.
