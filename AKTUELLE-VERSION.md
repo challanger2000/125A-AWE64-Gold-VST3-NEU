@@ -1,13 +1,21 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
 **Produkt:** 125A AWE64 Gold (Windows x64 VST3, DOSBox-X)  
-**Stand:** 23.11.2026  
+**Stand:** 24.11.2026  
 **Entwicklungskennung:** `0.0.0-dev`  
-**Release / abgenommenes Instrument:** **NEIN – Entwicklungsversion gebaut, Original-Creative-Klang/DAW-Abnahme offen**  
+**Release / abgenommenes Instrument:** **NEIN – Original-Creative-Klang- und bisherige Performanceprüfungen bestanden; Gesamtinstrument/DAW-Abnahme offen**  
 **Einziger Branch:** `main`  
 **Exakter neuester Quellstand:** [oberster Commit auf main](../../commits/main) (nicht auf eine veraltende SHA im Text verlassen)
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
+
+## 24.11.2026 — Guest-Tick-PCM: Windows-Klang und Performance vollständig PASS im bisherigen Testumfang
+
+- [Windows 45415014969](../../actions/runs/45415014969) SUCCESS auf 983c96ce, beide Jobs und alle ausgeführten Schritte bestanden; [Transport 45415014916](../../actions/runs/45415014916) und [Version 45415014891](../../actions/runs/45415014891) SUCCESS.
+- Native 128-Sample-Messung bei 44,1/48 kHz: MIDI→PCM Median 12,8571/13,9792 ms, p95 und Max 13,6054/14,5625 ms. Vorher p95 96,08/97,31 ms. Keine Queue-Unterläufe, Audio-/MIDI-Drops, stummen gehaltenen Blöcke oder Callback-Fristüberschreitungen in 6569/7147 gemessenen Blöcken. CPU-Prozess 3,46047/2,20306 % eines logischen CI-Kerns, 32-MIDI-Noten-Last 2,49988/2,50003 %. Keine Behauptung einer CPU-Messung auf Besitzer-i9 oder einer DAW-Abnahme.
+- Exakt hashidentische Cheezoids-Bank erneut 128/128 Originalvergleich PASS, kein verlorenes Sustain oder >20-dB-Pegelfensterabweichung. Alle drei RAM-Frequenzfälle, absoluten Send-/Recall-Register-Gates und Effekttypen erneut PASS. Keine Änderung des EMU8000-DSP.
+- Nutzer hat 20 ms ausdrücklich als Optimierungsziel statt starrer Produkt-Abnahmegrenze bestätigt; selbst höhere Latenz ist bei technisch unvermeidbarem Bedarf akzeptabel. Bestehendes 20-ms-Regressionstestziel bleibt unverändert, jetzt erreicht. Priorität: Originalklang, störungsfreie Wiedergabe, dann Performance. Keine weitere riskante Optimierung ohne Befund.
+- Noch keine Releasefreigabe: vollständige GUI-/Parameterfunktion, längere Stabilitäts-/Timingtests, Installer und vollständige VST3-Validierung, abschließender Studio-Pro-Praxistest bleiben separat zu verifizieren. Historische offene Befunde unten gelten nur bis zum nachgewiesenen Folgetest.
 
 ## 24.11.2026 — Guest-Tick-PCM statt unabhängiger SDL-Dummy-Uhr
 
