@@ -72,8 +72,8 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_HostRegisterPCM(
 '''
 def patch_emu(s):
     if 'AWE64_HostRegisterIO(' in s:raise ValueError('Already patched EMU8000')
-    math=(Path(__file__).resolve().parents[1]/"research/p165-control-port/VoiceOverlay.hpp").read_text(encoding="utf-8").replace("#pragma once\\n","",1)
-    s=once(s,'#include <string>','#include <string>\\n#ifdef AWE64_VST3_RUNTIME\\n#include <atomic>\\n'+math+'\\nextern uint64_t AWE64_OverlayMidiContext() noexcept;\\n#endif')
+    math=(Path(__file__).resolve().parents[1]/"research/p165-control-port/VoiceOverlay.hpp").read_text(encoding="utf-8").replace("#pragma once\n","",1)
+    s=once(s,'#include <string>','#include <string>\n#ifdef AWE64_VST3_RUNTIME\n#include <atomic>\n'+math+'\nextern uint64_t AWE64_OverlayMidiContext() noexcept;\n#endif')
     s=once(s,'class EMU8000_Device {',PORT_BRIDGE+'\nclass EMU8000_Device {')
     anchor='IO_WriteHandleObject WriteHandler[EMU_PORT_GROUPS];'
     s=once(s,anchor,anchor+'\n#ifdef AWE64_VST3_RUNTIME\n'
@@ -390,8 +390,8 @@ static void AWE64_PumpGuestMidi() {
 
 '''
     s=once(s,anchor,pump+anchor)
-    s=once(s,'mpu.queue[pos]=data;','mpu.queue[pos]=data;\\n#ifdef AWE64_VST3_RUNTIME\\n        awe64_overlay_tags[pos]=0;\\n#endif')
-    s=once(s,'ret=mpu.queue[mpu.queue_pos];','ret=mpu.queue[mpu.queue_pos];\\n#ifdef AWE64_VST3_RUNTIME\\n        const auto tag=awe64_overlay_tags[mpu.queue_pos];\\n        awe64_overlay_tags[mpu.queue_pos]=0;\\n        awe64_overlay_context=tag && mpu.mode==M_UART ? (++awe64_overlay_epoch<<2)|tag : 0;\\n#endif')
+    s=once(s,'mpu.queue[pos]=data;','mpu.queue[pos]=data;\n#ifdef AWE64_VST3_RUNTIME\n        awe64_overlay_tags[pos]=0;\n#endif')
+    s=once(s,'ret=mpu.queue[mpu.queue_pos];','ret=mpu.queue[mpu.queue_pos];\n#ifdef AWE64_VST3_RUNTIME\n        const auto tag=awe64_overlay_tags[mpu.queue_pos];\n        awe64_overlay_tags[mpu.queue_pos]=0;\n        awe64_overlay_context=tag && mpu.mode==M_UART ? (++awe64_overlay_epoch<<2)|tag : 0;\n#endif')
     anchor='static Bitu MPU401_ReadStatus(Bitu port,Bitu iolen) {'
     s=once(s,anchor,anchor+'''
 #ifdef AWE64_VST3_RUNTIME

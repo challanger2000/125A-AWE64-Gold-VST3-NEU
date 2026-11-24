@@ -3,7 +3,7 @@
 #include <array>
 #include <cstdint>
 
-namespace awe64::overlay {
+namespace awe64 { namespace overlay {
 // Quantized normalized controls, zero = exact original register word.
 using Controls = std::array<std::uint8_t,10>;
 constexpr unsigned scale(unsigned n,unsigned amount) noexcept {
@@ -31,10 +31,10 @@ constexpr std::uint16_t decaySustainRelease(std::uint16_t w,unsigned decay,
 struct FilterWords {std::uint16_t ifatn,pefe;};
 constexpr FilterWords filter(std::uint16_t ifatn,std::uint16_t pefe,const Controls& c) noexcept {
     auto cutoff=unsigned(ifatn>>8);
-    const auto depthControl=std::max({c[4],c[5],c[6],c[7]});
+    const auto depthControl=(std::max)({c[4],c[5],c[6],c[7]});
     // Existing signed filter and pitch modulation routes stay intact.
     if(depthControl && !(pefe&255u)) {
-        const auto depth=std::min(scale(96u,depthControl),cutoff/2u);
+        const auto depth=(std::min)(scale(96u,depthControl),cutoff/2u);
         pefe=static_cast<std::uint16_t>((pefe&0xff00u)|depth);
         cutoff-=2u*depth;
     }
@@ -46,4 +46,4 @@ constexpr std::uint16_t resonance(std::uint16_t cccaHigh,unsigned amount) noexce
     const auto q=unsigned(cccaHigh>>12);
     return static_cast<std::uint16_t>((cccaHigh&0xfffu)|((q+scale(15u-q,amount))<<12));
 }
-} // namespace awe64::overlay
+}} // namespace awe64::overlay

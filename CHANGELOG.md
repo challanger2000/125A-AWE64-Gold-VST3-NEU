@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 24.11.2026 — Windows-Compilerfehler der Regleranbindung korrigiert
+
+- Windows 45493826921 FAIL beim DLL-Build, vor Klang-/Reglerprüfung: erzeugter MPU-/EMU-Code enthielt literale Escape-Sequenzen statt Zeilenumbrüchen; gemeinsamer Header verwendete C++17-Namespace-Syntax im älteren DOSBox-MSVC-Projekt sowie min/max-Aufrufe, die mit Windows-Makros kollidieren. Portable Vorprüfung und Transport 45493826793, Version 45493826836 bestanden; Editor-Folgefehler mangels gebauter Binärdatei kein GUI-Funktionsbefund.
+- Korrigiert ausschließlich die drei belegten Compilerursachen: korrekte Python-Newline-Escapes, C++14-kompatible Namespaces, makrosichere (std::min)/(std::max). Neue Patch-Assertions prüfen erzeugte echte Zeilenumbrüche und entfernen #pragma once aus eingebettetem Header; portable Mathematik jetzt unter C++14 statt C++17. Keine Änderung der musikalischen Reglerlogik oder Testschwellen. Neuer Windows-Nachweis offen.
+
 ## 24.11.2026 — P165-Regler gemeinsam an Original-Registerpfad angebunden; Nachweis offen
 
 - Gemeinsame Implementierung aller zehn AMP-/FILTER-/Cutoff-/Resonanzregler: Host-Parameter, Automation, neue v5-State-Variante (v1–v4 bleiben lesbar und bei Neutralstellung schreibbar), Original-P165-Regler und vorhandener MOD RESET (setzt alle zwölf Modulationsregler zurück). Keine Änderung an der Chip-Synthese oder DEMO.EXE. Guest-Thread nutzt die portierte gemeinsame Mathematik; Kontextmarkierung an tatsächlich aus der MPU-FIFO gelesenen vollständigen Host-Nachrichten, Ende am nächsten Statuspoll. Boot/RAM-Upload ohne musikalischen Kontext; reservierte Voices und DMA ausgeschlossen. Filterpaar IFATN/PEFE in beiden Schreibreihenfolgen zusammenführen. Wirkung primär bei neuen Noten, Release bei NoteOff/entsprechenden CCs, wie beim alten Overlay. Keine Aussage über musikalische Vollständigkeit, bis Register- und PCM-Gegenproben vorliegen.

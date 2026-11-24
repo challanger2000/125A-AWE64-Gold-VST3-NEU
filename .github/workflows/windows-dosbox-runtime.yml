@@ -50,7 +50,7 @@ jobs:
       - name: Verify upstream commit and apply real source patch
         run: |
           test "$(git -C third_party/dosbox-x-AWE32 rev-parse HEAD)" = "f3a95b9f19a7f9863295e6481f271cf04733c635"
-          c++ -std=c++17 -Wall -Wextra -Werror -O2 research/p165-control-port/VoiceOverlayTest.cpp -o /tmp/awe64-overlay-math
+          c++ -std=c++14 -Wall -Wextra -Werror -O2 research/p165-control-port/VoiceOverlayTest.cpp -o /tmp/awe64-overlay-math
           /tmp/awe64-overlay-math
           python -m unittest discover -s tests -p test_dosbox_runtime_patch.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_mpu_probe.py -v
