@@ -1,0 +1,36 @@
+name: Native audit - deterministic runtime ABI faults
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/audit-native-runtime/**'
+      - '.github/workflows/windows-audit-runtime-shim.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runtime-fault-shim:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile actual production RuntimeHost with isolated test DLL
+        shell: pwsh
+        run: |
+          cmake -S tools/audit-native-runtime -B build-audit-shim -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'configure failed' }
+          cmake --build build-audit-shim --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+      - name: Run bounded native Windows fault probes
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $exe=(Resolve-Path 'build-audit-shim/Release/native_runtime_fault_audit.exe').Path
+          $failed=@()
+          foreach ($mode in @('normal','stall','recovery')) {
+              $dir=Join-Path $env:RUNNER_TEMP "awe64-shim-$mode"
+              & $exe $mode $dir
+              if ($LASTEXITCODE -ne 0) { $failed += $mode }
+          }
+          Write-Host "AUDIT_SHIM_CASES_FAILED=$failed"
+          if ($failed.Count -ne 0) { throw 'Native RuntimeHost ABI test contract failure or infrastructure error' }

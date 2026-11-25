@@ -9,6 +9,10 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 25.11.2026 — Native deterministische Laufzeit-ABI-Fehlerinjektion
+
+- A05/A02: kurzer nativer Windows-Build des **unveränderten produktiven DosBoxRuntimeHost.hpp** und tatsächlicher Queue/Adapter mit expliziter synthetischer ABI-DLL. Kooperativer Stop als Kontrolle, 6-s nichtkooperativer Worker, erzwungener CC7-Verlust nach gefüllter Queue und unabhängiger MIDI-Empfangslog. Kein echtes DOSBox-/VST3-/Klang-PASS; gezielte native Host-/Transportprüfung. Kein Produktcode geändert. Native Resultate offen.
+
 ## 25.11.2026 — Native Original-DLL-Fatalpfadprüfung
 
 - A22: gezielte isolierte Original-DOSBox-DLL-Prüfung mit synthetischem 1-MiB-ROM als Positivkontrolle und absichtlich fehlendem ROM plus blockierter temporärer ROM-Fallback-Datei. `-test` verhindert ROM-Downloadfrage; nur ein eigenes E_Exit-Dialogfenster des isolierten Kindprozesses wird quittiert, tatsächlicher Prozess-Exit/Timeout und Originaldiagnose werden getrennt geprüft. Keine Änderung am Originalkern/Produkt und keine privaten Daten. Direkte DLL-Fehlerinjektion, nicht behauptet, dass jede normale VST3-Aktivierung den Fehlerfall auslöst. [Erster Lauf 45703219472](../../actions/runs/45703219472): Testmodus-Positivkontrolle exit 0 ohne Rückkehrmarker/Trace, missing-ROM E_Exit-Dialog und 35-s-Timeout; spezifischer Fatalpfad und Prozessabbruch NOT VERIFIED. Prüfaufbau korrigiert: bewährter normaler AWEUTIL-Positivlauf ohne -test, -test nur für Downloadunterdrückung im Missing-ROM-Kind; exakter modaler Dialogtext per WM_GETTEXT und gezielter IDOK/BM_CLICK. Produkt und bestehende Klanggates unverändert. Neuer nativer Nachweis offen.
