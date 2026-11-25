@@ -9,6 +9,10 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 25.11.2026 — Native Windows-Paketgrenzen adversarial prüfen
+
+- Separate kurze datenfreie Windows-Gegenprobe A18/A21: echter Windows-Verzeichnisjunction, `..` und direkter Zielpfad mit derselben produktiven Paketierungsfunktion, Hashs ausschließlich für selbst erzeugte Fakedaten; unabhängige Git-ignore-Proben in einem temporären Git-Repository für die private Buildstruktur. Kein Besitzerinhalt, kein tatsächlicher Git-Add/Upload, kein Produktbuild. Native Ergebnisse noch offen.
+
 ## 25.11.2026 — Native adversariale Laufzeitfehlerprüfungen
 
 - Audit-only, Produktquellen und Originalkern unverändert. Zusätzlicher separater Windows-Workflow mit echter VST3/DOSBox-Laufzeit, synthetischem MIDI/PC-Speaker-Gast und eigenem nativen Host: frühe Note, Processing-Pause mit Queue-Zählern, Master-Automation innerhalb eines Blocks, aktiver SF2-Wechsel bei absichtlich fehlender installierter Runtime-DLL. Positive PCM-Kontrolle, separate Kindprozesse/Timeouts, kein Originalklangnachweis aus PC-Speaker.
