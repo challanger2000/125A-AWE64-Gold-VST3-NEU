@@ -314,9 +314,10 @@ try {
     # must not suppress timing evidence, nor may timing PASS waive CPU failure.
     & python (Join-Path $root 'tests/WindowsTimedVst3Acceptance.py') --bundle $bundlePath --host-exe $hostTestExe
     $timedExit = $LASTEXITCODE
-    if ($perfExit -ne 0 -or $timedExit -ne 0) {
-        throw "Independent native gates failed: performance=$perfExit timed=$timedExit; no long Cheezoids sweep."
-    }
+    # Continue independent sound-bank/effect gates even if CPU accounting
+    # or the experimental timing path is NOT VERIFIED. Neither may grant
+    # a final PASS: both exit codes remain mandatory at the final gate.
+    Write-Host "NATIVE_INDEPENDENT_GATE_STATUS performance=$perfExit timed=$timedExit"
     # Independently run the public author-bank regression before other
     # original gates can fail. No owner data or downloaded assets uploaded.
     $cheezExit = 0
@@ -418,7 +419,9 @@ try {
     if ($directEffectExit -ne 0) { throw "Direct original Creative effect gate failed." }
     if ($sendFailures.Count -ne 0) { throw ("Original send endpoint gates failed: " + ($sendFailures -join "; ")) }
     if ($cheezExit -ne 0) { throw 'Cheezoids all-program comparison failed.' }
-    if ($perfExit -ne 0) { throw 'Native performance/stability gate failed.' }
+    if ($perfExit -ne 0 -or $timedExit -ne 0) {
+        throw "Independent native gates failed: performance=$perfExit timed=$timedExit"
+    }
     # Only announce final PASS after BOTH independent tests and all original
     # owner SHA-256/Git-blob and EMU8000 trace gates have actually succeeded.
     Write-Host "PRIVATE_CREATIVE_VST3_EMU8000_PCM_PASS; PORT_WRITES=$writes; ORIGINAL_ROM=VERIFIED; MIDI_NOTE_ON_OFF=VERIFIED"

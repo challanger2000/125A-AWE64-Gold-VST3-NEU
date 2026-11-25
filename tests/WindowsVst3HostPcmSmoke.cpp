@@ -12,6 +12,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX  // Windows.h max/min macros must not break std::max
 #include <windows.h>
+#include "WindowsScheduledCpuTrace.hpp"
 #include <ole2.h>
 #include "pluginterfaces/base/ipluginbase.h"
 #include "pluginterfaces/base/funknown.h"
@@ -634,8 +635,13 @@ int main(int argc,char** argv) {
         auto value=[](FILETIME f){return (static_cast<std::uint64_t>(f.dwHighDateTime)<<32)|f.dwLowDateTime;};
         return {value(kernel)+value(user),cycles,true};
     };
-    bool cpuCalibrated=false;
+    awe64::qa::WindowsScheduledCpuTrace preciseCpu;
+    std::array<awe64::qa::SchedWindow,4> cpuWindows{};
     if(performance) {
+        preciseCpu.start();
+        // First yield creates an observed switch-in before calibration.
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        cpuWindows[0].begin=preciseCpu.now();
         const auto processBefore=cpuCounters(false);
         const auto threadBefore=cpuCounters(true);
         const auto until=std::chrono::steady_clock::now()+std::chrono::milliseconds(250);
@@ -645,8 +651,12 @@ int main(int argc,char** argv) {
         } while(std::chrono::steady_clock::now()<until);
         const auto threadAfter=cpuCounters(true);
         const auto processAfter=cpuCounters(false);
-        cpuCalibrated=awe64::qa::cpuPositiveControl(processBefore,processAfter,threadBefore,threadAfter);
-        std::cout<<(cpuCalibrated?"PERF_CPU_COUNTER_POSITIVE_CONTROL_PASS\n":"PERF_CPU_COUNTER_POSITIVE_CONTROL_NOT_VERIFIED\n");
+        cpuWindows[0].end=preciseCpu.now();
+        const bool legacyCalibrated=awe64::qa::cpuPositiveControl(processBefore,processAfter,threadBefore,threadAfter);
+        std::cout<<(legacyCalibrated?"PERF_LEGACY_CPU_COUNTER_POSITIVE_CONTROL_PASS\n":"PERF_LEGACY_CPU_COUNTER_POSITIVE_CONTROL_NOT_VERIFIED\n");
+        cpuWindows[1].begin=preciseCpu.now();
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        cpuWindows[1].end=preciseCpu.now();
     }
     // Windows runner embeds NO original Creative material. The fake DOS MZ
     // fixture merely drives the original DOSBox PC-speaker hardware.
@@ -1020,6 +1030,7 @@ int main(int argc,char** argv) {
         for(unsigned i=0;i<nblocks(12.);++i)if(!tick(false,false))return fail("Performance warmup failed");
         const auto cpuStart=cpuCounters(false);
         const auto wallStart=Clock::now();
+        cpuWindows[2].begin=preciseCpu.now();
         measure=true;
         std::vector<double> latencies;
         unsigned silentHeldBlocks=0;
@@ -1056,6 +1067,7 @@ int main(int argc,char** argv) {
         midiEvents.setChord(32,44,24.f/127.f);
         const auto polyCpuStart=cpuCounters(false);
         const auto polyWallStart=Clock::now();
+        cpuWindows[3].begin=preciseCpu.now();
         double chordEnergy=0.;unsigned chordSilent=0;
         // One extended real-time soak at 48 kHz; keep other rate probes short.
         const double chordHoldSeconds=hostRate==48000.?60.:5.;
@@ -1069,6 +1081,7 @@ int main(int argc,char** argv) {
                 if(e/buffer<1.e-8)++chordSilent;
             }
         }
+        cpuWindows[3].end=preciseCpu.now();
         const auto polyCpuEnd=cpuCounters(false);
         const double polySeconds=std::chrono::duration<double>(Clock::now()-polyWallStart).count();
         if(!tick(false,true))return fail("Chord release failed");
@@ -1080,13 +1093,10 @@ int main(int argc,char** argv) {
             if(finalPeak>=.002)return fail("Soak release did not settle; possible stuck voice");
             std::cout<<"PERF_SOAK_RELEASE_PEAK="<<finalPeak<<"\n";
         }
+        cpuWindows[2].end=preciseCpu.now();
         const auto cpuEnd=cpuCounters(false);
         const double wallSeconds=std::chrono::duration<double>(Clock::now()-wallStart).count();
         const auto cores=GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
-        awe64::qa::CpuUsage overall{},poly{};
-        const bool overallValid=awe64::qa::cpuUsage(cpuStart,cpuEnd,wallSeconds,cores,overall);
-        const bool polyValid=awe64::qa::cpuUsage(polyCpuStart,polyCpuEnd,polySeconds,cores,poly);
-        const bool cpuValid=cpuCalibrated&&overallValid&&polyValid;
         auto reportCpuInterval=[](const char* label,const auto& a,const auto& b,double seconds) {
             const auto delta=awe64::qa::cpuInterval(a,b);
             std::cout<<"PERF_CPU_RAW "<<label<<" STATUS="<<awe64::qa::cpuStatusName(delta.status)
@@ -1095,14 +1105,6 @@ int main(int argc,char** argv) {
         };
         reportCpuInterval("OVERALL",cpuStart,cpuEnd,wallSeconds);
         reportCpuInterval("POLYPHONY",polyCpuStart,polyCpuEnd,polySeconds);
-        // Cycles are diagnostic only: variable-frequency hardware and VMs
-        // do not permit a reliable conversion from cycles to CPU time.
-        if(cpuValid) {
-            std::cout<<"PERF_PROCESS_ONE_CORE_PERCENT="<<overall.oneCorePercent<<" TOTAL_MACHINE_PERCENT="<<overall.machinePercent<<"\n"
-                     <<"PERF_32_NOTE_ONE_CORE_PERCENT="<<poly.oneCorePercent<<" TOTAL_MACHINE_PERCENT="<<poly.machinePercent<<"\n";
-        } else {
-            std::cout<<"PERF_CPU_TIME_NOT_VERIFIED\n";
-        }
         std::sort(latencies.begin(),latencies.end());
         const double p95=latencies[static_cast<unsigned>(std::ceil(.95*latencies.size()))-1];
         std::cout<<"PERF_HOST_RATE="<<hostRate<<" PERF_BLOCK="<<buffer<<" LOGICAL_CPUS="<<cores<<"\n"
@@ -1201,7 +1203,27 @@ int main(int argc,char** argv) {
         if(silentHeldBlocks||chordSilent||chordEnergy<=0.)return fail("Held-tone stability gate failed");
         if(p95>20.)return fail("MIDI-to-PCM p95 exceeds 20 ms target");
         std::cout<<"REAL_VST3_TRANSPORT_LATENCY_PCM_PASS; QUEUE GATE SEPARATE\n";
-        if(!cpuValid)return fail("Invalid or flat process CPU counters; no valid performance measurement");
+        // Decode ETL only AFTER audio measurement, master/sustain and guest
+        // shutdown, so file parsing cannot create guest buffer underruns.
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::array<double,4> scheduled{};
+        const bool traceOk=preciseCpu.finish(cpuWindows,scheduled);
+        // Busy and sleeping controls were acquired before activation. Do
+        // not waive invalid/lost ETW data or convert cycles to seconds.
+        const bool calibrated=traceOk&&scheduled[0]>=.55&&scheduled[0]<=1.35&&
+            scheduled[1]>=0.&&scheduled[1]<=.15;
+        const bool cpuValid=calibrated&&cores&&scheduled[2]>0.&&scheduled[3]>0.&&
+            scheduled[2]<=cores&&scheduled[3]<=cores;
+        std::cout<<"PERF_ETW_STATUS="<<preciseCpu.status()<<" BUSY_CORE_RATIO="<<scheduled[0]
+                 <<" IDLE_CORE_RATIO="<<scheduled[1]<<"\n";
+        if(!cpuValid){
+            std::cout<<"PERF_CPU_TIME_NOT_VERIFIED\n";
+            return fail("ETW scheduled CPU measurement or controls invalid");
+        }
+        std::cout<<"PERF_CPU_COUNTER_POSITIVE_CONTROL_PASS\n"
+                 <<"PERF_CPU_MEASURE_METHOD=ETW_SCHEDULED_QPC; CI GUEST SCHEDULED TIME\n"
+                 <<"PERF_PROCESS_ONE_CORE_PERCENT="<<100.*scheduled[2]<<" TOTAL_MACHINE_PERCENT="<<100.*scheduled[2]/cores<<"\n"
+                 <<"PERF_32_NOTE_ONE_CORE_PERCENT="<<100.*scheduled[3]<<" TOTAL_MACHINE_PERCENT="<<100.*scheduled[3]/cores<<"\n";
         std::cout<<"REAL_VST3_PERFORMANCE_MEASUREMENT_PASS; CI CPU NOT OWNER CPU\n";
         std::cout<<"PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED\n"
                  <<"VST3_HOST_NOTE_ON_EVENTS_SENT="<<actualOn<<"\n"

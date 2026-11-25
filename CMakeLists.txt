@@ -12,7 +12,7 @@ if(BUILD_TESTING)
   if(NOT audit_fixture_result EQUAL 0)
     message(FATAL_ERROR "Synthetic audit SF2 fixture generation failed")
   endif()
-  foreach(audit IN ITEMS AuditGuestDemandTest AuditAdapterDemandTest AuditMidiTimelineTest AuditControlTimelineTest AuditHostEventPlanTest AuditHostDemandSessionTest AuditSrcPredictionTest AuditProcessTimedFragmentTest AuditCpuMeasurementTest)
+  foreach(audit IN ITEMS AuditGuestDemandTest AuditAdapterDemandTest AuditMidiTimelineTest AuditControlTimelineTest AuditHostEventPlanTest AuditHostDemandSessionTest AuditSrcPredictionTest AuditProcessTimedFragmentTest AuditCpuMeasurementTest AuditScheduledCpuTimeTest)
     add_executable(${audit} tests/${audit}.cpp)
     target_include_directories(${audit} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/integration")
     target_link_libraries(${audit} PRIVATE Threads::Threads)
@@ -225,7 +225,7 @@ void PresetBrowserView::ChooseRom() {
   add_executable(awe64_vst3_host_pcm_smoke tests/WindowsVst3HostPcmSmoke.cpp
     "${AWE64_VST3SDK}/public.sdk/source/common/memorystream.cpp")
   target_include_directories(awe64_vst3_host_pcm_smoke PRIVATE "${AWE64_VST3SDK}")
-  target_link_libraries(awe64_vst3_host_pcm_smoke PRIVATE sdk sdk_hosting base user32 ole32)
+  target_link_libraries(awe64_vst3_host_pcm_smoke PRIVATE sdk sdk_hosting base user32 ole32 advapi32)
   target_compile_features(awe64_vst3_host_pcm_smoke PRIVATE cxx_std_20)
 
   smtg_target_configure_version_file(AWE64GoldDOSBoxDev)
