@@ -49,11 +49,14 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     Steinberg::tresult processTimed(Steinberg::Vst::ProcessData&,integration::DosBoxRuntimeHost&);
     // Lifecycle changes on the host/editor thread. The audio callback uses
     // try_lock, never waits for the emulator or a disk operation.
+    // Serialize non-RT lifecycle changes even while a replacement boots
+    // outside runtimeMutex_. The audio thread never touches this mutex.
+    std::mutex transitionMutex_;
     std::mutex runtimeMutex_;
     std::mutex selectionMutex_;
     AWE125::PresetCatalog startedCatalog_{};
     std::uint64_t displayedRevision_=0;
-    bool startRuntimeLocked(const std::string&, const std::vector<std::uint8_t>* = nullptr,
+    bool startRuntimeLocked(std::unique_lock<std::mutex>&, const std::string&, const std::vector<std::uint8_t>* = nullptr,
                             AWE125::PresetCatalog* = nullptr);
     std::vector<std::uint8_t> requestedBankBytes_; // protected by runtimeMutex_
     std::uint64_t refreshBrowserCatalog();
@@ -79,6 +82,13 @@ public:
         Steinberg::int32 busIndex,Steinberg::int16 channel,
         Steinberg::Vst::CtrlNumber number,Steinberg::Vst::ParamID& id) override;
     Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown*) override;
+    Steinberg::int32 PLUGIN_API getBusCount(Steinberg::Vst::MediaType,Steinberg::Vst::BusDirection) override;
+    Steinberg::tresult PLUGIN_API getBusInfo(Steinberg::Vst::MediaType,Steinberg::Vst::BusDirection,
+        Steinberg::int32,Steinberg::Vst::BusInfo&) override;
+    Steinberg::tresult PLUGIN_API activateBus(Steinberg::Vst::MediaType,Steinberg::Vst::BusDirection,
+        Steinberg::int32,Steinberg::TBool) override;
+    Steinberg::tresult PLUGIN_API getBusArrangement(Steinberg::Vst::BusDirection,
+        Steinberg::int32,Steinberg::Vst::SpeakerArrangement&) override;
     Steinberg::tresult PLUGIN_API setActive(Steinberg::TBool) override;
     Steinberg::tresult PLUGIN_API setBusArrangements(Steinberg::Vst::SpeakerArrangement*,Steinberg::int32,
         Steinberg::Vst::SpeakerArrangement*,Steinberg::int32) override;

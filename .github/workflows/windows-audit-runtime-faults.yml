@@ -6,6 +6,8 @@ on:
       - 'src/**'
       - 'gui/PresetCatalog.h'
       - 'tests/WindowsAuditRuntimeFaults.cpp'
+      - 'tools/audit-native-runtime/fault_dll.cpp'
+      - 'tools/audit-native-runtime/CMakeLists.txt'
       - '.github/workflows/windows-audit-runtime-faults.yml'
   workflow_dispatch:
 permissions:
@@ -76,6 +78,13 @@ jobs:
           Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
           if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
           Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
+      - name: Build independent fault-injection DLL for asynchronous replacement failure
+        shell: pwsh
+        run: |
+          cmake -S tools/audit-native-runtime -B build-audit-shim -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'ABI fixture configure failed' }
+          cmake --build build-audit-shim --config Release --target AWE64DOSBoxRuntime --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'ABI fixture build failed' }
       - name: Execute isolated native fault cases independently
         shell: pwsh
         timeout-minutes: 5
@@ -87,6 +96,7 @@ jobs:
           $plugin=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3').Path
           $exe=(Get-ChildItem build-vst3 -Recurse -Filter awe64_vst3_host_pcm_smoke.exe | Select-Object -First 1).FullName
           if (-not $exe) { throw 'Native host missing' }
+          $env:AWE64_AUDIT_BOOTFAIL_DLL=(Resolve-Path 'build-audit-shim/Release/AWE64DOSBoxRuntime.dll').Path
           $env:AWE64_TEST_PERFORMANCE='1'
           $env:SDL_AUDIODRIVER='dummy'
           Remove-Item Env:AWE64_TEST_HOST_DEMAND_CLOCK -ErrorAction SilentlyContinue
@@ -95,7 +105,7 @@ jobs:
           exe,plugin,bank=sys.argv[1:]
           failed=[]
           switch_control=False
-          for mode in ('early','pause','automation','switch','rollback'):
+          for mode in ('early','pause','automation','switch','rollback','bootfail'):
               print('AUDIT_CASE_BEGIN',mode,flush=True)
               try:
                   p=subprocess.run([exe,plugin,mode,bank],capture_output=True,text=True,errors='replace',timeout=40)
@@ -106,7 +116,7 @@ jobs:
               marker='AUDIT_NATIVE_RUNTIME_EXECUTED mode='+mode+' failures='
               if p.returncode or p.stdout.count(marker)!=1:failed.append(mode)
               if mode=='switch':switch_control=p.returncode==0 and 'AUDIT_ACTIVE_BANK_SWITCH_CONTROL PASS' in p.stdout
-              if mode=='rollback' and not switch_control:
+              if mode in ('rollback','bootfail') and not switch_control:
                   print('AUDIT_A06_ACTIVE_ROLLBACK NOT_VERIFIED positive switch control failed');failed.append(mode)
               if mode=='pause':
                   counters=re.findall(r'PERF_QUEUE_BLOCKS=(\d+) AUDIO_DROPPED_FRAMES=(\d+) MIDI_DROPPED_EVENTS=(\d+) UNDERRUN_FRAMES=(\d+)',p.stdout)

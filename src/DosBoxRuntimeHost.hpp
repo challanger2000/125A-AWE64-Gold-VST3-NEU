@@ -464,6 +464,17 @@ public:
         running_.store(false,std::memory_order_release);
         return true;
     }
+    // Non-RT candidate-bank preparation only: do not prime/dequeue PCM
+    // or alter host timing while the former runtime is still processing.
+    bool waitForGuestMidiReady() noexcept {
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+        while(std::chrono::steady_clock::now()<deadline){
+            if(finished())return false;
+            if(ready_&&ready_()&&!finished())return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        return false;
+    }
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
         if(!ready_||!ready_()||(clockFault_&&clockFault_()))return false;
         if(!authenticGuest_||pcmPrimed_)return true;
@@ -634,6 +645,7 @@ public:
         // Reaper creation failure retains the entire core until process exit.
         std::fprintf(stderr,"AWE64_RUNTIME_QUARANTINED reaper=%s\n",thread?"started":"unavailable");
     }
+    bool waitForGuestMidiReady() noexcept {return core_&&core_->waitForGuestMidiReady();}
     bool ready(std::size_t frames=0) noexcept {return core_&&core_->ready(frames);}
     bool running() const noexcept {return core_&&core_->running();}
     bool finished() const noexcept {return !core_||core_->finished();}

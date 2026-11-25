@@ -129,13 +129,14 @@ bool DosBoxVst3Shell::requestSoundFont(const std::string& path,int expectedProgr
         AWE125::PresetCatalog candidate;
         if(!loadCatalog(path,candidate,path.empty()?nullptr:&bytes))return false;
         if(expectedProgram>=0 && (expectedProgram>127||!candidate.Find(0,static_cast<std::uint8_t>(expectedProgram))))return false;
-        std::lock_guard<std::mutex> lifecycle(runtimeMutex_);
+        std::lock_guard<std::mutex> transition(transitionMutex_);
+        std::unique_lock<std::mutex> lifecycle(runtimeMutex_);
         const auto previous=requestedSoundFont();
         if(previous==path&&bytes==requestedBankBytes_&&(!runtime_||!runtime_->finished()))return true;
         if(runtime_) {
             // Keep the old guest alive until the new engine has passed all
             // synchronous creation/staging steps; never destroy it on failure.
-            if(!startRuntimeLocked(path,path.empty()?nullptr:&bytes,&candidate))return false;
+            if(!startRuntimeLocked(lifecycle,path,path.empty()?nullptr:&bytes,&candidate))return false;
         } else publishCatalogLocked(std::move(candidate));
         requestedBankBytes_.swap(bytes);
         {
@@ -166,7 +167,7 @@ void DosBoxVst3Shell::stopRuntimeLocked() noexcept {
     hostDemand_.reset();
     guestStatus_.store(0,std::memory_order_release);
 }
-bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected,
+bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle,const std::string& selected,
                                         const std::vector<std::uint8_t>* validatedBank,
                                         AWE125::PresetCatalog* preparedCatalog) {
     try {
@@ -182,13 +183,23 @@ bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected,
         AWE125::PresetCatalog candidate;
         if(preparedCatalog)candidate=std::move(*preparedCatalog);
         else if(!loadCatalog(selected,candidate,validatedBank))return false;
-        if(ownBinary.empty()||!engine->begin(ownBinary,privateDir,selected,
-                demandRequested_?hostDemand_.lead():0u,validatedBank,captureGate_)) {
+        const bool replacing=bool(runtime_);
+        const auto lead=demandRequested_?hostDemand_.lead():0u;
+        // All non-RT lifecycle transitions are serialized by transitionMutex_.
+        // Let the old engine process normally while the candidate stages/boots.
+        // UART readiness is a necessary startup proof, not a soundfont
+        // semantic or original-audio proof. Initial activation stays asynchronous.
+        if(replacing)lifecycle.unlock();
+        bool started=!ownBinary.empty()&&engine->begin(ownBinary,privateDir,selected,lead,validatedBank,captureGate_);
+        if(started&&replacing)started=engine->waitForGuestMidiReady();
+        if(!started){
+            engine->stop();
+            if(replacing)lifecycle.lock();
             if(!runtime_)guestStatus_.store(-1,std::memory_order_release);
             return false;
         }
-        // begin() only proves synchronous creation, not asynchronous guest boot.
-        // Keep the former runtime until this point; preserve its status on failure.
+        if(replacing)lifecycle.lock();
+        // Only replace the previous guest after the new UART is live.
         const bool wasProcessing=timedProcessing_.load(std::memory_order_acquire);
         if(runtime_)stopRuntimeLocked();
         if(engine->clocked()&&!hostDemand_.activate()){engine->stop();return false;}
@@ -208,15 +219,33 @@ bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected,
         lastReverbType_=4;lastChorusType_=2;
         return true;
     } catch (...) {
+        if(!lifecycle.owns_lock())lifecycle.lock();
         if(!runtime_)guestStatus_.store(-1,std::memory_order_release);
         return false;
     }
 }
+int32 PLUGIN_API DosBoxVst3Shell::getBusCount(MediaType type,BusDirection dir) {
+    if((type!=kAudio&&type!=kEvent)||(dir!=kInput&&dir!=kOutput))return 0;
+    return SingleComponentEffect::getBusCount(type,dir);
+}
+tresult PLUGIN_API DosBoxVst3Shell::getBusInfo(MediaType type,BusDirection dir,int32 index,BusInfo& info) {
+    if(index<0||index>=getBusCount(type,dir))return kInvalidArgument;
+    return SingleComponentEffect::getBusInfo(type,dir,index,info);
+}
+tresult PLUGIN_API DosBoxVst3Shell::activateBus(MediaType type,BusDirection dir,int32 index,TBool state) {
+    if(index<0||index>=getBusCount(type,dir))return kInvalidArgument;
+    return SingleComponentEffect::activateBus(type,dir,index,state);
+}
+tresult PLUGIN_API DosBoxVst3Shell::getBusArrangement(BusDirection dir,int32 index,SpeakerArrangement& arr) {
+    if(index<0||index>=getBusCount(kAudio,dir))return kInvalidArgument;
+    return SingleComponentEffect::getBusArrangement(dir,index,arr);
+}
 tresult PLUGIN_API DosBoxVst3Shell::setActive(TBool state) {
-    std::lock_guard<std::mutex> lifecycle(runtimeMutex_);
+    std::lock_guard<std::mutex> transition(transitionMutex_);
+    std::unique_lock<std::mutex> lifecycle(runtimeMutex_);
     if(state) {
         if(runtime_)return kResultOk;
-        if(!startRuntimeLocked(requestedSoundFont()))return kResultFalse;
+        if(!startRuntimeLocked(lifecycle,requestedSoundFont()))return kResultFalse;
         return SingleComponentEffect::setActive(true);
     }
     stopRuntimeLocked();
@@ -256,6 +285,7 @@ uint32 PLUGIN_API DosBoxVst3Shell::getLatencySamples() {
     return latencySamples_.load(std::memory_order_acquire);
 }
 tresult PLUGIN_API DosBoxVst3Shell::setupProcessing(ProcessSetup& setup) {
+    std::lock_guard<std::mutex> transition(transitionMutex_);
     std::lock_guard<std::mutex> lifecycle(runtimeMutex_);
     if(runtime_&&runtime_->clocked())return kResultFalse;
     if(!rateConverter_.configure(setup.sampleRate))return kResultFalse;

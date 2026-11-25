@@ -14,6 +14,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
@@ -132,7 +133,7 @@ int main(int argc,char** argv){
     std::cout<<std::unitbuf;std::cerr<<std::unitbuf;
     if(argc!=4)return fail("usage: host plugin mode bank.sf2");
     const std::string mode=argv[2], bank=argv[3];
-    if(mode!="early"&&mode!="pause"&&mode!="rollback"&&mode!="switch"&&mode!="automation")return fail("unknown mode");
+    if(mode!="early"&&mode!="pause"&&mode!="rollback"&&mode!="switch"&&mode!="automation"&&mode!="bootfail")return fail("unknown mode");
         // Match the SDK's actual Windows hosting module: OLE is initialized
     // on the host UI thread before loading/initializing the plug-in.
     struct OleScope {
@@ -191,6 +192,23 @@ int main(int argc,char** argv){
        processor->setBusArrangements(nullptr,0,&stereo,1)!=S::kResultOk)
         return fail("stereo-only bus negotiation");
     std::cout<<"AUDIT_STEREO_BUS_CONTRACT PASS\n";
+    // Actual native ABI: negative, too-large and nonexistent bus indices
+    // must not index the SDK's internal bus vector or throw across COM.
+    for(const auto type:{V::kAudio,V::kEvent})for(const auto dir:{V::kInput,V::kOutput}){
+        const auto n=component->getBusCount(type,dir);
+        for(const auto index:{S::int32(-1),n,S::int32(2147483647)}){
+            V::BusInfo invalid{};
+            if(component->getBusInfo(type,dir,index,invalid)==S::kResultOk||
+               component->activateBus(type,dir,index,true)==S::kResultOk)
+                return fail("invalid bus index accepted");
+            if(type==V::kAudio&&processor->getBusArrangement(dir,index,actual)==S::kResultOk)
+                return fail("invalid arrangement index accepted");
+        }
+    }
+    if(component->getBusCount(V::MediaType(99),V::kOutput)!=0||
+       component->getBusCount(V::kAudio,V::BusDirection(99))!=0)
+        return fail("invalid bus enum");
+    std::cout<<"AUDIT_BUS_INDEX_BOUNDS PASS\n";
     using Clock=std::chrono::steady_clock;
     using namespace std::chrono;
     if(component->activateBus(V::kAudio,V::kOutput,0,true)!=S::kResultOk||
@@ -272,10 +290,45 @@ int main(int argc,char** argv){
             auto dll=std::filesystem::path(argv[1]).parent_path()/"AWE64DOSBoxRuntime.dll";
             auto moved=dll;moved+=".audit-hidden";
             std::error_code ec;
-            if(mode=="rollback"){std::filesystem::rename(dll,moved,ec);if(ec)return fail("rename installed runtime: "+ec.message());}
+            const bool failing=mode=="rollback"||mode=="bootfail";
+            auto faultDir=dll.parent_path()/"audit-bootfail";
+            if(failing){std::filesystem::rename(dll,moved,ec);if(ec)return fail("rename installed runtime: "+ec.message());}
+            if(mode=="bootfail"){
+                const char* shim=std::getenv("AWE64_AUDIT_BOOTFAIL_DLL");
+                if(!shim||!std::filesystem::create_directory(faultDir))return fail("boot-fault fixture");
+                std::filesystem::copy_file(shim,dll,ec);if(ec)return fail("stage test ABI DLL");
+                _putenv_s("AWE64_AUDIT_SHIM_MODE","bootfail");
+                _putenv_s("AWE64_AUDIT_SHIM_DIR",faultDir.string().c_str());
+            }
             S::MemoryStream incoming(bytes.data(),bytes.size());
+            // Pump the old running audio on a real separate host thread
+            // during the asynchronous replacement failure.
+            float concurrentPeak=0.f;unsigned duringFaultBlocks=0;
+            std::atomic<bool> stateReturned{false};
+            std::thread concurrent;
+            if(mode=="bootfail")concurrent=std::thread([&]{
+                const auto start=Clock::now();
+                for(unsigned n=0;n<80;++n){
+                    const bool inside=std::filesystem::exists(faultDir/"boot-failed")&&
+                        !stateReturned.load(std::memory_order_acquire);
+                    const auto p=block();
+                    if(inside&&!stateReturned.load(std::memory_order_acquire)){
+                        ++duringFaultBlocks;concurrentPeak=std::max(concurrentPeak,p);
+                    }
+                    std::this_thread::sleep_until(start+duration_cast<Clock::duration>(duration<double>((n+1)*512./44100.)));
+                }
+            });
             const auto result=component->setState(&incoming);
-            if(mode=="rollback"){std::filesystem::rename(moved,dll,ec);if(ec)return fail("restore installed runtime: "+ec.message());}
+            stateReturned.store(true,std::memory_order_release);
+            if(concurrent.joinable())concurrent.join();
+            if(mode=="bootfail"){
+                std::filesystem::remove(dll,ec);if(ec)return fail("remove test ABI DLL");
+                if(!std::filesystem::exists(faultDir/"boot-failed"))return fail("async fault not reached");
+                std::filesystem::remove_all(faultDir,ec);
+                _putenv_s("AWE64_AUDIT_SHIM_MODE","");
+                _putenv_s("AWE64_AUDIT_SHIM_DIR","");
+            }
+            if(failing){std::filesystem::rename(moved,dll,ec);if(ec)return fail("restore installed runtime: "+ec.message());}
             S::MemoryStream after;
             const bool unchanged=component->getState(&after)==S::kResultOk&&after.getSize()==prior.getSize()&&
                 std::memcmp(after.getData(),prior.getData(),static_cast<std::size_t>(prior.getSize()))==0;
@@ -288,7 +341,10 @@ int main(int argc,char** argv){
             }else{
             const auto continued=pump(40);
             std::cout<<"ROLLBACK_SETSTATE_RESULT="<<result<<" STATE_UNCHANGED="<<unchanged<<" CONTINUED_PEAK="<<continued<<std::endl;
-            verdict("AUDIT_A06_ACTIVE_ROLLBACK",result!=S::kResultOk&&unchanged&&continued>=.01f);
+            if(mode=="bootfail"){
+                std::cout<<"ASYNC_BOOT_FAULT concurrent_peak="<<concurrentPeak<<" during_fault_blocks="<<duringFaultBlocks<<" process_errors="<<unexpected<<std::endl;
+                verdict("AUDIT_A06_ASYNC_BOOT_ROLLBACK",result!=S::kResultOk&&unchanged&&continued>=.01f&&duringFaultBlocks>=4&&concurrentPeak>=.01f&&!unexpected);
+            }else verdict("AUDIT_A06_ACTIVE_ROLLBACK",result!=S::kResultOk&&unchanged&&continued>=.01f);
             }
         }
     }

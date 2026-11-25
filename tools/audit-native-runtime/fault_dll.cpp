@@ -26,6 +26,13 @@ EXPORT int AWE64_CALL AWE64_StartGuest(int argc,char** argv){
     const char* p=std::getenv("AWE64_AUDIT_SHIM_DIR");
     if(!m||!p)return 91;
     const std::string mode=m;const std::filesystem::path dir=p;
+    if(mode=="bootfail"){
+        // begin() has already loaded this ABI and launched the worker.
+        // Return an actual error without ever opening the UART.
+        std::ofstream(dir/"boot-failed").put('1');
+        std::this_thread::sleep_for(milliseconds(300));
+        return 96;
+    }
     if(mode=="rom"){
         const std::string prefix="sblaster awe32rom=";
         std::string selected;
