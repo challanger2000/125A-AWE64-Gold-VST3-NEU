@@ -22,11 +22,14 @@ def child(dll_path, root, mode):
         (root/'dosbox-x-awe32-empty.rom').mkdir()
         if rom.exists():raise RuntimeError('Missing ROM fault invalid')
     os.environ['EMU8K_TRACE']=str(root/'trace.txt')
-    args=['AWE64DOSBoxRuntime','-noconfig','-nogui','-nomenu','-test',
+    args=['AWE64DOSBoxRuntime','-noconfig','-nogui','-nomenu',
           '-set','sdl waitonerror=false','-set','sblaster sbtype=sbawe',
           '-set','sblaster awe32ram=28672','-set','sblaster awe32rom='+str(rom),
           '-set','midi mpu401=intelligent','-set','mixer rate=44100',
           '-c','AWEUTIL /S','-c','exit']
+    # Test mode suppresses the download only in the missing-ROM case.
+    # The positive control is the normal previously proven AWEUTIL gate.
+    if mode=='missing': args.insert(4,'-test')
     with os.add_dll_directory(str(dll_path.parent)):
         dll=ctypes.WinDLL(str(dll_path))
         fn=dll.AWE64_StartGuest
@@ -49,6 +52,10 @@ def parent(dll):
     u.GetWindowTextW.restype=ctypes.c_int
     u.PostMessageW.argtypes=[wintypes.HWND,wintypes.UINT,wintypes.WPARAM,wintypes.LPARAM]
     u.PostMessageW.restype=wintypes.BOOL
+    u.GetDlgItem.argtypes=[wintypes.HWND,ctypes.c_int];u.GetDlgItem.restype=wintypes.HWND
+    u.EnumChildWindows.argtypes=[wintypes.HWND,callback,wintypes.LPARAM];u.EnumChildWindows.restype=wintypes.BOOL
+    u.SendMessageTimeoutW.argtypes=[wintypes.HWND,wintypes.UINT,wintypes.WPARAM,wintypes.LPARAM,wintypes.UINT,wintypes.UINT,ctypes.POINTER(ctypes.c_size_t)]
+    u.SendMessageTimeoutW.restype=wintypes.LPARAM
     with tempfile.TemporaryDirectory(prefix='awe64_fatal_audit_') as folder:
         root=Path(folder)
         outcomes={}
@@ -58,7 +65,7 @@ def parent(dll):
             with (case/'stdout.txt').open('w+b') as out,(case/'stderr.txt').open('w+b') as err:
                 p=subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'--child',str(dll),str(case),mode],
                                    cwd=case,env=env,stdout=out,stderr=err)
-                seen=set()
+                seen=set();dialog_text=[]
                 @callback
                 def enumerate_dialog(hwnd,_):
                     pid=wintypes.DWORD()
@@ -68,7 +75,17 @@ def parent(dll):
                     if title.value=='E_Exit':
                         if hwnd not in seen:
                             seen.add(hwnd);print('AUDIT_FATAL_DIALOG_OBSERVED child='+str(p.pid),flush=True)
-                        u.PostMessageW(hwnd,0x0111,1,0) # WM_COMMAND / IDOK, only own child
+                            @callback
+                            def read_child(control,_):
+                                b=ctypes.create_unicode_buffer(4096);result=ctypes.c_size_t()
+                                u.SendMessageTimeoutW(control,0x000d,len(b),ctypes.addressof(b),2,500,ctypes.byref(result))
+                                if b.value:
+                                    dialog_text.append(b.value);print('AUDIT_FATAL_DIALOG_TEXT '+b.value,flush=True)
+                                return True
+                            u.EnumChildWindows(hwnd,read_child,0)
+                        button=u.GetDlgItem(hwnd,1)
+                        if button:u.PostMessageW(button,0x00f5,0,0) # BM_CLICK on IDOK only
+                        u.PostMessageW(hwnd,0x0111,1,button or 0) # WM_COMMAND, button HWND
                     return True
                 deadline=time.monotonic()+35
                 while p.poll() is None and time.monotonic()<deadline:
@@ -80,6 +97,7 @@ def parent(dll):
                 logs=out.read().decode('utf-8','replace')+'\n'+err.read().decode('utf-8','replace')
                 # Synthetic only; preserve exact diagnostic lines, not giant logs.
                 print('AUDIT_CASE',mode,'exit='+str(rc),'timeout='+str(timed),'fatal_dialog='+str(bool(seen)),flush=True)
+                logs+='\n'+'\n'.join(dialog_text)
                 for line in logs.splitlines():
                     if 'AUDIT_' in line or 'E_Exit' in line or 'cannot create a temporary empty ROM' in line:
                         print(line,flush=True)
