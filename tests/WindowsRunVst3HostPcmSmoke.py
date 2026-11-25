@@ -108,8 +108,18 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
         proc = run_private_creative_host(command, vst3, seconds)
     else:
         # Never change the already proven PUBLIC synthetic DOS host path.
-        proc = subprocess.run(command, timeout=40, text=True,
-                              capture_output=True, check=False)
+        try:
+            proc = subprocess.run(command, timeout=40, text=True,
+                                  capture_output=True, check=False)
+        except subprocess.TimeoutExpired as exc:
+            # Synthetic data only: preserve the last actual native startup
+            # and cleanup messages even when the child hits the watchdog.
+            for label, stream in (("stdout", exc.stdout), ("stderr", exc.stderr)):
+                if isinstance(stream, bytes):
+                    stream = stream.decode("utf-8", errors="replace")
+                print(f"SYNTHETIC_NATIVE_TIMEOUT {label}:\n{(stream or '')[-12000:]}",
+                      file=sys.stderr, flush=True)
+            raise
     print(proc.stdout[-5000:], end="")
     print(proc.stderr[-5000:], end="", file=sys.stderr)
     expected = ("PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED" if original

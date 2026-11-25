@@ -74,7 +74,11 @@ class DosBoxPatchTests(unittest.TestCase):
     def test_guest_entry(self):
         s='void GFX_Events() {}\n| SDL_WINDOW_SHOWN | (SDL2_resize_enable ? SDL_WINDOW_RESIZABLE : 0)\nint main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {}\n            DOSBOX_RunMachine();\n        } catch (int x) {'
         s+='\n'+"        SetConsoleCtrlHandler((PHANDLER_ROUTINE) ConsoleEventHandler,TRUE);"+'\n'+"        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) >= 0) {"+'\n'+"            LOG(LOG_GUI,LOG_WARN)(\"Failed to init joystick support\");\n            sdl.num_joysticks = 0;\n        }"
+        s+='\n'+"        std::string videodriver = static_cast<Section_prop *>(control->GetSection(\"sdl\"))->Get_string(\"videodriver\");"+'\n'+"            sdl.init_ignore = true;\n        }\n    {\n        Section_prop *section = static_cast<Section_prop *>(control->GetSection(\"dosbox\"));"+'\n'+"        if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,\"windows\")) sdl.using_windib = true;"
         r=patch.patch_main(s)
+        self.assertIn('std::string videodriver="dummy";',r)
+        self.assertIn('sdl.using_windib=false;',r)
+        self.assertIn('#ifndef AWE64_VST3_RUNTIME\n'+"        if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,\"windows\")) sdl.using_windib = true;"+'\n#endif',r)
         self.assertIn('#ifndef AWE64_VST3_RUNTIME\n'+"        SetConsoleCtrlHandler((PHANDLER_ROUTINE) ConsoleEventHandler,TRUE);"+'\n#endif',r)
         self.assertIn('#ifdef AWE64_VST3_RUNTIME\n        sdl.num_joysticks = 0;\n#else\n'+"        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) >= 0) {",r)
         self.assertIn("            LOG(LOG_GUI,LOG_WARN)(\"Failed to init joystick support\");\n            sdl.num_joysticks = 0;\n        }"+'\n#endif',r)
@@ -90,7 +94,8 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('~AWE64GuestRunScope() { awe64_guest_can_stop=false; }',r)
     def test_sdl2_static_library_cannot_supply_dll_crt_entry(self):
         original='#if (!defined(HAVE_LIBC) || defined(__WATCOMC__)) && !defined(SDL_STATIC_LIB)'
-        patched=patch.patch_sdl2_static(original+'\nif (SDL_VideoInit(NULL) < 0) {')
+        patched=patch.patch_sdl2_static(original+'\nif (SDL_VideoInit(NULL) < 0) {\nif (SDL_AudioInit(NULL) < 0) {')
+        self.assertIn('if (SDL_AudioInit("dummy") < 0) {',patched)
         self.assertIn('if (SDL_VideoInit("dummy") < 0) {',patched)
         self.assertIn('#define SDL_STATIC_LIB 1',patched)
         self.assertIn(original,patched)

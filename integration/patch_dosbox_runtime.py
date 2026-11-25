@@ -457,6 +457,23 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
             sdl.num_joysticks = 0;
         }
 #endif''')
+    # The embedded SDL copy now selects dummy audio/video directly.
+    # Do not run the standalone environment-dependent driver-selection
+    # branch, which otherwise sets using_windib despite dummy video.
+    s=once(s,"        std::string videodriver = static_cast<Section_prop *>(control->GetSection(\"sdl\"))->Get_string(\"videodriver\");",r'''#ifdef AWE64_VST3_RUNTIME
+        std::string videodriver="dummy";
+        sdl.using_windib=false;
+        sdl.init_ignore=true;
+#else
+        std::string videodriver = static_cast<Section_prop *>(control->GetSection("sdl"))->Get_string("videodriver");''')
+    s=once(s,"            sdl.init_ignore = true;\n        }\n    {\n        Section_prop *section = static_cast<Section_prop *>(control->GetSection(\"dosbox\"));",r'''            sdl.init_ignore = true;
+        }
+#endif
+    {
+        Section_prop *section = static_cast<Section_prop *>(control->GetSection("dosbox"));''')
+    s=once(s,"        if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,\"windows\")) sdl.using_windib = true;",r'''#ifndef AWE64_VST3_RUNTIME
+        if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,"windows")) sdl.using_windib = true;
+#endif''')
     # Defer even a stop requested BEFORE main() until original init is
     # complete and the existing kill-switch handler can perform cleanup.
     run='            DOSBOX_RunMachine();\n        } catch (int x) {'
@@ -495,8 +512,12 @@ def patch_sdl2_static(s):
     # The already-tested dummy video backend is mandatory for this private
     # embedded SDL copy. Avoid shared Win32 window classes (SDL_app) and
     # dependence on the host's SDL_VIDEODRIVER environment variable.
-    return once(s,'if (SDL_VideoInit(NULL) < 0) {',
+    s=once(s,'if (SDL_VideoInit(NULL) < 0) {',
                   'if (SDL_VideoInit("dummy") < 0) {')
+    # Match the successful dual-DLL test from the first SDL init, not
+    # merely when the emulated mixer later reinitializes its audio.
+    return once(s,'if (SDL_AudioInit(NULL) < 0) {',
+                  'if (SDL_AudioInit("dummy") < 0) {')
 
 def patch_project(s):
     cond="'$(Configuration)|$(Platform)'=='Release SDL2|x64'"

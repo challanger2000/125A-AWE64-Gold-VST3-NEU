@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 25.11.2026 — VST3-Mehrfachinstanz-Build kompiliert; früher Synthetic-Timeout
+
+- [Windows 45529738628](../../actions/runs/45529738628) FAIL erst beim ersten synthetischen VST3-PCM-Test (40s Watchdog); beide getrennten DLLs inklusive Shutdown erneut PASS, VST3 und neuer nativer Testhost kompiliert. Transport 45529738663 und Version 45529738632 SUCCESS. Echter Dual-VST3-Test und spätere Klangregression noch nicht erreicht. Bisherige Eininstanz-Referenz 6a80bb94 bleibt bestanden. Timeout-Ursache nicht endgültig nachgewiesen, weil Python bisher die native Ausgabe bei Timeout verwarf.
+- Konkrete Startpfadabweichung behoben: statisches eingebettetes SDL wählt von der ersten Initialisierung an Dummy-Audio UND Dummy-Video (wie der erfolgreiche separate Dual-DLL-Test), nicht erst beim Mixer. Standalone-Treiberwahl kann im eingebetteten Pfad nicht mehr `using_windib=true` trotz Dummy-Video setzen oder SDL-Treiber-Umgebungsvariablen ändern. Ankerregressionen erweitert. Synthetischer Timeout druckt jetzt native stdout/stderr-Tails und bleibt ein hartes FAIL (keine Zeitgrenze erhöht). Keine DSP-/GUI-Änderung oder weiteren Features. Frühe Gates unverändert vor Archivtests; vollständiger Nachweis offen.
+
 ## 25.11.2026 — Dual-DLL-Gate und Gesamtregression SUCCESS; echte VST3-Mehrfachinstanz implementiert
 
 - [Windows 45525422435](../../actions/runs/45525422435) auf 6a80bb94 vollständig SUCCESS: zwei getrennte DLL-Module, MIDI/PCM-Isolation, A-Stop/Join/Unmap und B-PCM danach, B-Stop/Join/Unmap, Exit 0x00000000. Kein Absturz mehr in der synthetischen Forschungsprobe. Alle bisherigen Einzelinstanz-Gates einschließlich 10/10 Regler, MOD RESET zweimal, Steinberg 47/47, Cheezoids 128/128 sowie 44,1/48/96 kHz ohne Unterläufe/Drops erneut PASS. Transport 45525422262 und Version 45525422233 SUCCESS.
