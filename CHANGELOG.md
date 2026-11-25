@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 25.11.2026 — SDL-Dummy-Video-Bootstrap: fehlender interner Hint korrigiert
+
+- [Windows 45531460147](../../actions/runs/45531460147) FAIL im ersten synthetischen VST3-PCM-Test: native Diagnose `Can't init SDL dummy not available`, 40s Watchdog. Vorherige Original-DLL- und Dual-DLL-Gates sowie VST3-Build PASS; Transport 45531460136 und Version 45531460085 SUCCESS. Echter Dual-VST3-Test und Originalklangregression nicht erreicht.
+- Konkreter Unterschied im gepinnten SDL-Quelltext belegt: `vs/sdl2/src/video/dummy/SDL_nullvideo.c` verlangt in `DUMMY_Available()` den Hint `SDL_HINT_VIDEODRIVER=dummy`, selbst wenn `SDL_VideoInit("dummy")` explizit aufgerufen wird. Der erfolgreiche Dual-DLL-Test setzte bislang beide SDL-Umgebungsvariablen; der normale VST3-Host nicht. Die statisch eingebettete SDL-Kopie setzt jetzt ihren eigenen Video-Hint mit `SDL_HINT_OVERRIDE` vor dem VideoInit-Aufruf, ohne Prozessumgebungsvariable. Der frühe Dual-DLL-Test startet jetzt ohne beide SDL-Driver-Umgebungsvariablen und behält sämtliche MIDI-/PCM-/Shutdown-Kriterien. Quellankerregression ergänzt. EMU8000, Creative-Klangpfad und P165 unverändert; neuer Windows-Nachweis offen.
+
 ## 25.11.2026 — VST3-Mehrfachinstanz-Build kompiliert; früher Synthetic-Timeout
 
 - [Windows 45529738628](../../actions/runs/45529738628) FAIL erst beim ersten synthetischen VST3-PCM-Test (40s Watchdog); beide getrennten DLLs inklusive Shutdown erneut PASS, VST3 und neuer nativer Testhost kompiliert. Transport 45529738663 und Version 45529738632 SUCCESS. Echter Dual-VST3-Test und spätere Klangregression noch nicht erreicht. Bisherige Eininstanz-Referenz 6a80bb94 bleibt bestanden. Timeout-Ursache nicht endgültig nachgewiesen, weil Python bisher die native Ausgabe bei Timeout verwarf.

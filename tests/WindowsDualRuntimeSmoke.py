@@ -161,8 +161,9 @@ class Runtime:
 def run_child(source):
     if os.name!="nt":
         raise RuntimeError("Windows only")
-    os.environ["SDL_VIDEODRIVER"]="dummy"
-    os.environ["SDL_AUDIODRIVER"]="dummy"
+    # Match an ordinary DAW: neither dummy driver is preselected by the host.
+    os.environ.pop("SDL_VIDEODRIVER", None)
+    os.environ.pop("SDL_AUDIODRIVER", None)
     with tempfile.TemporaryDirectory(prefix="awe64-dual-runtime-") as tmp:
         root=Path(tmp)
         a=Runtime(source,root,"A",60,2712)

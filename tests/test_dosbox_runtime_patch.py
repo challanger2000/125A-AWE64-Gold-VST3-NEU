@@ -96,7 +96,7 @@ class DosBoxPatchTests(unittest.TestCase):
         original='#if (!defined(HAVE_LIBC) || defined(__WATCOMC__)) && !defined(SDL_STATIC_LIB)'
         patched=patch.patch_sdl2_static(original+'\nif (SDL_VideoInit(NULL) < 0) {\nif (SDL_AudioInit(NULL) < 0) {')
         self.assertIn('if (SDL_AudioInit("dummy") < 0) {',patched)
-        self.assertIn('if (SDL_VideoInit("dummy") < 0) {',patched)
+        self.assertIn('SDL_SetHintWithPriority(SDL_HINT_VIDEODRIVER, "dummy", SDL_HINT_OVERRIDE);\n            if (SDL_VideoInit("dummy") < 0) {',patched)
         self.assertIn('#define SDL_STATIC_LIB 1',patched)
         self.assertIn(original,patched)
         with self.assertRaises(ValueError):

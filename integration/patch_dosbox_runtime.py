@@ -512,8 +512,12 @@ def patch_sdl2_static(s):
     # The already-tested dummy video backend is mandatory for this private
     # embedded SDL copy. Avoid shared Win32 window classes (SDL_app) and
     # dependence on the host's SDL_VIDEODRIVER environment variable.
+    # SDL_nullvideo.c DUMMY_Available() requires this hint even when
+    # SDL_VideoInit receives an explicit driver name. Set it in this
+    # static SDL copy, never in the host process environment.
     s=once(s,'if (SDL_VideoInit(NULL) < 0) {',
-                  'if (SDL_VideoInit("dummy") < 0) {')
+                  'SDL_SetHintWithPriority(SDL_HINT_VIDEODRIVER, "dummy", SDL_HINT_OVERRIDE);\n'
+                  '            if (SDL_VideoInit("dummy") < 0) {')
     # Match the successful dual-DLL test from the first SDL init, not
     # merely when the emulated mixer later reinitializes its audio.
     return once(s,'if (SDL_AudioInit(NULL) < 0) {',
