@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 25.11.2026 — Parallele DLL-MIDI/PCM-Isolation belegt; Shutdown separat lokalisieren
+
+- [Windows 45519885347](../../actions/runs/45519885347) FAIL im neuen frühen Forschungs-Gate, nicht im Produkt: `DUAL_DISTINCT_MODULES_PASS` und `DUAL_RUNTIME_MIDI_PCM_ISOLATION_PASS` belegen zwei gleichzeitig aktive DLL-Kopien und voneinander getrennte synthetische MIDI/PIT-PCM-Pfade. Kein Shutdown-PASS; Kindprozess endet unmittelbar danach ohne Fehlercode/Stack im veröffentlichten Bericht. Exakte Ursache noch unbekannt (Stop-Aufruf, Main-Cleanup, Join, Callback-Abmeldung oder Unload). Kein Mehrfachinstanz-VST3-/Creative-Klangnachweis. Vorherige Einzel-DLL-Gates PASS; Transport 45519885300 und Version 45519885221 SUCCESS. Vollständiger Eininstanz-Referenzstand bleibt 28b923e7 / 45515971767.
+- Forschungsprobe trennt jetzt Stop/Join, Callback-Abmeldung, DLL-FreeLibrary und tatsächliches Unmapping; weiterlaufende B-PCM nach A-Join und erneut nach A-Unload zwingend. Ungepufferte Stage-Marker, native Windows-Exitcode in Hex, Python-Faulthandler/Thread-Dumps und erweiterter Diagnoseauszug. Nur synthetischer Tonhaltezeitraum verlängert (36 auf 126 BIOS-Ticks), damit Überlebensmessung nicht zufällig in natürliches Tonende fällt. Keine gelockerten Isolation-/Shutdown-Gates, keine Produkt-/DSP-/GUI-Änderung. Gemeinsame Win32-Prozessressourcen im Upstream identifiziert (ConsoleCtrlHandler, CWD, SDL-Umgebung/Windowclass); erst anhand tatsächlicher Diagnose korrigieren. Neuer Lauf offen.
+
 ## 25.11.2026 — MOD RESET und Gesamtregression SUCCESS; Mehrfachinstanz-Forschung
 
 - [Windows 45515971767](../../actions/runs/45515971767) auf 28b923e7 vollständig SUCCESS. Echter MOD RESET Klick zweimal bestanden, je 12 Parameter null, 12 ausgeglichene Host-Gesten, 5 unabhängige Werte erhalten, Zustandsversion korrekt. P165-Lifecycle 1000x708, Steinberg 47/47, Regler-PCM 10/10, Cheezoids 128/128, alle drei Performance-Raten ohne Audio-/MIDI-Drops und Unterläufe. Transport 45515971818 und Version 45515971748 SUCCESS. Dies ist der aktuell abgenommene Eininstanz-Referenzstand.

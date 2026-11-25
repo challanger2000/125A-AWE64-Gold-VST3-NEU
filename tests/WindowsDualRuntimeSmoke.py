@@ -6,6 +6,7 @@ No product changes or external runtime process proposed by this experiment.
 """
 import ctypes as C
 import hashlib
+import faulthandler
 import os
 from pathlib import Path
 import shutil
@@ -36,12 +37,20 @@ def signature_note(note, divisor):
     pit = bytes.fromhex("b8980a")
     if image.count(old) != 1 or image.count(pit) != 1:
         raise RuntimeError("Original synthetic fixture anchors changed")
+    # Preserve the same guest and PIT writes; increase only the BIOS
+    # hold interval (36 -> 126 ticks, ~7s). Enough time to measure the
+    # surviving guest separately after stopping and unloading its peer.
+    hold = bytes.fromhex("29da83fa24")
+    if image.count(hold)!=1:
+        raise RuntimeError("Synthetic hold anchor changed")
     return image.replace(old, bytes((0x3c,note))).replace(
-        pit, bytes((0xb8,divisor&255,divisor>>8)))
+        pit, bytes((0xb8,divisor&255,divisor>>8))).replace(
+        hold, bytes.fromhex("29da83fa7e"))
 
 
 class Runtime:
     def __init__(self, source, root, name, note, divisor):
+        self.name = name
         self.folder = root / name
         self.folder.mkdir()
         dll = self.folder / ("AWE64Runtime_" + name + ".dll")
@@ -105,19 +114,33 @@ class Runtime:
               "-c",'mount c "'+str(self.folder)+'"','-c',"c:","-c","DEMO.EXE"]
         self.args=[x.encode("mbcs") for x in args]
         self.argv=(C.c_char_p*(len(self.args)+1))(*self.args,None)
-        self.worker=threading.Thread(target=lambda:self.result.append(
-            self.start(len(self.args),self.argv)),daemon=True)
+        def run():
+            try:
+                self.result.append(self.start(len(self.args),self.argv))
+                print(f"DUAL_STAGE {self.name} MAIN_RETURN={self.result}",flush=True)
+            except BaseException as error:
+                print(f"DUAL_STAGE {self.name} MAIN_EXCEPTION={error!r}",flush=True)
+                raise
+        self.worker=threading.Thread(target=run,daemon=True,name="DOSBox-"+name)
 
-    def close(self):
+    def stop_join(self):
+        print(f"DUAL_STAGE {self.name} STOP_ENTER",flush=True)
         if self.worker.is_alive():
             self.stop()
+            print(f"DUAL_STAGE {self.name} STOP_REQUEST_RETURNED",flush=True)
             self.worker.join(5)
         if self.worker.is_alive():
+            faulthandler.dump_traceback()
             raise RuntimeError("Runtime shutdown hung")
         if self.result != [0]:
             raise RuntimeError("Runtime exit was not clean: "+repr(self.result))
+        print(f"DUAL_STAGE {self.name} JOIN_PASS",flush=True)
         self.midi(None,MIDI())
         self.pcm(None,PCM())
+        print(f"DUAL_STAGE {self.name} CALLBACKS_CLEARED",flush=True)
+
+    def unload(self):
+        print(f"DUAL_STAGE {self.name} UNLOAD_ENTER",flush=True)
         # Free only after the worker and callbacks have actually stopped.
         kernel=C.WinDLL("kernel32",use_last_error=True)
         free=kernel.FreeLibrary
@@ -125,6 +148,14 @@ class Runtime:
         free.restype=C.c_int
         if not free(self.lib._handle):
             raise RuntimeError("Runtime FreeLibrary failed")
+        print(f"DUAL_STAGE {self.name} UNLOAD_RETURNED",flush=True)
+        mapped=C.c_void_p()
+        get=kernel.GetModuleHandleExW
+        get.argtypes=[C.c_uint,C.c_void_p,C.POINTER(C.c_void_p)]
+        get.restype=C.c_int
+        if get(6,C.c_void_p(self.lib._handle),C.byref(mapped)):
+            raise RuntimeError("Runtime module remains mapped after FreeLibrary")
+        print(f"DUAL_STAGE {self.name} UNMAP_PASS",flush=True)
 
 
 def run_child(source):
@@ -157,13 +188,22 @@ def run_child(source):
             raise RuntimeError("MIDI callback routing failed")
         print("DUAL_RUNTIME_MIDI_PCM_ISOLATION_PASS",flush=True)
         # A's stop flag, SDL shutdown and unload must not stop B.
+        a.stop_join()
         before=b.audible
-        a.close()
         wait_for(lambda:b.audible>before+2048,1.0,
                  "Stopping A interrupted B audio")
         if not b.worker.is_alive():
             raise RuntimeError("Stopping A killed guest B")
-        b.close()
+        print("DUAL_SURVIVOR_AFTER_JOIN_PASS",flush=True)
+        a.unload()
+        before=b.audible
+        wait_for(lambda:b.audible>before+2048,1.0,
+                 "Unloading A interrupted B audio")
+        if not b.worker.is_alive():
+            raise RuntimeError("Unloading A killed guest B")
+        print("DUAL_SURVIVOR_AFTER_UNLOAD_PASS",flush=True)
+        b.stop_join()
+        b.unload()
         print("DUAL_RUNTIME_INDEPENDENT_SHUTDOWN_PASS",flush=True)
         print("DUAL_RUNTIME_SYNTHETIC_RESEARCH_PASS; NOT_VST3_OR_CREATIVE",flush=True)
 
@@ -171,12 +211,18 @@ def run_child(source):
 if __name__=="__main__":
     path=Path(sys.argv[2]).resolve(strict=True)
     if sys.argv[1]=="--child":
-        run_child(path)
+        faulthandler.enable(all_threads=True)
+        faulthandler.dump_traceback_later(25)
+        try:
+            run_child(path)
+        finally:
+            faulthandler.cancel_dump_traceback_later()
     elif sys.argv[1]=="--parent":
-        p=subprocess.run([sys.executable,str(Path(__file__).resolve()),"--child",str(path)],
+        p=subprocess.run([sys.executable,"-u","-X","faulthandler",str(Path(__file__).resolve()),"--child",str(path)],
                          capture_output=True,text=True,timeout=35)
-        print(p.stdout[-5000:],end="")
-        print(p.stderr[-3000:],end="",file=sys.stderr)
+        print(f"DUAL_CHILD_EXIT=0x{p.returncode&0xffffffff:08x}",flush=True)
+        print(p.stdout[-10000:],end="",flush=True)
+        print(p.stderr[-14000:],end="",file=sys.stderr,flush=True)
         if p.returncode or "DUAL_RUNTIME_SYNTHETIC_RESEARCH_PASS; NOT_VST3_OR_CREATIVE" not in p.stdout:
             raise SystemExit("Dual DLL research failed; existing single-instance product unchanged")
     else:
