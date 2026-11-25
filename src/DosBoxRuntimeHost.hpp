@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <thread>
@@ -92,6 +93,7 @@ class DosBoxRuntimeCore final {
     std::atomic<bool> finished_{false};
     std::atomic<int> guestExitCode_{-1};
     std::filesystem::path stagedDirectory_;
+    HANDLE stagedRomLock_=INVALID_HANDLE_VALUE;
 
     static bool isUsableFile(const std::filesystem::path& p,
                              std::uintmax_t expectedSize=0) noexcept {
@@ -115,6 +117,44 @@ class DosBoxRuntimeCore final {
         bool ok=BCryptCreateHash(alg,&hash,nullptr,0,nullptr,0,0)>=0;
         if(ok)ok=BCryptHashData(hash,prefix,sizeof(prefix),0)>=0;
         if(ok)ok=BCryptHashData(hash,const_cast<PUCHAR>(bytes.data()),static_cast<ULONG>(bytes.size()),0)>=0;
+        if(ok)ok=BCryptFinishHash(hash,digest,sizeof(digest),0)>=0;
+        if(hash)BCryptDestroyHash(hash);
+        BCryptCloseAlgorithmProvider(alg,0);
+        return ok&&std::memcmp(digest,expected,sizeof(expected))==0;
+    }
+    // The original ROM is immutable for the lifetime of this guest.
+    // Copy and validate before entering DOSBox; hold a read-only handle
+    // denying writes/deletion until the actual worker has terminated.
+    bool stageRom(const std::filesystem::path& source) {
+        const auto target=stagedDirectory_/"awe32.raw";
+        if(!CopyFileW(source.c_str(),target.c_str(),TRUE))return false;
+        stagedRomLock_=CreateFileW(target.c_str(),GENERIC_READ,FILE_SHARE_READ,
+            nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(stagedRomLock_==INVALID_HANDLE_VALUE)return false;
+        LARGE_INTEGER size{};
+        if(!GetFileSizeEx(stagedRomLock_,&size)||size.QuadPart!=1048576)return false;
+        // Reject lossy narrow-path conversion instead of letting upstream
+        // search arbitrary fallback directories or display a download prompt.
+        const auto narrow=target.string();
+        if(!std::filesystem::equivalent(std::filesystem::path(narrow),target))return false;
+        std::ifstream probe(narrow,std::ios::binary);
+        return static_cast<bool>(probe);
+    }
+    bool authenticRom() noexcept {
+        // For the exact verified Creative guest, require the same original
+        // ROM hash as private package preparation. Synthetic ABI/PCM test
+        // guests remain distinguishable and may use their own fake ROM.
+        constexpr unsigned char expected[32]={0x4e,0x14,0x3b,0x94,0xf7,0x58,0x73,0x4f,0x59,0x4d,0xed,0x78,0xf4,0xe5,0x11,0x56,0x35,0x97,0x5c,0x16,0xfa,0x37,0xfa,0xbe,0xae,0x0b,0xaa,0x49,0x38,0xca,0x71,0x0e};
+        BCRYPT_ALG_HANDLE alg=nullptr;BCRYPT_HASH_HANDLE hash=nullptr;
+        if(BCryptOpenAlgorithmProvider(&alg,BCRYPT_SHA256_ALGORITHM,nullptr,0)<0)return false;
+        bool ok=BCryptCreateHash(alg,&hash,nullptr,0,nullptr,0,0)>=0;
+        std::array<unsigned char,16384> block{};
+        unsigned char digest[32]{};
+        for(unsigned i=0;ok&&i<64;++i){
+            DWORD n=0;
+            ok=ReadFile(stagedRomLock_,block.data(),static_cast<DWORD>(block.size()),&n,nullptr)&&
+               n==block.size()&&BCryptHashData(hash,block.data(),n,0)>=0;
+        }
         if(ok)ok=BCryptFinishHash(hash,digest,sizeof(digest),0)>=0;
         if(hash)BCryptDestroyHash(hash);
         BCryptCloseAlgorithmProvider(alg,0);
@@ -198,6 +238,7 @@ public:
         // Windows may match a loaded DLL by basename: make that unique too.
         try {
             if(!makeStagingDirectory())return false;
+            if(!stageRom(rom)){stop();return false;}
             const auto isolated=stagedDirectory_/(stagedDirectory_.filename().wstring()+L".dll");
             if(!CopyFileW(dll.c_str(),isolated.c_str(),TRUE)||
                GetModuleHandleW(isolated.c_str())) {
@@ -242,6 +283,7 @@ public:
                     stop();return false;
                 }
                 guestProgram="D:\\FXDEMO.EXE";
+                if(!authenticRom()){stop();return false;}
                 authenticGuest_=true;
             }
             if(!externalBank.empty()) {
@@ -275,7 +317,7 @@ public:
                 "AWE64DOSBoxRuntime", "-noconfig", "-nogui", "-nomenu",
                 "-set", "sblaster sbtype=sbawe",
                 "-set", "sblaster awe32ram=28672",
-                "-set", "sblaster awe32rom="+utf8(rom),
+                "-set", "sblaster awe32rom="+utf8(stagedDirectory_/"awe32.raw"),
                 "-set", "midi mpu401=intelligent",
                 "-set", "mixer rate=44100",
             };
@@ -412,6 +454,9 @@ public:
         startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;sends_=nullptr;guestClockPcm_=nullptr;voiceControls_=nullptr;
         registerClock_=nullptr;clockFault_=nullptr;demandLead_=0;
         argvStorage_.clear();
+        if(stagedRomLock_!=INVALID_HANDLE_VALUE){
+            CloseHandle(stagedRomLock_);stagedRomLock_=INVALID_HANDLE_VALUE;
+        }
         if(!stagedDirectory_.empty()) {
             std::error_code ec;std::filesystem::remove_all(stagedDirectory_,ec);
             stagedDirectory_.clear();

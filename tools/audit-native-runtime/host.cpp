@@ -18,7 +18,7 @@ int main(int argc,char** argv){
     if(argc!=3)return infra("usage: host mode synthetic-fixture-dir");
     const std::string mode=argv[1];
     const auto dir=std::filesystem::absolute(argv[2]);
-    if(mode!="normal"&&mode!="stall"&&mode!="recovery")return infra("mode");
+    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom")return infra("mode");
     // These files contain only self-generated fake bytes; use a fresh directory.
     if(!std::filesystem::create_directory(dir))return infra("fresh fixture dir");
     {std::ofstream f(dir/"awe32.raw",std::ios::binary);std::vector<char> zero(1048576,0);f.write(zero.data(),zero.size());}
@@ -31,7 +31,32 @@ int main(int argc,char** argv){
     if(!h.begin(exe,dir))return infra("real production RuntimeHost::begin");
     if(!wait([&]{return h.ready();}))return infra("shim readiness not observed");
     unsigned failures=0;
-    if(mode=="recovery"){
+    if(mode=="rom"){
+        std::ifstream info(dir/"rom-path.txt");
+        std::string path;std::getline(info,path);
+        if(path.empty())return infra("guest ROM argument missing");
+        const auto staged=std::filesystem::path(path);
+        const auto source=dir/"awe32.raw";
+        const bool isolated=staged!=source&&!std::filesystem::equivalent(staged,source);
+        // Remove the installed ROM AFTER the guest has received its argument.
+        std::filesystem::remove(source);
+        const bool protectedFromDelete=!DeleteFileW(staged.c_str())&&GetLastError()==ERROR_SHARING_VIOLATION;
+        HANDLE writer=CreateFileW(staged.c_str(),GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,
+            nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+        const bool protectedFromWrite=writer==INVALID_HANDLE_VALUE&&GetLastError()==ERROR_SHARING_VIOLATION;
+        if(writer!=INVALID_HANDLE_VALUE)CloseHandle(writer);
+        std::ofstream(dir/"resume").put('1');
+        const bool read=wait([&]{return std::filesystem::exists(dir/"rom-read-ok");});
+        h.stop();
+        const bool cleaned=!std::filesystem::exists(staged);
+        const bool missingRejected=!h.begin(exe,dir);
+        const bool pass=isolated&&protectedFromDelete&&protectedFromWrite&&read&&cleaned&&missingRejected;
+        std::cout<<"AUDIT_ROM_SNAPSHOT "<<(pass?"PASS":"FAIL")<<" isolated="<<isolated
+                 <<" delete_denied="<<protectedFromDelete<<" write_denied="<<protectedFromWrite
+                 <<" read_after_source_removal="<<read<<" cleaned="<<cleaned
+                 <<" missing_rejected="<<missingRejected<<std::endl;
+        failures+=!pass;
+    }else if(mode=="recovery"){
         if(!h.sendMidi({0,0xb0,7,0,3})||!wait([&]{return std::filesystem::exists(dir/"baseline-received");}))
             return infra("CC7 baseline not consumed");
         for(unsigned n=0;n<4096;++n)

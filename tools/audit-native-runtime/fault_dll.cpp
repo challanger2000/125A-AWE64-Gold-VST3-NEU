@@ -20,12 +20,31 @@ EXPORT int AWE64_CALL AWE64_IsGuestMidiReady(){return ready.load(std::memory_ord
 EXPORT void AWE64_CALL AWE64_SetAbsoluteSends(unsigned){}
 EXPORT void AWE64_CALL AWE64_SetVoiceControls(uint64_t,unsigned){}
 EXPORT void AWE64_CALL AWE64_SetGuestClockPCM(unsigned){}
-EXPORT int AWE64_CALL AWE64_StartGuest(int,char**){
+EXPORT int AWE64_CALL AWE64_StartGuest(int argc,char** argv){
     using namespace std::chrono;
     const char* m=std::getenv("AWE64_AUDIT_SHIM_MODE");
     const char* p=std::getenv("AWE64_AUDIT_SHIM_DIR");
     if(!m||!p)return 91;
     const std::string mode=m;const std::filesystem::path dir=p;
+    if(mode=="rom"){
+        const std::string prefix="sblaster awe32rom=";
+        std::string selected;
+        for(int i=0;i<argc;++i){
+            const std::string arg=argv[i];
+            if(arg.rfind(prefix,0)==0)selected=arg.substr(prefix.size());
+        }
+        if(selected.empty())return 93;
+        std::ofstream(dir/"rom-path.txt")<<selected;
+        ready.store(true,std::memory_order_release);
+        while(!stop.load(std::memory_order_acquire)&&!std::filesystem::exists(dir/"resume"))
+            std::this_thread::sleep_for(milliseconds(1));
+        std::ifstream rom(selected,std::ios::binary);
+        unsigned count=0;char byte=0;bool zero=true;
+        while(rom.get(byte)){++count;zero=zero&&byte==0;}
+        if(count==1048576&&zero)std::ofstream(dir/"rom-read-ok").put('1');
+        while(!stop.load(std::memory_order_acquire))std::this_thread::sleep_for(milliseconds(1));
+        return count==1048576&&zero?0:94;
+    }
     ready.store(true,std::memory_order_release);
     if(mode=="stall"){
         // Simulate an unresponsive worker that ignores the stop flag for

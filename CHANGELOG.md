@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 25.11.2026 — Stabilisierung 3: ROM-Preflight und Original-ROM-Lebensdauer
+
+- Ergebnis auf `24c53699`: [SF2](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45706126975), [native Runtime-Faults](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45706127035), [native ABI](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45706127136), [Transport](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45706127000) und Version PASS. Pause 0 Overflow-Drops, 51.200 bewusst nicht erfasste Frames; Stop bei 6-s-Shim-Stall 2.508 ms, Quarantäne/Reaper PASS.
+- [Original-Gate 45706127057](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45706127057) Job 139528591816: Validator 47/47, GUI/MOD RESET PASS, Original-Transport-Latenzgate FAIL. Drei Messungen p95 20,1134 / 19,5833 / 17,9271 ms, jeweils 0 Audio-/MIDI-Drops und 0 Underruns. Überschreitung des 20-ms-Ziels nur 0,1134 ms; keine Pufferreduktion auf Verdacht und keine stille Gate-Lockerung. Priorität Betriebssicherheit.
+- A10/A22-R: vor Original-Gaststart eine eigene unveränderliche ROM-Kopie in Instanz-Staging erstellen, exakte Größe/narrow-path-Zugänglichkeit prüfen, für originalen Creative-Gast zusätzlich exakten SHA256 der verbindlichen privaten Paketierung prüfen. Windows-Lesehandle verweigert Schreiben/Löschen bis zum tatsächlichen Worker-Ende, auch bei Quarantäne. Keine ROM-DSP-Modifikation. Neue native Shim-Gegenprobe: Quellen-ROM nach Aktivierung löschen, Gast liest weiterhin Snapshot, Schreib-/Löschversuche gegen Snapshot abgelehnt, Cleanup und erneuter Start ohne ROM. Ergebnisse noch offen. Keine Behauptung, dass damit alle DOSBox-Fatalpfade abgesichert sind.
+
 ## 25.11.2026 — Stabilisierung 1: ausgeführter Nachtest und Bus-Vertrag
 
 - Commit `88273211`: [22/22 auf Linux und Windows](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45705048430); [Paketierung 3/3](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45705048428); [SF2 Loopgrenzen + Same-Path-Recall PASS](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45705048568).
