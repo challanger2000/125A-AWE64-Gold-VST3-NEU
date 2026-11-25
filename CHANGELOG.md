@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 25.11.2026 — Echter synthetischer Dual-VST3-Test PASS; Original-Launcher korrigiert
+
+- [Windows 45535905418](../../actions/runs/45535905418): DLL-Build, zwei unabhängige DLLs ohne Host-SDL-Variablen, echter Einzel- und Dual-VST3-Synthetic-PCM-/Lifecycle-Test, Negativkontrolle, Steinberg-Validator und P165/MOD RESET PASS. Original-Creative-Einzel-VST3 liefert erneut musikalisches PCM (98 aktive Notenblöcke, 58105 nichtstumme Frames, kein Near-Full-Scale-Frame im gehaltenen Ton). Gesamt-FAIL beim Aufruf des neuen Dual-Originaltests: Windows PowerShell 5.1 wertet normale native stderr-Ausgabe `LOG: Early LOG Init complete` bei `2>&1` und ErrorActionPreference Stop als NativeCommandError. Kein Dual-Original-PASS und keine nachfolgenden Gesamtgates. Transport 45535905360, Version 45535905267 SUCCESS.
+- Nur Testlauncher geändert: vorhandener Python-Hostrunner startet --dual-original mit 90s Watchdog, getrennt erfasstem stdout/stderr, unverändertem zwingendem Exit 0 und exakt einmaligem vollständigem nativem PASS-Marker. Datenfreie Regression für normale stderr-Ausgabe, fehlenden/falschen/doppelten Marker und Nichtnull-Exit. Kein roher Original-DOS-Log-Upload. Produktcode, GUI, EMU8000 und alle nativen Prüfbedingungen unverändert; Windows-Gesamtnachweis weiterhin offen.
+
 ## 25.11.2026 — SDL-Dummy-Start bestätigt; Direct3D-Neustart unterbunden
 
 - [Windows 45533700405](../../actions/runs/45533700405) FAIL nach 5:09, nun im frühen Dual-DLL-Gate ohne SDL-Umgebungsvariablen. Native Diagnose bestätigt ausdrücklich `Video dummy, Audio dummy`: vorheriger Hint-Fix wirkt. Erster Gast stürzt danach mit Access Violation 0x10 vor MIDI-Ready ab; VST3-Build und spätere Gates nicht erreicht. Transport 45533700459 und Version 45533700439 SUCCESS.

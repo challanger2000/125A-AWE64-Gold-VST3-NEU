@@ -77,5 +77,23 @@ class PrivateCreativeBootDiagnosticTests(unittest.TestCase):
                                  output.stdout)
 
 
+class DualCreativeRunnerTests(unittest.TestCase):
+    def test_normal_native_stderr_is_not_failure(self):
+        code = ("import sys; print('LOG: Early LOG Init complete', file=sys.stderr); "
+                "print('REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS')")
+        self.assertTrue(runner.run_dual_creative_command([sys.executable, "-c", code]))
+
+    def test_exit_and_exact_unique_marker_are_required(self):
+        for code in (
+            "print('unrelated output')",
+            "print('REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS extra')",
+            "print('REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS\\nREAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS')",
+            "import sys; print('REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS'); sys.exit(1)",
+        ):
+            with self.subTest(code=code):
+                with self.assertRaises(RuntimeError):
+                    runner.run_dual_creative_command([sys.executable, "-c", code])
+
+
 if __name__ == "__main__":
     unittest.main()

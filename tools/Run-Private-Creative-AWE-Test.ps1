@@ -125,12 +125,11 @@ try {
         [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $null, 'Process')
         [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', 'dummy', 'Process')
         [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', '1', 'Process')
-        $dualLog = & $hostTestExe $pluginBinary --dual-original 2>&1
-        $dualCode = $LASTEXITCODE
-        $dualLog | ForEach-Object { Write-Host $_ }
-        if ($dualCode -ne 0 -or @($dualLog | Where-Object { "$_" -eq 'REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS' }).Count -ne 1) {
-            throw "Two real original Creative VST3 instances failed; exit=$dualCode"
-        }
+        # Windows PowerShell 5.1 treats redirected native stderr as
+        # NativeCommandError under Stop, even for normal DOSBox logging.
+        # The Python runner drains both streams and checks real exit/marker.
+        & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --dual-original
+        if ($LASTEXITCODE -ne 0) { throw 'Two real original Creative VST3 instances failed.' }
     } finally {
         [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $previousBootLog, 'Process')
         [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', $previousOriginal, 'Process')

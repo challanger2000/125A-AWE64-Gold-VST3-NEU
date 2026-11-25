@@ -97,6 +97,23 @@ def validate_voice_overlay_report(stdout: str):
         raise RuntimeError("Missing measured silence before a filter trial")
 
 
+def run_dual_creative_command(command: list[str]):
+    # Capture native stderr independently: ordinary DOSBox logs are not
+    # PowerShell errors. Only native exit and one exact PASS line count.
+    proc = subprocess.run(command, timeout=90, capture_output=True,
+                          text=True, encoding="utf-8", errors="replace",
+                          check=False)
+    marker = "REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS"
+    # Print only test-owned result lines; do not publish native guest logs.
+    for line in proc.stdout.splitlines():
+        if line.startswith(("DUAL_VST3_", "REAL_VST3_TWO_ACTIVE_COMPONENTS_")):
+            print(line, flush=True)
+    if proc.returncode or proc.stdout.splitlines().count(marker) != 1:
+        raise RuntimeError(f"Dual original VST3 gate FAILED; exit=0x{proc.returncode & 0xffffffff:08x}")
+    print(marker, flush=True)
+    return True
+
+
 def run_native_host(exe: Path, vst3: Path, original: bool = False,
                     seconds: int = 45):
     if not (15 <= seconds <= 120):
@@ -168,5 +185,13 @@ if __name__ == "__main__":
     p.add_argument("--original", action="store_true",
                    help="Private Windows-only SHA-verified owner assets")
     p.add_argument("--seconds", type=int, default=45)
+    p.add_argument("--dual-original", action="store_true")
     args = p.parse_args()
-    run_native_host(args.exe, args.plugin, args.original, args.seconds)
+    if args.dual_original:
+        if args.original:
+            p.error("--original and --dual-original are mutually exclusive")
+        run_dual_creative_command([str(args.exe.resolve(strict=True)),
+                                   str(args.plugin.resolve(strict=True)),
+                                   "--dual-original"])
+    else:
+        run_native_host(args.exe, args.plugin, args.original, args.seconds)
