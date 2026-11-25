@@ -39,7 +39,7 @@ inline bool terminal(Chunk c,std::size_t stride,const char* name) noexcept {
 inline bool hierarchy(Chunk headers,std::size_t stride,std::size_t offset,
                       Chunk bags,Chunk gens,Chunk mods,unsigned linkOp,
                       std::size_t targetCount, const std::bitset<65536>* required,
-                      std::bitset<65536>* referenced) noexcept {
+                      std::bitset<65536>* referenced, Chunk sampleHeaders={}) noexcept {
     const auto hc=headers.size/stride,bc=bags.size/4,
         gc=gens.size/4,mc=mods.size/10;
     if(hc<2||bc<2||gc<2||mc<1||targetCount<2||
@@ -62,10 +62,19 @@ inline bool hierarchy(Chunk headers,std::size_t stride,std::size_t offset,
         for(std::size_t b=first;b<last;++b) {
             const auto g=le16(bags.p+b*4),gEnd=le16(bags.p+(b+1)*4);
             unsigned links=0;
+            unsigned firstTarget=0;
             for(std::size_t i=g;i<gEnd;++i) {
                 if(le16(gens.p+4*i)!=linkOp)continue;
                 const auto target=le16(gens.p+4*i+2);
-                if(target>=targetCount-1||++links>1)return false;
+                if(target>=targetCount-1)return false;
+                // Creative SYNTHGM.SF2 has two sampleID generators in one
+                // instrument bag, both referencing the same ROM sample.
+                // Preserve the original bytes and loader semantics. Do not
+                // permit ambiguous links or repeat links to RAM samples.
+                if(links && (!sampleHeaders.p || target!=firstTarget ||
+                    !(le16(sampleHeaders.p+46u*target+44u)&0x8000u)))return false;
+                firstTarget=target;
+                ++links;
                 if(referenced)referenced->set(target);
             }
             if(links)linked=true;
@@ -111,7 +120,7 @@ inline bool validateSf2Structure(const std::vector<std::uint8_t>& bytes) noexcep
     if(!terminal(phdr,38,"EOP")||!terminal(inst,22,"EOI")||!terminal(shdr,46,"EOS"))return false;
     std::bitset<65536> referencedInstruments;
     if(!hierarchy(phdr,38,24,pbag,pgen,pmod,41,inst.size/22,nullptr,&referencedInstruments)||
-       !hierarchy(inst,22,20,ibag,igen,imod,53,shdr.size/46,&referencedInstruments,nullptr))return false;
+       !hierarchy(inst,22,20,ibag,igen,imod,53,shdr.size/46,&referencedInstruments,nullptr,shdr))return false;
     const auto count=shdr.size/46;
     for(std::size_t i=0;i+1<count;++i) {
         const auto* s=shdr.p+46*i;

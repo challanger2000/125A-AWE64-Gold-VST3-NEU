@@ -9,6 +9,13 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 25.11.2026 — Original-GM-SF2: belegte historische ROM-Zone kompatibel halten
+
+- [Windows 45634211957](../../actions/runs/45634211957) auf b9321a20: Gesamt-FAIL beim externen GM-SF2-Recall (IComponent::setState), noch vor Gaststart. DLL- und VST3-Build, Original-UART-/PCM-/Hardware-Smokes, synthetische Einzel-/Dual-VST3, Negativkontrolle, Steinberg-Validator, P165/MOD RESET, authentischer Original-Einzelklang (99 aktive Notenblöcke) und Dual-Creative-PCM/Lifecycle bestanden. [Transport 45634212099](../../actions/runs/45634212099) Linux/Windows und [Version 45634212149](../../actions/runs/45634212149) SUCCESS. Spätere Klang-, Timing-, CPU- und Performance-Gates wurden nicht erreicht.
+- Ursache am tatsächlichen 42.726-Byte-Original-SYNTHGM.SF2 (Archiv-Git-Blob 205a540e5545945b58ab136ef5423327e2066d2c) untersucht: Instrument 172, Bag 649 enthält zwei Generatorgruppen mit jeweils sampleID 127, ein ROM-Mono-Sample. Der neue Validator lehnt den zweiten Verweis pauschal ab. Die unabhängige Strukturanalyse der Originalbank fand genau diese Verletzung der neuen Linkregel. Keine Änderung der Originalbank oder des Creative-Laders.
+- Eng begrenzte Ausnahme nur für wiederholte identische, gültige ROM-Sample-Verweise innerhalb einer Instrumentzone; verschiedene Sample-IDs, RAM-Duplikate, terminale/ungültige IDs und doppelte Preset-Instrument-Links bleiben unzulässig. Lokaler C++20-Gegenversuch: neuer synthetischer ROM-Positivfall scheitert am alten Code, besteht am korrigierten; drei neue Negativfälle abgewiesen, alle bisherigen 27 synthetischen Fälle und acht Besitzerbanken erneut korrekt behandelt. Keine Originalbytes in Git. Das Verhalten der tatsächlichen Originalbank im nativen VST3 bleibt bis zum neuen Windows-Lauf offen.
+- Keine Änderung der GUI, des EMU8000-Kerns, des experimentellen Timing-Modus oder bestehender Klangtestgrenzen. PARTIAL / NO-GO, 0.0.0-dev.
+
 ## 25.11.2026 — Audit-Korrekturkandidat (PARTIAL / NOT VERIFIED)
 
 - Referenz: `164d2141cefdcaacb3806b37ec84d66fcb25f4c2`. Vorherige native CI 45609264124, Transport 45609264137 und Versionsprüfung 45609264252 erfolgreich. Die dort ausgegebene CPU-Nullmessung ist kein belastbarer Leistungsnachweis.

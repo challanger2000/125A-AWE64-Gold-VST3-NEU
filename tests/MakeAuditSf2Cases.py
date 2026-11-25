@@ -65,3 +65,24 @@ write('accept_sf201',lambda l:mutate(l[b'INFO'],b'ifil',2,'<H',1))
 def rom(l):
     mutate(l[b'pdta'],b'shdr',44,'<H',0x8001);l.pop(b'sdta')
 write('accept_rom_only',rom)
+
+# Original Creative GM has two generator groups in a single instrument bag,
+# each ending in an identical ROM sampleID. Reproduce its shape without
+# embedding any proprietary preset, ROM or bank bytes.
+def replace_chunk(l,tag,data):
+    for i,(t,d) in enumerate(l):
+        if t==tag:
+            l[i]=(t,data);return
+    raise ValueError(tag)
+def repeated_sample(l,use_rom,conflicting=False,terminal=False):
+    pd=l[b'pdta']
+    if use_rom:rom(l)
+    if conflicting:
+        data=dict(pd)[b'shdr']
+        replace_chunk(pd,b'shdr',data[:46]+data[:46]+data[46:])
+    replace_chunk(pd,b'igen',gen(43,0x3f00)+gen(53,0)+gen(43,0x7f40)+gen(53,1 if conflicting or terminal else 0)+gen(0,0))
+    replace_chunk(pd,b'ibag',struct.pack('<4H',0,0,4,0))
+write('accept_repeated_rom_sample',lambda l:repeated_sample(l,True))
+write('reject_conflicting_rom_sample',lambda l:repeated_sample(l,True,conflicting=True))
+write('reject_repeated_ram_sample',lambda l:repeated_sample(l,False))
+write('reject_terminal_rom_sample',lambda l:repeated_sample(l,True,terminal=True))
