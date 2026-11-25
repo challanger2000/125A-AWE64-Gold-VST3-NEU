@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 25.11.2026 — Audit-Korrekturkandidat (PARTIAL / NOT VERIFIED)
+
+- Referenz: `164d2141cefdcaacb3806b37ec84d66fcb25f4c2`. Vorherige native CI 45609264124, Transport 45609264137 und Versionsprüfung 45609264252 erfolgreich. Die dort ausgegebene CPU-Nullmessung ist kein belastbarer Leistungsnachweis.
+- A02: MIDI-Overflow-Recovery für verlorene Note-Offs und Sustain. A03: struktureller SF2-Preflight; synthetische Positiv-/Negativdateien werden ausschließlich im Build-Verzeichnis erzeugt. Die portablen Kandidaten wurden lokal mit Gegenproben getestet.
+- A01/A04/A07: Host-Demand-Timing als ausdrücklich experimenteller Opt-in-Pfad; der bisherige Gast-Takt bleibt Standard. Native Timing-, PCM-, Offline- und Pause/Resume-Gegenproben sind ergänzt, aber noch nicht auf Windows ausgeführt. CPU-Messung (A08) mit Positivkontrolle und Ablehnung unplausibler Nullmessungen.
+- A05/A06/A09: transaktionaler Laufzeitwechsel und Zustandswechsel noch nicht integriert. A10–A14 sowie Gesamt-Audit und unabhängiger Audit offen. Kein FULL AUDIT, kein Release, keine Freigabe als fertiges Plugin. Version bleibt `0.0.0-dev`.
+- Alle nativen Ergebnisse dieses Kandidaten stehen aus. P165-GUI, Original-Creative-Dateien und gepinnter EMU8000-Quellkern bleiben unverändert. Keine privaten Bänke im Repository.
+
 ## 25.11.2026 — Echter synthetischer Dual-VST3-Test PASS; Original-Launcher korrigiert
 
 - [Windows 45535905418](../../actions/runs/45535905418): DLL-Build, zwei unabhängige DLLs ohne Host-SDL-Variablen, echter Einzel- und Dual-VST3-Synthetic-PCM-/Lifecycle-Test, Negativkontrolle, Steinberg-Validator und P165/MOD RESET PASS. Original-Creative-Einzel-VST3 liefert erneut musikalisches PCM (98 aktive Notenblöcke, 58105 nichtstumme Frames, kein Near-Full-Scale-Frame im gehaltenen Ton). Gesamt-FAIL beim Aufruf des neuen Dual-Originaltests: Windows PowerShell 5.1 wertet normale native stderr-Ausgabe `LOG: Early LOG Init complete` bei `2>&1` und ErrorActionPreference Stop als NativeCommandError. Kein Dual-Original-PASS und keine nachfolgenden Gesamtgates. Transport 45535905360, Version 45535905267 SUCCESS.

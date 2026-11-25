@@ -568,7 +568,125 @@ def patch_project(s):
 
     return left+marker+group+'  </ItemDefinitionGroup>'+tail
 
+
+# Audit A01: opt-in host-demand pacing. Legacy reference and synthetic
+# fixtures keep their original wall-clock behaviour. Never change SDL or
+# EMU8000 synthesis for this scheduling adjustment.
+_original_patch_mixer = patch_mixer
+_original_patch_mpu = patch_mpu
+
+def patch_mixer(s):
+    s = _original_patch_mixer(s)
+    anchor = 'static std::atomic<bool> awe64_guest_clock_pcm{false};'
+    s = once(s, anchor, anchor + r"""
+static std::atomic<bool> awe64_guest_clock_fault{false};
+extern bool AWE64_HostDemandEnabled() noexcept;
+bool AWE64_GuestClockEnabled() noexcept {
+    return awe64_guest_clock_pcm.load(std::memory_order_acquire) && AWE64_HostDemandEnabled();
+}
+extern "C" __declspec(dllexport) int __cdecl AWE64_GuestClockFault() noexcept {
+    return awe64_guest_clock_fault.load(std::memory_order_acquire)?1:0;
+}
+""")
+    # In the synchronous guest mixer, only count real frames. The standalone
+    # callback's backlog drop and last-DAC padding are not a clock source.
+    anchor = '    if ((unsigned long)remains >= (mixer.blocksize*2UL)) {'
+    s = once(s, anchor, r"""#ifdef AWE64_VST3_RUNTIME
+    if(!AWE64_GuestClockEnabled())
+#endif
+""" + anchor)
+    anchor = '    if (need > 0)\n        mixer.prebuffer_wait = true;'
+    s = once(s, anchor, r"""#ifdef AWE64_VST3_RUNTIME
+    const auto actualFrames=static_cast<unsigned int>(len/MIXER_SSIZE-need);
+    if(AWE64_GuestClockEnabled() && need!=0)
+        awe64_guest_clock_fault.store(true,std::memory_order_release);
+#endif
+"""+anchor)
+    anchor = '        if(fn)fn(awe64_pcm_context.load(std::memory_order_acquire),\n                 reinterpret_cast<const int16_t*>(stream),\n                 static_cast<unsigned int>(len/MIXER_SSIZE));'
+    s = once(s, anchor, r"""        const auto frames=AWE64_GuestClockEnabled()?actualFrames:static_cast<unsigned int>(len/MIXER_SSIZE);
+        if(fn&&frames)fn(awe64_pcm_context.load(std::memory_order_acquire),
+                 reinterpret_cast<const int16_t*>(stream),frames);""")
+    anchor = '        int remains=(int)mixer.work_in-(int)mixer.work_out;\n        if(remains<0)remains+=(int)mixer.work_wrap;\n        int16_t pcm[128*2];\n        while(remains>0) {\n            const int n=remains>128?128:remains;\n            MIXER_CallBack(nullptr,reinterpret_cast<Uint8*>(pcm),n*MIXER_SSIZE);\n            remains-=n;\n        }'
+    s = once(s, anchor, r"""        const auto available=[]() noexcept {
+            int count=(int)mixer.work_in-(int)mixer.work_out;
+            if(count<0)count+=(int)mixer.work_wrap;
+            return count;
+        };
+        int remains=available();
+        int16_t pcm[128*2];
+        if(!AWE64_GuestClockEnabled()) {
+            while(remains>0) {
+                const int n=remains>128?128:remains;
+                MIXER_CallBack(nullptr,reinterpret_cast<Uint8*>(pcm),n*MIXER_SSIZE);
+                remains-=n;
+            }
+        } else {
+        // Verify actual work-pointer progress, not requested sample count.
+        // If the invariant fails, do not generate more padding or loop.
+        while(remains>0 && !awe64_guest_clock_fault.load(std::memory_order_acquire)) {
+            const int n=remains>128?128:remains;
+            MIXER_CallBack(nullptr,reinterpret_cast<Uint8*>(pcm),n*MIXER_SSIZE);
+            const int after=available();
+            if(after!=remains-n) {
+                awe64_guest_clock_fault.store(true,std::memory_order_release);
+                break;
+            }
+            remains=after;
+        }
+        }""")
+    return s
+
+def patch_mpu(s):
+    s = _original_patch_mpu(s)
+    anchor = 'static unsigned char awe64_overlay_tags[32]{};'
+    s = once(s, anchor, 'extern bool AWE64_HostDemandEnabled() noexcept;\n'+anchor)
+    anchor = '    for(unsigned n=0;n<8 && mpu.queue_used<=MPU401_QUEUE-3;++n) {'
+    s = once(s, anchor, r"""    // The timed command stream is processed between complete original MIDI
+    // handlers. Never publish the next overlay while the previous packet is
+    // still pending in the guest UART. Legacy mode retains eight packets.
+    const bool clocked=AWE64_HostDemandEnabled();
+    if(clocked&&mpu.queue_used!=0)return;
+    for(unsigned n=0;n<(clocked?1u:8u) && mpu.queue_used<=MPU401_QUEUE-3;++n) {""")
+    return s
+
+def patch_dosbox_clock(s):
+    anchor = 'static Bitu Normal_Loop(void) {'
+    s = once(s, anchor, r"""#ifdef AWE64_VST3_RUNTIME
+#include <atomic>
+using Awe64TickDecision = int (__cdecl *)(void*);
+static std::atomic<void*> awe64_clock_ctx{nullptr};
+static std::atomic<Awe64TickDecision> awe64_clock_decision{nullptr};
+extern "C" __declspec(dllexport) void __cdecl AWE64_HostRegisterClock(void* ctx,Awe64TickDecision fn) noexcept {
+    awe64_clock_decision.store(nullptr,std::memory_order_release);
+    awe64_clock_ctx.store(ctx,std::memory_order_release);
+    awe64_clock_decision.store(fn,std::memory_order_release);
+}
+bool AWE64_HostDemandEnabled() noexcept {
+    return awe64_clock_decision.load(std::memory_order_acquire)!=nullptr;
+}
+static int AWE64_HostTickDecision() noexcept {
+    auto fn=awe64_clock_decision.load(std::memory_order_acquire);
+    return fn?fn(awe64_clock_ctx.load(std::memory_order_acquire)):0;
+}
+#endif
+""" + anchor)
+    anchor = '                GFX_Events();\n                if (DOSBox_Paused() == false && ticksRemain > 0) {'
+    s = once(s, anchor, r"""                GFX_Events();
+#ifdef AWE64_VST3_RUNTIME
+                // At the original safe tick boundary, after the original
+                // cooperative stop check. Boot/direct reference returns 0.
+                const int hostTick=AWE64_HostTickDecision();
+                if(hostTick!=0) {
+                    if(hostTick==1 && !DOSBox_Paused())TIMER_AddTick();
+                    else {SDL_Delay(1);return 0;}
+                    continue;
+                }
+#endif
+                if (DOSBox_Paused() == false && ticksRemain > 0) {""")
+    return s
+
 PATCHES={
+    'src/dosbox.cpp':patch_dosbox_clock,
     'src/hardware/emu8000.cpp':patch_emu,
     'src/hardware/mixer.cpp':patch_mixer,
     'src/hardware/mpu401.cpp':patch_mpu,

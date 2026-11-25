@@ -56,6 +56,7 @@ public:
 };
 
 struct StereoFrame final { float left; float right; };
+enum class GuestCommand : std::uint8_t { Midi, VoiceControls, AbsoluteSends };
 struct MidiEvent final {
     std::uint64_t absoluteHostSample;
     std::uint8_t status;
@@ -63,6 +64,10 @@ struct MidiEvent final {
     std::uint8_t data2;
     std::uint8_t size;
     std::array<std::uint8_t,11> sysex{};
+    std::uint64_t guestFrame=0; // valid only in explicitly clocked mode
+    GuestCommand command=GuestCommand::Midi;
+    std::uint64_t controlLo=0;
+    unsigned controlHi=0;
 };
 
 // Audio producer: DOSBox worker; consumer: VST3 audio thread.
@@ -74,6 +79,8 @@ class RealtimeQueues final {
     SpscQueue<MidiEvent, 4096> midi_{};
     std::atomic<std::uint64_t> audioDrops_{0};
     std::atomic<std::uint64_t> midiDrops_{0};
+    std::atomic<bool> midiRecovery_{false};
+    std::atomic<std::uint64_t> midiRecoveryEpoch_{0};
     std::atomic<std::uint64_t> audioUnderruns_{0};
 public:
     bool pushAudio(const StereoFrame& frame) noexcept {
@@ -82,9 +89,33 @@ public:
         return false;
     }
     bool pushMidi(const MidiEvent& event) noexcept {
+        // Never admit new events behind a lost release while the consumer
+        // still owes its fail-safe release sequence. The single producer
+        // requests recovery; the single consumer acknowledges it only
+        // after all already accepted MIDI and recovery packets are emitted.
+        if (midiRecovery_.load(std::memory_order_acquire)) {
+            midiDrops_.fetch_add(1,std::memory_order_relaxed);
+            return false;
+        }
         if (midi_.tryPush(event)) return true;
         midiDrops_.fetch_add(1, std::memory_order_relaxed);
+        midiRecovery_.store(true,std::memory_order_release);
         return false;
+    }
+    // Producer only: a rejected host batch must also initiate recovery.
+    void requestMidiRecovery() noexcept {
+        midiRecovery_.store(true,std::memory_order_release);
+    }
+    bool midiRecoveryPending() const noexcept {
+        return midiRecovery_.load(std::memory_order_acquire);
+    }
+    // Consumer only: call after its final recovery packet is delivered.
+    void completeMidiRecovery() noexcept {
+        midiRecoveryEpoch_.fetch_add(1,std::memory_order_relaxed);
+        midiRecovery_.store(false,std::memory_order_release);
+    }
+    std::uint64_t midiRecoveryEpoch() const noexcept {
+        return midiRecoveryEpoch_.load(std::memory_order_acquire);
     }
     bool peekMidi(MidiEvent& event) const noexcept {return midi_.tryPeek(event);}
     bool popMidi(MidiEvent& event) noexcept { return midi_.tryPop(event); }

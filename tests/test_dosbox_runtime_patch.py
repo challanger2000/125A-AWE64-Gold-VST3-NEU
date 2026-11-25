@@ -33,7 +33,10 @@ class DosBoxPatchTests(unittest.TestCase):
         s=('#define MIXER_SSIZE 4\n'
            'SDL_AudioDeviceID SDL2_AudioDevice = 0; /* valid IDs are 2 or higher, 1 for compat, 0 is never a valid ID */\n'
            'static void MIXER_Mix(void) {\n    MIXER_FillUp();\n}\n\n'
-           'static void SDLCALL MIXER_CallBack(void*,Uint8*,int) {\n    }\n}\n\nstd::string mixerinfo() {\n'
+           'static void SDLCALL MIXER_CallBack(void*,Uint8*,int) {\n'
+           '    if (need > 0)\n        mixer.prebuffer_wait = true;\n'
+           '    if ((unsigned long)remains >= (mixer.blocksize*2UL)) {\n'
+           '    }\n}\n\nstd::string mixerinfo() {\n'
            '    if (mixer.nosound) {\n        SDL_PauseAudioDevice(SDL2_AudioDevice, 0);\n'
            '        mixer.prebuffer_samples = ((unsigned int)ms * (unsigned int)mixer.freq) / 1000u;')
         r=patch.patch_mixer(s)
@@ -47,6 +50,9 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('MIXER_CallBack(nullptr,reinterpret_cast<Uint8*>(pcm),n*MIXER_SSIZE)',r)
         self.assertIn('if(!awe64_guest_clock_pcm.load(std::memory_order_acquire))',r)
         self.assertIn('mixer.prebuffer_samples=0;',r)
+        self.assertIn('&& AWE64_HostDemandEnabled()',r)
+        self.assertIn('after!=remains-n',r)
+        self.assertIn('if(!AWE64_GuestClockEnabled())',r)
         with self.assertRaises(ValueError):patch.patch_mixer(r)
     def test_real_creative_unchanged_mpu401_input(self):
         s='#include <assert.h>\nextern bool enable_slave_pic;\n' + (
@@ -59,6 +65,8 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('AWE64_HostRegisterMidi(',r)
         self.assertIn('AWE64_PumpGuestMidi()',r)
         self.assertIn('MPU401_QUEUE-3',r)
+        self.assertIn('const bool clocked=AWE64_HostDemandEnabled();',r)
+        self.assertIn('if(clocked&&mpu.queue_used!=0)return;',r)
         self.assertIn('if(mpu.mode!=M_UART) {',r)
         self.assertIn('AWE64_IsGuestMidiReady()',r)
         self.assertIn('awe64_overlay_context=tag && mpu.mode==M_UART',r)
@@ -71,6 +79,15 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('if(mpu.queue_used!=0)return;',r)
         self.assertLess(r.index('if(mpu.queue_used!=0)return;'),r.index('auto pull=awe64_mpu_pull.load'))
         with self.assertRaises(ValueError):patch.patch_mpu(r)
+    def test_host_demand_clock_opt_in(self):
+        src='static Bitu Normal_Loop(void) {\n                GFX_Events();\n                if (DOSBox_Paused() == false && ticksRemain > 0) {'
+        out=patch.patch_dosbox_clock(src)
+        self.assertIn('awe64_clock_decision.load(std::memory_order_acquire)!=nullptr',out)
+        self.assertIn('if(hostTick!=0)',out)
+        self.assertIn('if(hostTick==1 && !DOSBox_Paused())TIMER_AddTick();',out)
+        self.assertIn('else {SDL_Delay(1);return 0;}',out)
+        with self.assertRaises(ValueError):
+            patch.patch_dosbox_clock('')
     def test_guest_entry(self):
         s='void GFX_Events() {}\n| SDL_WINDOW_SHOWN | (SDL2_resize_enable ? SDL_WINDOW_RESIZABLE : 0)\nint main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {}\n            DOSBOX_RunMachine();\n        } catch (int x) {'
         s+='\n'+"        SetConsoleCtrlHandler((PHANDLER_ROUTINE) ConsoleEventHandler,TRUE);"+'\n'+"        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) >= 0) {"+'\n'+"            LOG(LOG_GUI,LOG_WARN)(\"Failed to init joystick support\");\n            sdl.num_joysticks = 0;\n        }"

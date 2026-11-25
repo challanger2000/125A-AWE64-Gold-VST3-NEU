@@ -24,6 +24,11 @@ typedef int (AWE64_CALL *AWE64_IsGuestMidiReadyFn)(void);
 typedef void (AWE64_CALL *AWE64_SetAbsoluteSendsFn)(unsigned);
 typedef void (AWE64_CALL *AWE64_SetVoiceControlsFn)(uint64_t,unsigned);
 typedef void (AWE64_CALL *AWE64_SetGuestClockPCMFn)(unsigned);
+// Host-demand clock: callback invoked only at a DOSBox virtual tick boundary.
+// 0 legacy/boot pacing, 1 advance one virtual tick, 2 wait for host demand.
+typedef int (AWE64_CALL *AWE64_TickDecisionFn)(void*);
+typedef void (AWE64_CALL *AWE64_RegisterClockFn)(void*,AWE64_TickDecisionFn);
+typedef int (AWE64_CALL *AWE64_GuestClockFaultFn)(void);
 #ifdef __cplusplus
 }
 #endif

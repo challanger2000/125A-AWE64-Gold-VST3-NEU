@@ -311,6 +311,9 @@ try {
         [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG',$previousBootLog,'Process')
     }
     if ($perfExit -ne 0) { throw 'Native performance/stability gate failed before long Cheezoids sweep.' }
+    # Opt-in timed host must also pass native PCM and pause/resume.
+    & python (Join-Path $root 'tests/WindowsTimedVst3Acceptance.py') --bundle $bundlePath --host-exe $hostTestExe
+    if ($LASTEXITCODE -ne 0) { throw 'Native timed host gate failed before long Cheezoids sweep.' }
     # Independently run the public author-bank regression before other
     # original gates can fail. No owner data or downloaded assets uploaded.
     $cheezExit = 0

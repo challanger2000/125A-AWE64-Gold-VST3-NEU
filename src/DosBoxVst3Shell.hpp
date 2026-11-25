@@ -8,6 +8,7 @@
 #include "DosBoxRuntimeHost.hpp"
 #include "RealtimeQueues.hpp"
 #include "HostRateConverter.hpp"
+#include "HostDemandSession.hpp"
 #include <memory>
 #include <atomic>
 #include <array>
@@ -36,6 +37,12 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::array<std::atomic<std::uint8_t>,10> voiceControls_{};
     std::uint8_t lastReverbType_=4,lastChorusType_=2;
     rt::HostRateConverter rateConverter_{};
+    rt::HostDemandSession hostDemand_{};
+    // Experimental clock path only; native acceptance required before default.
+    bool demandRequested_=false;
+    std::atomic<unsigned> latencySamples_{0};
+    std::atomic<bool> demandActive_{false},timedProcessing_{false};
+    Steinberg::tresult processTimed(Steinberg::Vst::ProcessData&,integration::DosBoxRuntimeHost&);
     // Lifecycle changes on the host/editor thread. The audio callback uses
     // try_lock, never waits for the emulator or a disk operation.
     std::mutex runtimeMutex_;

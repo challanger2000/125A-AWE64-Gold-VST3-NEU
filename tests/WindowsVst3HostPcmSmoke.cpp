@@ -1,3 +1,4 @@
+#include "../src/PerfCpuMeasurement.hpp"
 // REAL VST3-host audio-callback gate with an explicitly NON-CREATIVE DOS fixture.
 //
 // Loads the exact compiled AWE64GoldDOSBoxDev.vst3 Windows binary, creates
@@ -167,6 +168,7 @@ public:
     void setChord(unsigned count,unsigned first,float velocity) noexcept {
         count_=count;firstPitch_=first;velocity_=velocity;
     }
+    void setOffset(unsigned offset) noexcept {note_.sampleOffset=static_cast<S::int32>(offset);}
     void setEnabled(bool enabled,bool noteOff=false) noexcept {
         enabled_=enabled;
         noteOff_=noteOff;
@@ -228,6 +230,7 @@ int main(int argc,char** argv) {
     const char* hostRateEnv=std::getenv("AWE64_TEST_HOST_RATE");
     const double hostRate=hostRateEnv?std::atof(hostRateEnv):44100.;
     if(hostRate!=44100.&&hostRate!=48000.&&hostRate!=96000.)return fail("Unsupported native test host rate");
+    const bool timedNative=std::getenv("AWE64_TEST_TIMED_HOST")!=nullptr;
     const bool sweep=std::getenv("AWE64_TEST_CHEEZOIDS_SWEEP")!=nullptr;
     const bool performance=std::getenv("AWE64_TEST_PERFORMANCE")!=nullptr;
     const bool overlayTest=std::getenv("AWE64_TEST_VOICE_OVERLAYS")!=nullptr;
@@ -567,7 +570,7 @@ int main(int argc,char** argv) {
             // same component remains active. Both go through actual state.
             auto defaultBytes=bytes;defaultBytes.resize(11);defaultBytes[4]=1;defaultBytes[6]=0;
             S::MemoryStream defaultState(defaultBytes.data(),defaultBytes.size());
-            if(component->setState(&defaultState)!=S::kResultOk)
+            if(!timedNative&&component->setState(&defaultState)!=S::kResultOk)
                 return fail("ROM state reset before live bank change failed");
             std::cout<<"REAL_VST3_EXTERNAL_SF2_STATE_ROUNDTRIP_PASS\n";
         }
@@ -614,13 +617,37 @@ int main(int argc,char** argv) {
     if(component->activateBus(V::kAudio,V::kOutput,0,true)!=S::kResultOk)
         return fail("Stereo bus activation failed");
     V::ProcessSetup setup{};
-    setup.processMode=V::kRealtime;
+    setup.processMode=timedNative?V::kOffline:V::kRealtime;
     setup.symbolicSampleSize=V::kSample32;
     setup.sampleRate=hostRate;
     setup.maxSamplesPerBlock=512;
     if(processor->canProcessSampleSize(V::kSample32)!=S::kResultTrue ||
        processor->setupProcessing(setup)!=S::kResultOk)
         return fail("VST3 setupProcessing(requested host rate/float32) failed");
+    auto cpuCounters=[](bool thread)->awe64::qa::CpuCounters{
+        FILETIME created{},exited{},kernel{},user{}; ULONG64 cycles=0;
+        const HANDLE handle=thread?GetCurrentThread():GetCurrentProcess();
+        const BOOL times=thread?GetThreadTimes(handle,&created,&exited,&kernel,&user):
+                                GetProcessTimes(handle,&created,&exited,&kernel,&user);
+        const BOOL counted=thread?QueryThreadCycleTime(handle,&cycles):QueryProcessCycleTime(handle,&cycles);
+        if(!times||!counted)return {};
+        auto value=[](FILETIME f){return (static_cast<std::uint64_t>(f.dwHighDateTime)<<32)|f.dwLowDateTime;};
+        return {value(kernel)+value(user),cycles,true};
+    };
+    if(performance) {
+        const auto processBefore=cpuCounters(false);
+        const auto threadBefore=cpuCounters(true);
+        const auto until=std::chrono::steady_clock::now()+std::chrono::milliseconds(250);
+        volatile std::uint64_t work=1;
+        do {
+            for(unsigned i=0;i<4096;++i)work=work*6364136223846793005ull+1u;
+        } while(std::chrono::steady_clock::now()<until);
+        const auto threadAfter=cpuCounters(true);
+        const auto processAfter=cpuCounters(false);
+        if(!awe64::qa::cpuPositiveControl(processBefore,processAfter,threadBefore,threadAfter))
+            return fail("CPU counter positive control failed; no valid performance measurement");
+        std::cout<<"PERF_CPU_COUNTER_POSITIVE_CONTROL_PASS\n";
+    }
     // Windows runner embeds NO original Creative material. The fake DOS MZ
     // fixture merely drives the original DOSBox PC-speaker hardware.
     if(component->setActive(true)!=S::kResultOk)
@@ -634,7 +661,7 @@ int main(int argc,char** argv) {
     output.numChannels=2;
     output.channelBuffers32=channels;
     V::ProcessData data{};
-    data.processMode=V::kRealtime;
+    data.processMode=timedNative?V::kOffline:V::kRealtime;
     data.symbolicSampleSize=V::kSample32;
     data.numSamples=512;
     data.numInputs=0;
@@ -665,6 +692,77 @@ int main(int argc,char** argv) {
     // validated short public synthetic DOS test. Preserve the latter.
     const unsigned maxBlocks=originalMode ?
         std::min(static_cast<unsigned>(originalSeconds*hostRate/512.),endOriginalBlock) : 600u;
+    if(timedNative) {
+        if(!originalMode||externalState.empty()||ramHz!=441.||hostRate<44100.||hostRate>96000.)
+            return fail("Timed host gate requires original 441 Hz RAM fixture");
+        constexpr unsigned blockSize=512, lateOffset=384;
+        using Clock=std::chrono::steady_clock;
+        const auto warmStart=Clock::now();
+        // Give the original guest time to complete boot before the actual
+        // timed trials; no note is injected during this warmup.
+        for(unsigned i=0;i<warmupBlocks;++i) {
+            midiEvents.setEnabled(false);
+            if(processor->process(data)!=S::kResultOk)return fail("Timed host warmup failed");
+            std::this_thread::sleep_until(warmStart+std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>((i+1)*blockSize/hostRate)));
+        }
+        const auto latency=processor->getLatencySamples();
+        if(latency<blockSize/2||latency>static_cast<unsigned>(hostRate*.25))
+            return fail("Timed host reported latency out of candidate bounds");
+        auto tick=[&](bool on,bool off,unsigned offset) {
+            midiEvents.setEnabled(on||off,off);midiEvents.setOffset(offset);
+            l.fill(0.f);r.fill(0.f);
+            if(processor->process(data)!=S::kResultOk)return false;
+            for(unsigned k=0;k<blockSize;++k)if(!std::isfinite(l[k])||!std::isfinite(r[k]))return false;
+            return true;
+        };
+        auto quiet=[&]() {
+            for(unsigned i=0;i<static_cast<unsigned>(hostRate/blockSize*1.5);++i)
+                if(!tick(false,false,0))return false;
+            for(unsigned k=0;k<blockSize;++k)if(std::max(std::abs(l[k]),std::abs(r[k]))>=.002f)return false;
+            return true;
+        };
+        auto trial=[&](unsigned offset,unsigned& onset,bool pause=false) {
+            if(!quiet())return false;
+            auto suspend=[&]() {
+                if(processor->setProcessing(false)!=S::kResultOk)return false;
+                std::this_thread::sleep_for(std::chrono::milliseconds(350));
+                return processor->setProcessing(true)==S::kResultOk;
+            };
+            if(pause&&!suspend())return false; // note on first resumed block
+            unsigned streak=0;bool found=false;double energy=0.;
+            // This is the actual offline process mode, with no sleeping
+            // between callbacks. Guest advances only under host demand.
+            for(unsigned i=0;i<static_cast<unsigned>(hostRate/blockSize*.35);++i) {
+                if(pause&&i==static_cast<unsigned>(hostRate/blockSize*.15)&&!suspend())return false;
+                if(!tick(i==0,false,i==0?offset:0))return false;
+                for(unsigned k=0;k<blockSize;++k) {
+                    const auto peak=std::max(std::abs(l[k]),std::abs(r[k]));
+                    streak=peak>=.002f?streak+1:0;
+                    if(!found&&streak>=4){onset=i*blockSize+k-3;found=true;}
+                    if(i*blockSize+k>latency+offset+static_cast<unsigned>(hostRate*.08))
+                        energy+=double(l[k])*l[k]+double(r[k])*r[k];
+                }
+            }
+            if(!found||energy<.001||!tick(false,true,0))return false;
+            return true;
+        };
+        unsigned early=0,late=0,resumed=0;
+        if(!trial(0,early)||!trial(lateOffset,late)||!trial(0,resumed,true)||!quiet())return fail("Timed host PCM onset/held/release failed");
+        const auto tolerance=static_cast<unsigned>(std::ceil(hostRate*.002));
+        const auto delta=static_cast<int>(late)-static_cast<int>(early);
+        if(std::abs(delta-static_cast<int>(lateOffset))>static_cast<int>(tolerance))
+            return fail("Timed host within-block offset PCM difference incorrect");
+        if(std::abs(static_cast<int>(resumed)-static_cast<int>(early))>static_cast<int>(tolerance))
+            return fail("Timed host processing suspension shifted the resumed note onset");
+        if(early+tolerance<latency||early>latency+static_cast<unsigned>(hostRate*.020))
+            return fail("Timed host PCM onset inconsistent with reported transport latency");
+        if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
+           component->terminate()!=S::kResultOk)return fail("Timed host shutdown failed");
+        processor->release();component->release();factory->release();
+        if(!exitDll())return fail("Timed host module shutdown failed");FreeLibrary(module);
+        std::cout<<"TIMED_HOST_RATE="<<hostRate<<" LATENCY="<<latency<<" EARLY="<<early<<" LATE="<<late<<" DELTA="<<delta<<" TOLERANCE="<<tolerance<<" RESUMED="<<resumed<<"\n";
+        std::cout<<"REAL_VST3_TIMED_PAUSE_RESUME_PASS\nREAL_VST3_TIMED_OFFLINE_PCM_PASS\n";return 0;
+    }
     if(!externalState.empty()){
         // Allow the initial original Creative guest to settle before
         // exercising stop/join/unload/restart inside the same component.
@@ -920,14 +1018,8 @@ int main(int argc,char** argv) {
         };
         auto nblocks=[&](double seconds){return static_cast<unsigned>(std::ceil(seconds*hostRate/buffer));};
         for(unsigned i=0;i<nblocks(12.);++i)if(!tick(false,false))return fail("Performance warmup failed");
-        auto cpu100ns=[]()->std::uint64_t{
-            FILETIME created{},exited{},kernel{},user{};
-            if(!GetProcessTimes(GetCurrentProcess(),&created,&exited,&kernel,&user))return 0;
-            auto value=[](FILETIME f){return (static_cast<std::uint64_t>(f.dwHighDateTime)<<32)|f.dwLowDateTime;};
-            return value(kernel)+value(user);
-        };
-        const auto cpuStart=cpu100ns();
-        if(!cpuStart)return fail("Process CPU counter unavailable");
+        const auto cpuStart=cpuCounters(false);
+        if(!cpuStart.valid)return fail("Process CPU counter unavailable");
         const auto wallStart=Clock::now();
         measure=true;
         std::vector<double> latencies;
@@ -963,7 +1055,7 @@ int main(int argc,char** argv) {
         // sample voices: original driver can reserve voices or steal them).
         for(unsigned i=0;i<nblocks(1.);++i)if(!tick(false,false))return fail("Chord idle failed");
         midiEvents.setChord(32,44,24.f/127.f);
-        const auto polyCpuStart=cpu100ns();
+        const auto polyCpuStart=cpuCounters(false);
         const auto polyWallStart=Clock::now();
         double chordEnergy=0.;unsigned chordSilent=0;
         // One extended real-time soak at 48 kHz; keep other rate probes short.
@@ -978,7 +1070,7 @@ int main(int argc,char** argv) {
                 if(e/buffer<1.e-8)++chordSilent;
             }
         }
-        const auto polyCpuEnd=cpu100ns();
+        const auto polyCpuEnd=cpuCounters(false);
         const double polySeconds=std::chrono::duration<double>(Clock::now()-polyWallStart).count();
         if(!tick(false,true))return fail("Chord release failed");
         actualOff+=midiEvents.getEventCount();
@@ -989,14 +1081,15 @@ int main(int argc,char** argv) {
             if(finalPeak>=.002)return fail("Soak release did not settle; possible stuck voice");
             std::cout<<"PERF_SOAK_RELEASE_PEAK="<<finalPeak<<"\n";
         }
-        const auto cpuEnd=cpu100ns();
+        const auto cpuEnd=cpuCounters(false);
         const double wallSeconds=std::chrono::duration<double>(Clock::now()-wallStart).count();
-        if(cpuEnd<cpuStart||polyCpuEnd<polyCpuStart||polySeconds<=0||wallSeconds<=0)
-            return fail("Invalid process CPU measurements");
         const auto cores=GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
-        if(!cores)return fail("Logical CPU count unavailable");
-        const double corePercent=100.*(cpuEnd-cpuStart)*1.e-7/wallSeconds;
-        const double polyPercent=100.*(polyCpuEnd-polyCpuStart)*1.e-7/polySeconds;
+        awe64::qa::CpuUsage overall{},poly{};
+        if(!awe64::qa::cpuUsage(cpuStart,cpuEnd,wallSeconds,cores,overall)||
+           !awe64::qa::cpuUsage(polyCpuStart,polyCpuEnd,polySeconds,cores,poly))
+            return fail("Invalid or flat process CPU counters; no valid performance measurement");
+        const double corePercent=overall.oneCorePercent;
+        const double polyPercent=poly.oneCorePercent;
         std::sort(latencies.begin(),latencies.end());
         const double p95=latencies[static_cast<unsigned>(std::ceil(.95*latencies.size()))-1];
         std::cout<<"PERF_HOST_RATE="<<hostRate<<" PERF_BLOCK="<<buffer<<" LOGICAL_CPUS="<<cores<<"\n"

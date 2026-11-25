@@ -3,11 +3,19 @@
 **Produkt:** 125A AWE64 Gold (Windows x64 VST3, DOSBox-X)  
 **Stand:** 25.11.2026  
 **Entwicklungskennung:** `0.0.0-dev`  
-**Release / abgenommenes Instrument:** **NEIN – Original-Creative-Klang- und bisherige Performanceprüfungen bestanden; Gesamtinstrument/DAW-Abnahme offen**  
+**Release / abgenommenes Instrument:** **NEIN – Audit-Korrekturkandidat, PARTIAL / NOT VERIFIED; native Abnahme offen, NO-GO**  
 **Einziger Branch:** `main`  
 **Exakter neuester Quellstand:** [oberster Commit auf main](../../commits/main) (nicht auf eine veraltende SHA im Text verlassen)
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
+
+## 25.11.2026 — Audit-Korrekturkandidat (PARTIAL / NOT VERIFIED)
+
+- Referenz: `164d2141cefdcaacb3806b37ec84d66fcb25f4c2`. Vorherige native CI 45609264124, Transport 45609264137 und Versionsprüfung 45609264252 erfolgreich. Die dort ausgegebene CPU-Nullmessung ist kein belastbarer Leistungsnachweis.
+- A02: MIDI-Overflow-Recovery für verlorene Note-Offs und Sustain. A03: struktureller SF2-Preflight; synthetische Positiv-/Negativdateien werden ausschließlich im Build-Verzeichnis erzeugt. Die portablen Kandidaten wurden lokal mit Gegenproben getestet.
+- A01/A04/A07: Host-Demand-Timing als ausdrücklich experimenteller Opt-in-Pfad; der bisherige Gast-Takt bleibt Standard. Native Timing-, PCM-, Offline- und Pause/Resume-Gegenproben sind ergänzt, aber noch nicht auf Windows ausgeführt. CPU-Messung (A08) mit Positivkontrolle und Ablehnung unplausibler Nullmessungen.
+- A05/A06/A09: transaktionaler Laufzeitwechsel und Zustandswechsel noch nicht integriert. A10–A14 sowie Gesamt-Audit und unabhängiger Audit offen. Kein FULL AUDIT, kein Release, keine Freigabe als fertiges Plugin. Version bleibt `0.0.0-dev`.
+- Alle nativen Ergebnisse dieses Kandidaten stehen aus. P165-GUI, Original-Creative-Dateien und gepinnter EMU8000-Quellkern bleiben unverändert. Keine privaten Bänke im Repository.
 
 ## 25.11.2026 — Echter synthetischer Dual-VST3-Test PASS; Original-Launcher korrigiert
 

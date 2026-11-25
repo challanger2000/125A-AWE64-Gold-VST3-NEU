@@ -8,12 +8,16 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <bcrypt.h>
 #include "CreativeSysexRepair.hpp"
 #include "DosBoxHostAdapter.hpp"
 #include "ExternalSoundFont.hpp"
 #include "AWE64_DOSBOX_ABI.h"
+#include "MidiTimeline.hpp"
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
@@ -44,6 +48,9 @@ class DosBoxRuntimeHost final {
     std::uint64_t lastVoiceLo_=0;
     unsigned lastVoiceHi_=0;
     AWE64_SetGuestClockPCMFn guestClockPcm_=nullptr;
+    AWE64_RegisterClockFn registerClock_=nullptr;
+    AWE64_GuestClockFaultFn clockFault_=nullptr;
+    unsigned demandLead_=0;
     bool pcmPrimed_=false;
     unsigned lastSends_=0x10000u;
     bool authenticGuest_=false;
@@ -145,8 +152,11 @@ public:
 
     bool begin(const std::filesystem::path& binary,
                const std::filesystem::path& privateDir,
-               const std::string& externalBank={}) {
+               const std::string& externalBank={},unsigned demandLead=0) {
         if(module_ || worker_.joinable())return false;
+        if(demandLead && (demandLead<=2*rt::GuestDemandClock::maxTickFrames ||
+                         demandLead>=rt::GuestDemandClock::ringFrames/2))return false;
+        demandLead_=demandLead;
         // Real original owner material ONLY. Do not start a fake engine.
         const auto rom=privateDir/"awe32.raw";
         const auto guest=privateDir/"DEMO.EXE";
@@ -183,7 +193,10 @@ public:
         sends_=reinterpret_cast<AWE64_SetAbsoluteSendsFn>(GetProcAddress(module_,"AWE64_SetAbsoluteSends"));
         guestClockPcm_=reinterpret_cast<AWE64_SetGuestClockPCMFn>(GetProcAddress(module_,"AWE64_SetGuestClockPCM"));
         voiceControls_=reinterpret_cast<AWE64_SetVoiceControlsFn>(GetProcAddress(module_,"AWE64_SetVoiceControls"));
-        if(!registerMidi_||!registerPCM_||!startGuest_||!requestStop_||!ready_||!sends_||!guestClockPcm_||!voiceControls_) {
+        registerClock_=reinterpret_cast<AWE64_RegisterClockFn>(GetProcAddress(module_,"AWE64_HostRegisterClock"));
+        clockFault_=reinterpret_cast<AWE64_GuestClockFaultFn>(GetProcAddress(module_,"AWE64_GuestClockFault"));
+        if(!registerMidi_||!registerPCM_||!startGuest_||!requestStop_||!ready_||!sends_||!guestClockPcm_||!voiceControls_||
+           (demandLead_&&(!registerClock_||!clockFault_))) {
             stop();return false;
         }
         try {
@@ -221,7 +234,11 @@ public:
             measurementStarted_=false;measuredBlocks_=depthTotal_=0;
             depthMin_=32768;depthMax_=midiDepthMax_=0;
             queues_=std::make_unique<rt::RealtimeQueues>();
-            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_);
+            if(demandLead_&&!authenticGuest_){stop();return false;}
+            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_,demandLead_!=0,voiceControls_,sends_);
+            if(demandLead_ && !adapter_->publishDemand(demandLead_-2*rt::GuestDemandClock::maxTickFrames)) {
+                stop();return false;
+            }
             // Original DOSBox-X sblaster.cpp forces SBT_NONE if opt_silent.
             // A sounding AWE64 must NEVER include the -silent flag.
             // -nogui and -nomenu suppress UI without disabling hardware.
@@ -285,6 +302,7 @@ public:
             guestClockPcm_(authenticGuest_?1u:0u);
             registerMidi_(adapter_.get(),&DosBoxHostAdapter::pullMidi);
             registerPCM_(adapter_.get(),&DosBoxHostAdapter::receivePCM);
+            if(demandLead_)registerClock_(adapter_.get(),&DosBoxHostAdapter::tickDecision);
             finished_.store(false,std::memory_order_release);
             guestExitCode_.store(-1,std::memory_order_release);
             worker_=std::thread([this]{workerMain();});
@@ -336,6 +354,7 @@ public:
         authenticGuest_=false;lastSends_=0x10000u;
         if(registerMidi_)registerMidi_(nullptr,nullptr);
         if(registerPCM_)registerPCM_(nullptr,nullptr);
+        if(registerClock_)registerClock_(nullptr,nullptr);
         adapter_.reset();
         queues_.reset();
         if(module_) {
@@ -354,6 +373,7 @@ public:
         module_=nullptr;
         registerMidi_=nullptr;registerPCM_=nullptr;
         startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;sends_=nullptr;guestClockPcm_=nullptr;voiceControls_=nullptr;
+        registerClock_=nullptr;clockFault_=nullptr;demandLead_=0;
         argvStorage_.clear();
         if(!stagedDirectory_.empty()) {
             std::error_code ec;std::filesystem::remove_all(stagedDirectory_,ec);
@@ -362,10 +382,11 @@ public:
         running_.store(false,std::memory_order_release);
     }
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
-        if(!ready_||!ready_())return false;
+        if(!ready_||!ready_()||(clockFault_&&clockFault_()))return false;
         if(!authenticGuest_||pcmPrimed_)return true;
         // One initial prefill: 8.7 ms at native rate, or one larger block.
-        const auto target=std::max<std::size_t>(384,std::min<std::size_t>(hostBlock,8192)+128);
+        const auto target=demandLead_?static_cast<std::size_t>(demandLead_-2*rt::GuestDemandClock::maxTickFrames):
+            std::max<std::size_t>(384,std::min<std::size_t>(hostBlock,8192)+128);
         if(!queues_||queues_->snapshot().audioFrames<target)return false;
         pcmPrimed_=true;
         return true;
@@ -374,7 +395,7 @@ public:
         return running_.load(std::memory_order_acquire);
     }
     [[nodiscard]] bool finished() const noexcept {
-        return finished_.load(std::memory_order_acquire);
+        return finished_.load(std::memory_order_acquire)||(clockFault_&&clockFault_());
     }
     [[nodiscard]] int guestExitCode() const noexcept {
         return guestExitCode_.load(std::memory_order_acquire);
@@ -390,6 +411,34 @@ public:
             sends_(packed);lastSends_=packed;
         }
     }
+    [[nodiscard]] bool clocked() const noexcept {return demandLead_!=0;}
+    [[nodiscard]] unsigned demandLead() const noexcept {return demandLead_;}
+    [[nodiscard]] std::uint64_t guestFrames() const noexcept {return adapter_?adapter_->guestFrames():0;}
+    [[nodiscard]] bool publishDemand(std::uint64_t horizon) noexcept {
+        return adapter_&&adapter_->publishDemand(horizon);
+    }
+    [[nodiscard]] bool submitTimed(rt::MidiBlockBatch& batch,const rt::MidiTimeline& timeline) noexcept {
+        if(!demandLead_||!queues_)return false;
+        if(performanceStats_&&!measurementStarted_&&batch.hasNoteOn()) {
+            measurementStart_=measurementEnd_=queues_->snapshot();
+            measurementStarted_=true;
+        }
+        return batch.submit(timeline,*queues_);
+    }
+    void requestMidiRecovery() noexcept {if(queues_)queues_->requestMidiRecovery();}
+    std::size_t audioFramesAvailable() const noexcept {return queues_?queues_->snapshot().audioFrames:0;}
+    bool waitForAudio(std::size_t frames,bool offline) noexcept {
+        if(audioFramesAvailable()>=frames)return true;
+        if(!offline)return false; // NEVER wait on realtime path
+        const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(2);
+        while(!finished()&&std::chrono::steady_clock::now()<until) {
+            if(audioFramesAvailable()>=frames)return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        return false;
+    }
+    [[nodiscard]] std::uint64_t midiRecoveryEpoch() const noexcept {return queues_?queues_->midiRecoveryEpoch():0;}
+    [[nodiscard]] bool midiRecoveryPending() const noexcept {return queues_&&queues_->midiRecoveryPending();}
     bool sendMidi(const rt::MidiEvent& e) noexcept {
         if(!queues_)return false;
         if(performanceStats_&&!measurementStarted_&&(e.status&0xf0u)==0x90u&&e.data2) {

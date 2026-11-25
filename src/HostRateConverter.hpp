@@ -51,6 +51,12 @@ public:
         history_.fill({0.f,0.f});newest_=0;remainder_=0;primed_=false;
     }
     bool bypass() const noexcept{return rate_==inputRate;}
+    std::size_t requiredInputFrames(std::size_t count) const noexcept {
+        if(bypass()||!count)return count;
+        // render() pulls one initial sample and one per native phase wrap,
+        // including the wrap following the last output sample.
+        return (primed_?0u:1u)+static_cast<std::size_t>((std::uint64_t(remainder_)+std::uint64_t(count)*inputRate)/rate_);
+    }
     unsigned latencySamples() const noexcept {
         return bypass()?0u:(delayInputSamples*rate_+inputRate-1)/inputRate;
     }
