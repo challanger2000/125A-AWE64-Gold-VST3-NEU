@@ -73,7 +73,11 @@ class DosBoxPatchTests(unittest.TestCase):
         with self.assertRaises(ValueError):patch.patch_mpu(r)
     def test_guest_entry(self):
         s='void GFX_Events() {}\n| SDL_WINDOW_SHOWN | (SDL2_resize_enable ? SDL_WINDOW_RESIZABLE : 0)\nint main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {}\n            DOSBOX_RunMachine();\n        } catch (int x) {'
+        s+='\n'+"        SetConsoleCtrlHandler((PHANDLER_ROUTINE) ConsoleEventHandler,TRUE);"+'\n'+"        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) >= 0) {"+'\n'+"            LOG(LOG_GUI,LOG_WARN)(\"Failed to init joystick support\");\n            sdl.num_joysticks = 0;\n        }"
         r=patch.patch_main(s)
+        self.assertIn('#ifndef AWE64_VST3_RUNTIME\n'+"        SetConsoleCtrlHandler((PHANDLER_ROUTINE) ConsoleEventHandler,TRUE);"+'\n#endif',r)
+        self.assertIn('#ifdef AWE64_VST3_RUNTIME\n        sdl.num_joysticks = 0;\n#else\n'+"        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) >= 0) {",r)
+        self.assertIn("            LOG(LOG_GUI,LOG_WARN)(\"Failed to init joystick support\");\n            sdl.num_joysticks = 0;\n        }"+'\n#endif',r)
         self.assertIn('AWE64_StartGuest(',r)
         self.assertIn('return main(argc,argv);',r)
         self.assertIn('AWE64_RequestStop',r)

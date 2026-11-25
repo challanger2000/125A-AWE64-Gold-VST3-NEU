@@ -441,6 +441,22 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
 #ifdef AWE64_VST3_RUNTIME
     if(awe64_guest_can_stop && awe64_guest_stop.load(std::memory_order_acquire))throw(0);
 #endif''')
+    # Standalone DOSBox owns these process-level facilities. An embedded
+    # instrument must not register a process console shutdown handler
+    # (which raises SIGTERM), or detect physical game controllers through
+    # SDL's shared Win32 notification-window class "Message".
+    # Keep the original standalone paths; don't change guest hardware/DSP.
+    s=once(s,'        SetConsoleCtrlHandler((PHANDLER_ROUTINE) ConsoleEventHandler,TRUE);',r'''#ifndef AWE64_VST3_RUNTIME
+        SetConsoleCtrlHandler((PHANDLER_ROUTINE) ConsoleEventHandler,TRUE);
+#endif''')
+    s=once(s,'        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) >= 0) {',r'''#ifdef AWE64_VST3_RUNTIME
+        sdl.num_joysticks = 0;
+#else
+        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) >= 0) {''')
+    s=once(s,"            LOG(LOG_GUI,LOG_WARN)(\"Failed to init joystick support\");\n            sdl.num_joysticks = 0;\n        }",r'''            LOG(LOG_GUI,LOG_WARN)("Failed to init joystick support");
+            sdl.num_joysticks = 0;
+        }
+#endif''')
     # Defer even a stop requested BEFORE main() until original init is
     # complete and the existing kill-switch handler can perform cleanup.
     run='            DOSBOX_RunMachine();\n        } catch (int x) {'
