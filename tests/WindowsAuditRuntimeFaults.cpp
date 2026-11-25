@@ -197,10 +197,11 @@ int main(int argc,char** argv){
     data.numSamples=512;data.numOutputs=1;data.outputs=&output;
     MidiNoteHostEvents event;data.inputEvents=&event;
     unsigned unexpected=0,nonfinite=0;
+    S::tresult lastResult=S::kResultOk;
     auto block=[&](bool note=false,V::IParameterChanges* changes=nullptr){
         event.setEnabled(note);data.inputParameterChanges=changes;
         left.fill(123.f);right.fill(123.f);output.silenceFlags=0;
-        const auto result=processor->process(data);if(result!=S::kResultOk)++unexpected;
+        lastResult=processor->process(data);if(lastResult!=S::kResultOk)++unexpected;
         float peak=0;
         for(unsigned k=0;k<512;++k){if(!std::isfinite(left[k])||!std::isfinite(right[k])||std::abs(left[k])>1.01f||std::abs(right[k])>1.01f)++nonfinite;peak=std::max({peak,std::abs(left[k]),std::abs(right[k])});}
         return peak;
@@ -215,11 +216,13 @@ int main(int argc,char** argv){
     if(mode=="early"){
         // Exactly one note, in the first process callback after activation.
         const auto first=block(true);
+        const auto firstResult=lastResult;
         const auto early=std::max(first,pump(220));
         const auto late= pump(70,true);
         std::cout<<"EARLY_NOTE_PEAK="<<early<<" LATE_NOTE_PEAK="<<late<<" PROCESS_ERRORS="<<unexpected<<std::endl;
         if(early<.01f&&late<.01f)return fail("neither early nor late note reached synthetic guest");
-        verdict("AUDIT_A09_EARLY_NOTE",early>=.01f||unexpected!=0);
+        std::cout<<"EARLY_NOTE_FIRST_RESULT="<<firstResult<<std::endl;
+        verdict("AUDIT_A09_EARLY_NOTE",early>=.01f&&firstResult==S::kResultOk);
     }else{
         (void)pump(180); // boot warm-up, independently measure post-boot idle
         const float idle=pump(20);

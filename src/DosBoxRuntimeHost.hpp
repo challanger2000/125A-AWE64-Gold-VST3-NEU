@@ -59,6 +59,29 @@ class DosBoxRuntimeHost final {
     rt::RealtimeQueues::Snapshot measurementStart_{},measurementEnd_{};
     std::uint64_t measuredBlocks_=0,depthTotal_=0;
     std::size_t depthMin_=32768,depthMax_=0,midiDepthMax_=0;
+    // Producer-only journal of dropped persistent controller values. Do not
+    // resurrect sustain or notes after a fail-safe recovery.
+    std::array<rt::MidiEvent,128> lostControllers_{};
+    bool haveLostControllers_=false;
+    static int persistentControllerSlot(const rt::MidiEvent& e) noexcept {
+        if(e.command!=rt::GuestCommand::Midi||e.data1>127||e.data2>127)return -1;
+        unsigned index=0;
+        switch(e.status&0xf0u){
+            case 0xb0: switch(e.data1){
+                case 1:index=0;break;case 7:index=1;break;case 10:index=2;break;
+                case 11:index=3;break;case 91:index=4;break;case 93:index=5;break;
+                default:return -1;
+            }break;
+            case 0xd0:index=6;break;
+            case 0xe0:index=7;break;
+            default:return -1;
+        }
+        return int((e.status&15u)*8+index);
+    }
+    void rememberLost(const rt::MidiEvent& e) noexcept {
+        const int slot=persistentControllerSlot(e);
+        if(slot>=0){lostControllers_[static_cast<unsigned>(slot)]=e;haveLostControllers_=true;}
+    }
     std::unique_ptr<rt::RealtimeQueues> queues_;
     std::unique_ptr<DosBoxHostAdapter> adapter_;
     std::thread worker_;
@@ -152,7 +175,8 @@ public:
 
     bool begin(const std::filesystem::path& binary,
                const std::filesystem::path& privateDir,
-               const std::string& externalBank={},unsigned demandLead=0) {
+               const std::string& externalBank={},unsigned demandLead=0,
+               const std::vector<std::uint8_t>* validatedBank=nullptr) {
         if(module_ || worker_.joinable())return false;
         if(demandLead && (demandLead<=2*rt::GuestDemandClock::maxTickFrames ||
                          demandLead>=rt::GuestDemandClock::ringFrames/2))return false;
@@ -219,12 +243,12 @@ public:
             if(!externalBank.empty()) {
                 std::vector<std::uint8_t> bytes;
                 bool adapted=false;
-                if(!awe64::guest::readExternalSf2(std::filesystem::u8path(externalBank),bytes,adapted)) {
+                if(!validatedBank&&!awe64::guest::readExternalSf2(std::filesystem::u8path(externalBank),bytes,adapted)) {
                     stop();return false;
                 }
                 // Unique disposable directory, outside the installed bundle.
                 if(!makeStagingDirectory()){stop();return false;}
-                if(!awe64::guest::writeExternalSf2(stagedDirectory_/"BANK.SF2",bytes)){
+                if(!awe64::guest::writeExternalSf2(stagedDirectory_/"BANK.SF2",validatedBank?*validatedBank:bytes)){
                     stop();return false;
                 }
                 guestBank="D:\\BANK.SF2";
@@ -233,6 +257,7 @@ public:
             performanceStats_=perf&&std::strcmp(perf,"1")==0;
             measurementStarted_=false;measuredBlocks_=depthTotal_=0;
             depthMin_=32768;depthMax_=midiDepthMax_=0;
+            lostControllers_.fill({});haveLostControllers_=false;
             queues_=std::make_unique<rt::RealtimeQueues>();
             if(demandLead_&&!authenticGuest_){stop();return false;}
             adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_,demandLead_!=0,voiceControls_,sends_);
@@ -447,7 +472,30 @@ public:
             measurementStart_=measurementEnd_=queues_->snapshot();
             measurementStarted_=true;
         }
-        return queues_->pushMidi(e);
+        // Legacy FIFO recovery drains accepted messages, then explicit
+        // note-off/panic. Replay only actually rejected persistent controls
+        // before the next admitted event, using its current timestamp.
+        if(!demandLead_){
+            if(queues_->midiRecoveryPending()){
+                rememberLost(e);
+                queues_->countRejectedMidi();
+                return false;
+            }
+            if((e.status&0xf0u)==0xb0&&e.data1==121){
+                const unsigned first=(e.status&15u)*8;
+                for(unsigned i=0;i<8;++i)lostControllers_[first+i]={};
+            }
+            if(haveLostControllers_)for(auto& lost:lostControllers_)if(lost.status){
+                auto replay=lost;replay.absoluteHostSample=e.absoluteHostSample;
+                replay.guestFrame=e.guestFrame;
+                if(!queues_->pushMidi(replay)){rememberLost(e);return false;}
+                lost={};
+            }
+            haveLostControllers_=false;
+        }
+        if(queues_->pushMidi(e))return true;
+        if(!demandLead_)rememberLost(e);
+        return false;
     }
     void measureQueueBeforeBlock() noexcept {
         if(!measurementStarted_||!queues_)return;

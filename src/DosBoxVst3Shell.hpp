@@ -9,6 +9,7 @@
 #include "RealtimeQueues.hpp"
 #include "HostRateConverter.hpp"
 #include "HostDemandSession.hpp"
+#include "MasterGainPlan.hpp"
 #include <memory>
 #include <atomic>
 #include <array>
@@ -38,6 +39,7 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::uint8_t lastReverbType_=4,lastChorusType_=2;
     rt::HostRateConverter rateConverter_{};
     rt::HostDemandSession hostDemand_{};
+    rt::MasterGainPlan legacyMaster_{};
     // Experimental clock path only; native acceptance required before default.
     bool demandRequested_=false;
     std::atomic<unsigned> latencySamples_{0};
@@ -49,13 +51,16 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::mutex selectionMutex_;
     AWE125::PresetCatalog startedCatalog_{};
     std::uint64_t displayedRevision_=0;
-    bool startRuntimeLocked(const std::string&);
+    bool startRuntimeLocked(const std::string&, const std::vector<std::uint8_t>* = nullptr,
+                            AWE125::PresetCatalog* = nullptr);
+    std::vector<std::uint8_t> requestedBankBytes_; // protected by runtimeMutex_
     std::uint64_t refreshBrowserCatalog();
     void stopRuntimeLocked() noexcept;
     std::string requestedBank_;
     std::string startedBank_;
     std::atomic<std::uint64_t> catalogRevision_{1};
-    bool loadCatalog(const std::string&,AWE125::PresetCatalog&) const;
+    bool loadCatalog(const std::string&,AWE125::PresetCatalog&,
+                     const std::vector<std::uint8_t>* = nullptr) const;
     void publishCatalogLocked(AWE125::PresetCatalog&&);
     bool requestSoundFont(const std::string&,int expectedProgram=-1);
     std::string requestedSoundFont();

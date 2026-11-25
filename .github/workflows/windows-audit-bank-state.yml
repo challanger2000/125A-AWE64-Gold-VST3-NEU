@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/**'
+      - 'gui/PresetCatalog.h'
       - 'tests/WindowsAuditBankState.cpp'
       - '.github/workflows/windows-audit-bank-state.yml'
   workflow_dispatch:

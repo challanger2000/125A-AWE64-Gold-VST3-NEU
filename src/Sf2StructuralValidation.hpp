@@ -32,6 +32,32 @@ inline bool terminal(Chunk c,std::size_t stride,const char* name) noexcept {
         c.p[c.size-stride+1]==name[1] && c.p[c.size-stride+2]==name[2] &&
         c.p[c.size-stride+3]==0;
 }
+// SF2 instrument-zone address generators: a local generator supersedes
+// the same operator in the instrument global zone; fine and coarse offsets
+// combine. Signed arithmetic prevents underflow/wrap at zero.
+struct SampleAddress {
+    std::array<std::int64_t,9> value{};
+    std::bitset<9> present{};
+    void generator(unsigned op,unsigned raw) noexcept {
+        constexpr unsigned ops[]{0,1,2,3,4,12,45,50,54};
+        for(unsigned i=0;i<9;++i)if(ops[i]==op){
+            value[i]=raw>=32768?std::int64_t(raw)-65536:raw;
+            present.set(i);return;
+        }
+    }
+    bool validRam(const std::uint8_t* s,std::size_t words,const SampleAddress& global) const noexcept {
+        auto v=[&](unsigned i){return present.test(i)?value[i]:global.value[i];};
+        const std::int64_t a=std::int64_t(le32(s+20))+v(0)+32768*v(4);
+        const std::int64_t b=std::int64_t(le32(s+24))+v(1)+32768*v(5);
+        const std::int64_t c=std::int64_t(le32(s+28))+v(2)+32768*v(6);
+        const std::int64_t d=std::int64_t(le32(s+32))+v(3)+32768*v(7);
+        if(a<0||a>=b||b>std::int64_t(words))return false;
+        const auto mode=static_cast<unsigned>(v(8))&3u;
+        if(mode==1||mode==3||v(2)||v(3)||v(6)||v(7))
+            return a<=c&&c<d&&d<=b;
+        return true;
+    }
+};
 // The final header references the terminal bag, the final bag references
 // terminal generator/modulator records. No index may reference a terminal
 // instrument/sample as a real sound. Permit legacy generator ordering and
@@ -39,7 +65,7 @@ inline bool terminal(Chunk c,std::size_t stride,const char* name) noexcept {
 inline bool hierarchy(Chunk headers,std::size_t stride,std::size_t offset,
                       Chunk bags,Chunk gens,Chunk mods,unsigned linkOp,
                       std::size_t targetCount, const std::bitset<65536>* required,
-                      std::bitset<65536>* referenced, Chunk sampleHeaders={}) noexcept {
+                      std::bitset<65536>* referenced, Chunk sampleHeaders={},std::size_t sampleWords=0) noexcept {
     const auto hc=headers.size/stride,bc=bags.size/4,
         gc=gens.size/4,mc=mods.size/10;
     if(hc<2||bc<2||gc<2||mc<1||targetCount<2||
@@ -59,12 +85,16 @@ inline bool hierarchy(Chunk headers,std::size_t stride,std::size_t offset,
             last=le16(headers.p+(h+1)*stride+offset);
         if(first>last||last>=bc)return false;
         bool linked=false;
+        SampleAddress globalAddress{};
         for(std::size_t b=first;b<last;++b) {
             const auto g=le16(bags.p+b*4),gEnd=le16(bags.p+(b+1)*4);
             unsigned links=0;
             unsigned firstTarget=0;
+            SampleAddress address{};
             for(std::size_t i=g;i<gEnd;++i) {
-                if(le16(gens.p+4*i)!=linkOp)continue;
+                const auto op=le16(gens.p+4*i);
+                if(sampleHeaders.p)address.generator(op,le16(gens.p+4*i+2));
+                if(op!=linkOp)continue;
                 const auto target=le16(gens.p+4*i+2);
                 if(target>=targetCount-1)return false;
                 // Creative SYNTHGM.SF2 has two sampleID generators in one
@@ -77,9 +107,16 @@ inline bool hierarchy(Chunk headers,std::size_t stride,std::size_t offset,
                 ++links;
                 if(referenced)referenced->set(target);
             }
-            if(links)linked=true;
+            if(links){
+                linked=true;
+                if(sampleHeaders.p){
+                    const auto* sh=sampleHeaders.p+46u*firstTarget;
+                    if(!(le16(sh+44)&0x8000u)&&!address.validRam(sh,sampleWords,globalAddress))return false;
+                }
+            }
             // Only the first zone can be global (no instrument/sample ID).
             else if(b!=first)return false;
+            else globalAddress=address;
         }
         // Some legacy banks retain unused empty instruments. They are
         // safe to keep only if no preset refers to them.
@@ -120,7 +157,7 @@ inline bool validateSf2Structure(const std::vector<std::uint8_t>& bytes) noexcep
     if(!terminal(phdr,38,"EOP")||!terminal(inst,22,"EOI")||!terminal(shdr,46,"EOS"))return false;
     std::bitset<65536> referencedInstruments;
     if(!hierarchy(phdr,38,24,pbag,pgen,pmod,41,inst.size/22,nullptr,&referencedInstruments)||
-       !hierarchy(inst,22,20,ibag,igen,imod,53,shdr.size/46,&referencedInstruments,nullptr,shdr))return false;
+       !hierarchy(inst,22,20,ibag,igen,imod,53,shdr.size/46,&referencedInstruments,nullptr,shdr,smpl.size/2))return false;
     const auto count=shdr.size/46;
     for(std::size_t i=0;i+1<count;++i) {
         const auto* s=shdr.p+46*i;
@@ -128,7 +165,13 @@ inline bool validateSf2Structure(const std::vector<std::uint8_t>& bytes) noexcep
         const auto type=le16(s+44); const auto kind=type&0x7fffu;
         if(kind!=1&&kind!=2&&kind!=4&&kind!=8)return false;
         if(start>=end||rate==0)return false;
-        if(!(type&0x8000u) && (!smpl.p||end>smpl.size/2))return false;
+        if(!(type&0x8000u)) {
+            if(!smpl.p||end>smpl.size/2)return false;
+            const auto loopStart=le32(s+28),loopEnd=le32(s+32);
+            // Legacy unlooped samples may have both loop points zero.
+            // Otherwise bounds are absolute sample indices, end exclusive.
+            if((loopStart||loopEnd)&&(loopStart<start||loopEnd>end||loopStart>=loopEnd))return false;
+        }
         if(kind!=1 && le16(s+42)>=count-1)return false;
     }
     return true;

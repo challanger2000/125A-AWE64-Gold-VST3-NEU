@@ -95,14 +95,15 @@ std::string DosBoxVst3Shell::soundFontStatus() {
         return "SF2 vorgemerkt: beim naechsten Aktivieren laden.";
     return {};
 }
-bool DosBoxVst3Shell::loadCatalog(const std::string& selected,AWE125::PresetCatalog& candidate) const {
+bool DosBoxVst3Shell::loadCatalog(const std::string& selected,AWE125::PresetCatalog& candidate,
+                                   const std::vector<std::uint8_t>* validatedBank) const {
     using Host=integration::DosBoxRuntimeHost;
     const auto binary=Host::pluginBinaryPath();
     const auto source=selected.empty()?(Host::privateAssetsDir(binary)/"SYNTHGM.SF2"):std::filesystem::u8path(selected);
     const auto utf8=source.u8string();
     const std::string path(reinterpret_cast<const char*>(utf8.data()),utf8.size());
     std::string error;
-    if(candidate.LoadSoundFont(path,error))candidate.KeepMidiBankZero();
+    if(validatedBank?candidate.LoadSoundFontBytes(*validatedBank,error):candidate.LoadSoundFont(path,error))candidate.KeepMidiBankZero();
     else if(selected.empty())candidate.SetOriginalCreativeMidiNumbers(); // no real names claimed for synthetic fixture
     return !candidate.Entries().empty();
 }
@@ -123,25 +124,20 @@ void DosBoxVst3Shell::publishCatalogLocked(AWE125::PresetCatalog&& candidate) {
 bool DosBoxVst3Shell::requestSoundFont(const std::string& path,int expectedProgram) {
     try {
         if(path.size()>32768 || path.find('\0')!=std::string::npos)return false;
-        if(!path.empty()) {
-            std::vector<std::uint8_t> bytes;bool adapted=false;
-            if(!guest::readExternalSf2(std::filesystem::u8path(path),bytes,adapted))return false;
-        }
+        std::vector<std::uint8_t> bytes;bool adapted=false;
+        if(!path.empty()&&!guest::readExternalSf2(std::filesystem::u8path(path),bytes,adapted))return false;
         AWE125::PresetCatalog candidate;
-        if(!loadCatalog(path,candidate))return false;
+        if(!loadCatalog(path,candidate,path.empty()?nullptr:&bytes))return false;
         if(expectedProgram>=0 && (expectedProgram>127||!candidate.Find(0,static_cast<std::uint8_t>(expectedProgram))))return false;
         std::lock_guard<std::mutex> lifecycle(runtimeMutex_);
         const auto previous=requestedSoundFont();
-        if(previous==path && (!runtime_||!runtime_->finished()))return true;
+        if(previous==path&&bytes==requestedBankBytes_&&(!runtime_||!runtime_->finished()))return true;
         if(runtime_) {
-            // Restart only this component's original DOSBox guest with
-            // the new bank. Never call DOSBox on the real-time callback.
-            stopRuntimeLocked();
-            if(!startRuntimeLocked(path)) {
-                (void)startRuntimeLocked(previous);
-                return false;
-            }
+            // Keep the old guest alive until the new engine has passed all
+            // synchronous creation/staging steps; never destroy it on failure.
+            if(!startRuntimeLocked(path,path.empty()?nullptr:&bytes,&candidate))return false;
         } else publishCatalogLocked(std::move(candidate));
+        requestedBankBytes_.swap(bytes);
         {
             std::lock_guard<std::mutex> lock(selectionMutex_);
             requestedBank_=path;
@@ -170,18 +166,35 @@ void DosBoxVst3Shell::stopRuntimeLocked() noexcept {
     hostDemand_.reset();
     guestStatus_.store(0,std::memory_order_release);
 }
-bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected) {
+bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected,
+                                        const std::vector<std::uint8_t>* validatedBank,
+                                        AWE125::PresetCatalog* preparedCatalog) {
     try {
         auto engine=std::make_unique<integration::DosBoxRuntimeHost>();
         const auto ownBinary=engine->pluginBinaryPath();
         const auto privateDir=integration::DosBoxRuntimeHost::privateAssetsDir(ownBinary);
+        std::vector<std::uint8_t> bytes;
+        bool adapted=false;
+        if(!selected.empty()&&!validatedBank) {
+            if(!guest::readExternalSf2(std::filesystem::u8path(selected),bytes,adapted))return false;
+            validatedBank=&bytes;
+        }
         AWE125::PresetCatalog candidate;
-        if(!loadCatalog(selected,candidate)||ownBinary.empty()||!engine->begin(ownBinary,privateDir,selected,demandRequested_?hostDemand_.lead():0u)) {
-            guestStatus_.store(-1,std::memory_order_release);
+        if(preparedCatalog)candidate=std::move(*preparedCatalog);
+        else if(!loadCatalog(selected,candidate,validatedBank))return false;
+        if(ownBinary.empty()||!engine->begin(ownBinary,privateDir,selected,
+                demandRequested_?hostDemand_.lead():0u,validatedBank)) {
+            if(!runtime_)guestStatus_.store(-1,std::memory_order_release);
             return false;
         }
+        // begin() only proves synchronous creation, not asynchronous guest boot.
+        // Keep the former runtime until this point; preserve its status on failure.
+        const bool wasProcessing=timedProcessing_.load(std::memory_order_acquire);
+        if(runtime_)stopRuntimeLocked();
         if(engine->clocked()&&!hostDemand_.activate()){engine->stop();return false;}
         runtime_=std::move(engine);
+        if(!preparedCatalog)requestedBankBytes_.swap(bytes);
+        timedProcessing_.store(wasProcessing,std::memory_order_release);
         demandActive_.store(runtime_->clocked(),std::memory_order_release);
         publishCatalogLocked(std::move(candidate));
         {
@@ -195,8 +208,7 @@ bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected) {
         lastReverbType_=4;lastChorusType_=2;
         return true;
     } catch (...) {
-        stopRuntimeLocked();
-        guestStatus_.store(-1,std::memory_order_release);
+        if(!runtime_)guestStatus_.store(-1,std::memory_order_release);
         return false;
     }
 }
@@ -243,43 +255,67 @@ tresult PLUGIN_API DosBoxVst3Shell::setupProcessing(ProcessSetup& setup) {
 tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     // No DOSBox/Creative emulator on the DAW realtime callback.
     // Only bounded SPSC MIDI enqueue and actual original mixer PCM dequeue.
+    auto silence=[&]() noexcept {
+        if(data.symbolicSampleSize!=kSample32||!data.outputs||data.numOutputs<1||!data.outputs[0].channelBuffers32)return;
+        auto& out=data.outputs[0];
+        for(int32 ch=0;ch<std::min<int32>(out.numChannels,2);++ch)
+            if(out.channelBuffers32[ch]&&data.numSamples>0)
+                std::fill_n(out.channelBuffers32[ch],data.numSamples,0.f);
+        out.silenceFlags=out.numChannels>=2?3:1;
+    };
+    if(data.symbolicSampleSize!=kSample32||data.numSamples<0)return kResultFalse;
     std::unique_lock<std::mutex> lifecycle(runtimeMutex_,std::try_to_lock);
     if(!lifecycle.owns_lock()||!runtime_) {
-        // During a non-RT guest restart the DAW receives bounded silence.
-        if(data.outputs&&data.numOutputs>0&&data.outputs[0].channelBuffers32) {
-            auto& out=data.outputs[0];
-            for(int32 ch=0;ch<out.numChannels;++ch)
-                if(out.channelBuffers32[ch]&&data.numSamples>0)
-                    std::fill_n(out.channelBuffers32[ch],data.numSamples,0.f);
-            out.silenceFlags=out.numChannels>=2?3:1;
-        }
-        return kResultOk;
+        silence();
+        // Do not acknowledge lost musical events during a lifecycle transition.
+        return data.inputEvents&&data.inputEvents->getEventCount()>0?kResultFalse:kResultOk;
     }
     auto& engine=*runtime_;
     if(engine.clocked())return processTimed(data,engine);
     if(engine.finished()) {
         guestStatus_.store(-2,std::memory_order_release);
+        silence();
         return kResultFalse; // original DOS guest exited; no fake playback
     }
     const bool ready=engine.ready(data.numSamples>0?static_cast<std::size_t>(data.numSamples):0u);
     if(ready)guestStatus_.store(2,std::memory_order_release);
+    if(data.numSamples>0&&(!data.outputs||data.numOutputs!=1||data.outputs[0].numChannels!=2||
+       !data.outputs[0].channelBuffers32||!data.outputs[0].channelBuffers32[0]||!data.outputs[0].channelBuffers32[1])){
+        silence();return kResultFalse;
+    }
+    bool accepted=true;
+    legacyMaster_.begin(data.numSamples,master_.load(std::memory_order_acquire));
+    // Validate/count all incoming points before consuming any. Bounded work,
+    // including invalid host-supplied counts and nonfinite master values.
+    unsigned total=0;
+    if(data.inputParameterChanges){
+        const auto count=data.inputParameterChanges->getParameterCount();
+        if(count<0||count>4096){silence();return kResultFalse;}
+        for(int32 i=0;i<count;++i){
+            auto* q=data.inputParameterChanges->getParameterData(i);
+            if(!q||q->getPointCount()<0||static_cast<unsigned>(q->getPointCount())>4096-total){
+                silence();return kResultFalse;
+            }
+            total+=static_cast<unsigned>(q->getPointCount());
+            if(q->getParameterId()==kMaster)for(int32 j=0;j<q->getPointCount();++j){
+                int32 offset=0;ParamValue value=0.;
+                if(q->getPoint(j,offset,value)!=kResultOk||!legacyMaster_.add(offset,value)){
+                    silence();return kResultFalse;
+                }
+            }
+        }
+    }
+    if(data.inputEvents&&(data.inputEvents->getEventCount()<0||
+        static_cast<unsigned>(data.inputEvents->getEventCount())>4096-total)){
+        engine.requestMidiRecovery();silence();return kResultFalse;
+    }
+    master_.store(legacyMaster_.last(),std::memory_order_release);
 
     if(data.inputParameterChanges) {
         for(int32 i=0;i<data.inputParameterChanges->getParameterCount();++i) {
             auto* q=data.inputParameterChanges->getParameterData(i);
             if(!q || q->getPointCount()<1)continue;
-            if(q->getParameterId()>=rt::midiControllerBase) {
-                // Preserve every mapped controller change in this block.
-                for(int32 n=0;n<q->getPointCount();++n) {
-                    int32 offset=0;ParamValue v=0.;rt::MidiEvent midi{};
-                    if(ready&&q->getPoint(n,offset,v)==kResultOk &&
-                       rt::makeMappedController(q->getParameterId(),v,
-                           absoluteSamplePosition_+static_cast<std::uint64_t>(
-                               std::clamp(offset,0,data.numSamples)),midi))
-                        (void)engine.sendMidi(midi);
-                }
-                continue;
-            }
+            if(q->getParameterId()>=rt::midiControllerBase||q->getParameterId()==kMaster)continue;
             int32 offset=0;ParamValue normalized=0.;
             if(q->getPoint(q->getPointCount()-1,offset,normalized)!=kResultOk)
                 continue;
@@ -293,10 +329,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
                     break;
                 }
                 case kBank:break; // only physical bank zero is currently proven
-                case kMaster:
-                    master_.store(static_cast<float>(value),std::memory_order_release);
-                    break;
-                case kReverbSend:reverbSend_.store(static_cast<std::uint8_t>(std::lround(value*255.)),std::memory_order_release);break;
+                 case kReverbSend:reverbSend_.store(static_cast<std::uint8_t>(std::lround(value*255.)),std::memory_order_release);break;
                 case kChorusSend:chorusSend_.store(static_cast<std::uint8_t>(std::lround(value*255.)),std::memory_order_release);break;
                 case kReverbType:reverbType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);break;
                 case kChorusType:chorusType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);break;
@@ -307,7 +340,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
             }
         }
     }
-    if(ready) {
+    {
         std::uint64_t lo=0;
         for(unsigned i=0;i<8;++i)lo|=std::uint64_t(voiceControls_[i].load(std::memory_order_acquire))<<(i*8);
         const unsigned hi=voiceControls_[8].load(std::memory_order_acquire)|(unsigned(voiceControls_[9].load(std::memory_order_acquire))<<8);
@@ -315,53 +348,73 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     }
     const auto bank=bank_.load(std::memory_order_acquire);
     const auto program=program_.load(std::memory_order_acquire);
-    if(ready&&(!initialProgramSent_||lastBank_!=bank||lastProgram_!=program)) {
+    // The patched MPU pump waits for the original guest UART handshake.
+    // Queue setup and notes even while PCM is still priming.
+    if(!initialProgramSent_||lastBank_!=bank||lastProgram_!=program) {
         // The original Creative DOS demo uses CC0 (BANK MSB), not CC32
         // (BANK LSB), to select an AWE SF2 bank. Keep MIDI routed through
         // the original MPU-401, never synthesize or write EMU registers here.
-        bool accepted=true;
+        bool setupAccepted=true;
         if(!initialProgramSent_||lastBank_!=bank)
-            accepted=engine.sendMidi(
-                rt::makeCreativeBankSelect(absoluteSamplePosition_,bank))&&accepted;
-        accepted=engine.sendMidi(
-            rt::makeCreativeProgramChange(absoluteSamplePosition_,program))&&accepted;
-        if(accepted) {
-            initialProgramSent_=true;lastBank_=bank;lastProgram_=program;
-        }
+            setupAccepted=engine.sendMidi(rt::makeCreativeBankSelect(absoluteSamplePosition_,bank));
+        setupAccepted=engine.sendMidi(rt::makeCreativeProgramChange(absoluteSamplePosition_,program))&&setupAccepted;
+        if(setupAccepted){initialProgramSent_=true;lastBank_=bank;lastProgram_=program;}
+        accepted=setupAccepted&&accepted;
     }
-    if(ready)engine.setAbsoluteSends(reverbSend_.load(std::memory_order_acquire),chorusSend_.load(std::memory_order_acquire));
+    engine.setAbsoluteSends(reverbSend_.load(std::memory_order_acquire),chorusSend_.load(std::memory_order_acquire));
     const auto reverb=reverbType_.load(std::memory_order_acquire);
     const auto chorus=chorusType_.load(std::memory_order_acquire);
-    if(ready&&reverb!=lastReverbType_&&engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,false,reverb)))
-        lastReverbType_=reverb;
-    if(ready&&chorus!=lastChorusType_&&engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,true,chorus)))
-        lastChorusType_=chorus;
-    if(ready&&data.inputEvents){
+    if(reverb!=lastReverbType_){
+        if(engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,false,reverb)))lastReverbType_=reverb;
+        else accepted=false;
+    }
+    if(chorus!=lastChorusType_){
+        if(engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,true,chorus)))lastChorusType_=chorus;
+        else accepted=false;
+    }
+    if(data.inputParameterChanges)for(int32 i=0;i<data.inputParameterChanges->getParameterCount();++i){
+        auto* q=data.inputParameterChanges->getParameterData(i);
+        if(q->getParameterId()<rt::midiControllerBase)continue;
+        for(int32 n=0;n<q->getPointCount();++n){
+            int32 offset=0;ParamValue v=0.;rt::MidiEvent midi{};
+            if(q->getPoint(n,offset,v)!=kResultOk||offset<0||
+               (data.numSamples?offset>=data.numSamples:offset!=0)||
+               !rt::makeMappedController(q->getParameterId(),v,absoluteSamplePosition_+static_cast<std::uint64_t>(offset),midi)){
+                accepted=false;continue;
+            }
+            if(!engine.sendMidi(midi))accepted=false;
+        }
+    }
+    if(data.inputEvents){
         const int32 count=data.inputEvents->getEventCount();
         for(int32 i=0;i<count;++i){
             Event event{};
-            if(data.inputEvents->getEvent(i,event)!=kResultOk)continue;
+            if(data.inputEvents->getEvent(i,event)!=kResultOk){accepted=false;continue;}
             std::uint8_t status=0,note=0,velocity=0;
             int32 channel=0,offset=0,pitch=0;
             if(event.type==Event::kNoteOnEvent){
                 const auto& on=event.noteOn;
                 channel=on.channel;offset=event.sampleOffset;pitch=on.pitch;
                 status=0x90u;
+                if(!std::isfinite(on.velocity)){accepted=false;continue;}
                 velocity=static_cast<std::uint8_t>(std::lround(
                     std::clamp(double(on.velocity),0.,1.)*127.));
             } else if(event.type==Event::kNoteOffEvent){
                 const auto& off=event.noteOff;
                 channel=off.channel;offset=event.sampleOffset;pitch=off.pitch;
                 status=0x80u;
+                if(!std::isfinite(off.velocity)){accepted=false;continue;}
                 velocity=static_cast<std::uint8_t>(std::lround(
                     std::clamp(double(off.velocity),0.,1.)*127.));
             } else continue;
-            if(channel<0||channel>15||pitch<0||pitch>127)continue;
+            if(event.busIndex!=0||channel<0||channel>15||pitch<0||pitch>127||
+               offset<0||(data.numSamples?offset>=data.numSamples:offset!=0)){
+                accepted=false;continue;
+            }
             note=static_cast<std::uint8_t>(pitch);
             const auto when=absoluteSamplePosition_+
                 static_cast<std::uint64_t>(std::clamp(offset,0,data.numSamples));
-            (void)engine.sendMidi({when,static_cast<std::uint8_t>(status|channel),
-                                   note,velocity,3});
+            if(!engine.sendMidi({when,static_cast<std::uint8_t>(status|channel),note,velocity,3}))accepted=false;
         }
     }
     if(data.outputs&&data.numOutputs>0&&data.outputs[0].channelBuffers32&&
@@ -378,14 +431,16 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
                 rt::StereoFrame f{};engine.readAudio(&f.left,&f.right,1);return f;
             });
             engine.measureQueueAfterBlock();
-            const float gain=master_.load(std::memory_order_acquire);
-            for(int32 i=0;i<data.numSamples;i++){
-                left[i]*=gain;right[i]*=gain;
-            }
+            legacyMaster_.apply(left,right);
+            auto& out=data.outputs[0];
+            out.silenceFlags=0;
+            if(std::all_of(left,left+data.numSamples,[](float x){return x==0.f;}))out.silenceFlags|=1;
+            if(std::all_of(right,right+data.numSamples,[](float x){return x==0.f;}))out.silenceFlags|=2;
         }
     }
     if(data.numSamples>0)
         absoluteSamplePosition_+=static_cast<std::uint64_t>(data.numSamples);
+    if(!accepted){engine.requestMidiRecovery();return kResultFalse;}
     return kResultOk;
 }
 tresult DosBoxVst3Shell::processTimed(ProcessData& data,integration::DosBoxRuntimeHost& engine) {

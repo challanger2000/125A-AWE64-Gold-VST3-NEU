@@ -9,6 +9,7 @@
 #include <fstream>
 #include <limits>
 #include <span>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -51,6 +52,15 @@ public:
         namespace fs=std::filesystem;
         std::ifstream in(fs::u8path(path),std::ios::binary);
         if(!in) {error="Preset catalog: cannot open SF2";return false;}
+        return LoadSoundFontStream(in,error);
+    }
+    // Read the exact validated/staged bytes, not a second open of the path.
+    bool LoadSoundFontBytes(const std::vector<std::uint8_t>& bytes,std::string& error) {
+        std::istringstream in(std::string(reinterpret_cast<const char*>(bytes.data()),bytes.size()),std::ios::binary);
+        return LoadSoundFontStream(in,error);
+    }
+private:
+    bool LoadSoundFontStream(std::istream& in,std::string& error) {
         in.seekg(0,std::ios::end);
         const auto end=in.tellg();
         if(end<12) {error="Preset catalog: short RIFF";return false;}
@@ -150,6 +160,7 @@ public:
         error.clear();
         return true;
     }
+public:
     // Append the user's original GM ROM preset metadata; no waveform is copied.
     // Standard bank 0 remains available beneath a later overriding SF2.
     // Banks 16383/16382 are reserved for explicit original ROM GM/drums.
@@ -207,7 +218,7 @@ private:
     static bool equal3(const uint8_t* p,const char* literal) {
         return p[0]==literal[0]&&p[1]==literal[1]&&p[2]==literal[2];
     }
-    static bool readAt(std::ifstream& f,uint64_t offset,void* dest,size_t n) {
+    static bool readAt(std::istream& f,uint64_t offset,void* dest,size_t n) {
         if(offset>static_cast<uint64_t>(std::numeric_limits<std::streamoff>::max()))
             return false;
         f.clear();

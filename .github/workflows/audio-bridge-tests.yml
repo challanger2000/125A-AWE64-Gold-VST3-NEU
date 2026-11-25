@@ -3,9 +3,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'src/RealtimeQueues.hpp'
-      - 'src/CreativeMidiBankSelect.hpp'
-      - 'src/Sf2CreativeDosCompatibility.hpp'
+      - 'src/**'
+      - 'gui/PresetCatalog.h'
+      - '.gitignore'
+      - 'tools/audit_private_paths.py'
       - 'tests/**'
       - 'integration/DosBoxHostAdapter.hpp'
       - 'integration/AWE64_DOSBOX_ABI.h'

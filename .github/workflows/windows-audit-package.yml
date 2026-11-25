@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
     paths:
+      - '.gitignore'
+      - 'tools/prepare_private_vst3.py'
       - 'tools/audit_private_paths.py'
       - '.github/workflows/windows-audit-package.yml'
   workflow_dispatch:

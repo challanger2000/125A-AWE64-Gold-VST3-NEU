@@ -102,6 +102,10 @@ public:
         midiRecovery_.store(true,std::memory_order_release);
         return false;
     }
+    // Producer-only rejection while a recovery is already in progress.
+    // Do not tryPush after observing pending: the consumer may ACK between
+    // that observation and push, bypassing the caller's pending CC replay.
+    void countRejectedMidi() noexcept {midiDrops_.fetch_add(1,std::memory_order_relaxed);}
     // Producer only: a rejected host batch must also initiate recovery.
     void requestMidiRecovery() noexcept {
         midiRecovery_.store(true,std::memory_order_release);

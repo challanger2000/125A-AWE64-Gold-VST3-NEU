@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/DosBoxRuntimeHost.hpp'
+      - 'src/RealtimeQueues.hpp'
+      - 'integration/DosBoxHostAdapter.hpp'
       - 'tools/audit-native-runtime/**'
       - '.github/workflows/windows-audit-runtime-shim.yml'
   workflow_dispatch:

@@ -70,11 +70,18 @@ def assemble(source: Path, assets: Path, destination: Path) -> Path:
     # Privacy fence: only our gitignored PRIVATE directory may receive
     # the licensed original Creative ROM / bank / executable.
     repository=Path(__file__).resolve().parents[1]
-    private=(repository/"PRIVATE").resolve()
-    output=destination.absolute()
-    if not output.is_relative_to(private):
+    private=repository/"PRIVATE"
+    # Refuse a redirected PRIVATE root (including Windows junctions).
+    if private.resolve()!=private:
+        raise ValueError("Private root must not be redirected")
+    output=destination.resolve()
+    if output==private or not output.is_relative_to(private):
         raise ValueError("Private output must stay below the gitignored /PRIVATE directory")
     output.parent.mkdir(parents=True,exist_ok=True)
+    if private.resolve()!=private or output.parent.resolve()!=output.parent:
+        raise ValueError("Private output parent redirected")
+    if output.exists():
+        raise FileExistsError("Refuse to overwrite an existing private candidate")
     work=Path(tempfile.mkdtemp(prefix=".awe64_private_",dir=output.parent))
     try:
         candidate=work/source.name
@@ -84,6 +91,10 @@ def assemble(source: Path, assets: Path, destination: Path) -> Path:
         for name,spec in REQUIRED.items():
             shutil.copy2(assets/name,private_inside/name)
             verify(private_inside/name,spec)
+        if private.resolve()!=private or output.parent.resolve()!=output.parent:
+            raise ValueError("Private output parent redirected during staging")
+        if output.exists():
+            raise FileExistsError("Refuse to overwrite an existing private candidate")
         candidate.rename(output)
     finally:
         shutil.rmtree(work,ignore_errors=True)

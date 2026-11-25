@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/**'
+      - 'gui/PresetCatalog.h'
       - 'tests/WindowsAuditRuntimeFaults.cpp'
       - '.github/workflows/windows-audit-runtime-faults.yml'
   workflow_dispatch:

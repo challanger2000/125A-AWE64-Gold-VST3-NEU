@@ -20,3 +20,9 @@ awe32.raw
 *.iso
 /PRIVATE/
 /private-assets/
+
+# All local build trees and nested private resources (Windows/Linux).
+/build-*/
+PRIVATE/
+DEMO.EXE
+SYNTHGM.SF2

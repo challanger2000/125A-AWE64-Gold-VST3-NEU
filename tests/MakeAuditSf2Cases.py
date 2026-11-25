@@ -86,3 +86,18 @@ write('accept_repeated_rom_sample',lambda l:repeated_sample(l,True))
 write('reject_conflicting_rom_sample',lambda l:repeated_sample(l,True,conflicting=True))
 write('reject_repeated_ram_sample',lambda l:repeated_sample(l,False))
 write('reject_terminal_rom_sample',lambda l:repeated_sample(l,True,terminal=True))
+
+write('reject_sample_loop_end_oob',lambda l:mutate(l[b'pdta'],b'shdr',32,'<I',0xffffffff))
+write('reject_sample_loop_start_oob',lambda l:mutate(l[b'pdta'],b'shdr',28,'<I',0xffffffff))
+write('reject_sample_reversed_loop',lambda l:mutate(l[b'pdta'],b'shdr',28,'<I',3950))
+
+# Independent signed generator-address counterexamples. Insert a fine or
+# coarse offset before sampleModes/sampleID, with corrected bag terminal.
+def with_address(l,op,amount):
+    pd=l[b'pdta'];data=dict(pd)[b'igen']
+    replace_chunk(pd,b'igen',gen(op,amount)+data)
+    replace_chunk(pd,b'ibag',struct.pack('<4H',0,0,3,0))
+write('reject_sample_start_offset',lambda l:with_address(l,0,-1))
+write('reject_sample_end_coarse_offset',lambda l:with_address(l,12,1))
+write('reject_sample_loop_offset',lambda l:with_address(l,2,4000))
+write('accept_sample_start_offset',lambda l:with_address(l,0,10))

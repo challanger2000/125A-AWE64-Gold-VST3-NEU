@@ -1,5 +1,19 @@
 # Änderungsverlauf
 
+## 25.11.2026 — Stabilisierung 1 ergänzt: Host-Master, frühe MIDI-Eingaben, CC-Recovery
+
+- A01: Master-Gain-Punkte im Defaultpfad linear im Host-Samplebereich anwenden, mit fester 4096-Punkte-Kapazität, Flush- und Grenztests. Nicht gleichbedeutend mit samplegenauer MPU/Overlay-Zeitplanung.
+- A09: MIDI-Setup und frühe Notes bereits in den FIFO einreihen, die vorhandene MPU-UART-Gate-Logik hält die Zustellung bis zum Guest-Handshake zurück; Fehler bei Queue-Ablehnung/ungültigen Noten nicht als Erfolg verschlucken. Finished-Ausgänge nullen, Stereo-/Format-/NaN-Validierung und SilenceFlags im Defaultpfad. Native Validator-/Host-Nachprüfung ausstehend.
+- A02: Legacy-Recovery protokolliert abgelehnte persistente CC1/7/10/11/91/93, Channel Pressure und Pitchbend pro Kanal und sendet sie vor dem nächsten angenommenen Ereignis erneut. Sustain/Notes werden nie reaktiviert. Clocked-batch-Recovery und simultane Controllerreset-Semantik separat offen.
+- Kein Original-DSP-/GUI-Wechsel. A04 echte Pause, A05 nichtkooperatives Shutdown und A22 Fatalpfade bleiben gesonderte Architektur-/Lifecycle-Aufgaben; keine unsichere Thread-Abtrennung/erzwungenes DLL-Unload.
+
+## 25.11.2026 — Stabilisierung 1: Bank-Identität, RAM-SF2-Loopgrenzen, private Paketierung
+
+- A03: RAM-Sample-Header mit außerhalb des Samples liegenden oder verkehrten Loop-Grenzen abweisen; neue drei synthetische Regressionen. ROM-Header/Creative-Ausnahmen unverändert; zusätzliche RAM-Instrumentzonen-Grenzprüfung mit signierten feinen/groben Offsets, Globalzonenvererbung und aktiven Loopgrenzen. Presetgenerator-/umfassende Legacy-Matrix und Originalbank-Nachprüfung weiterhin offen.
+- A06: externe Bank anhand der tatsächlich validierten/stagierten Bytes statt nur Pfad identifizieren; Presetkatalog und Gaststaging lesen denselben Snapshot. Ersatzengine vor Zerstörung der alten synchron erstellen; bei synchron fehlgeschlagener Erzeugung alte Engine und State erhalten. Asynchrone Gastboot-Freigabe/Stop-Timeout noch nicht gelöst.
+- A18/A21: kanonischer Zielpfad, nicht umgeleitete PRIVATE-Wurzel, Prüfungen vor Commit der Paketierung; verschachtelte PRIVATE-/Build-Verzeichnisse und exakte Originaldateinamen ignorieren. Kein Schutzversprechen gegen absichtlich parallel umbenannte Verzeichnisse.
+- Relevante Audit-/Transport-Trigger ergänzt. Zusammenhängender Fixcommit, keine Änderung an GUI-Layout oder EMU8000/DOSBox-Kern. Nativer Nachtest offen; NO-GO bis Regression und Restbefunde geschlossen.
+
 ## 25.11.2026 — Native deterministische Laufzeit-ABI-Fehlerinjektion
 
 - A05/A02: kurzer nativer Windows-Build des **unveränderten produktiven DosBoxRuntimeHost.hpp** und tatsächlicher Queue/Adapter mit expliziter synthetischer ABI-DLL. Kooperativer Stop als Kontrolle, 6-s nichtkooperativer Worker, erzwungener CC7-Verlust nach gefüllter Queue und unabhängiger MIDI-Empfangslog. Kein echtes DOSBox-/VST3-/Klang-PASS; gezielte native Host-/Transportprüfung. Kein Produktcode geändert. [Windows-ABI-Audit 45703606784](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45703606784), Job 139519757621 auf 30c62801, Build PASS, alle drei Fälle ausgeführt: kooperativer Stop 16 ms, nichtkooperativer Worker blockiert stop() 6005 ms (A05 FAIL im kontrollierten nativen Host-Fault-Test, 3-s-Auditgrenze); CC7=0 ausgeliefert, CC7=127 bei gefüllter Queue abgelehnt, neue Note nach Recovery tatsächlich zugestellt ohne CC7-Wiederherstellung (A02 FAIL). Reale native RuntimeHost-Implementierung mit kontrollierter Test-DLL, nicht der Originalgast, keine echte PCM-Aussage.
