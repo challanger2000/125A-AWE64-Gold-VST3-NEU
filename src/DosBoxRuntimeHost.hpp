@@ -384,9 +384,10 @@ public:
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
         if(!ready_||!ready_()||(clockFault_&&clockFault_()))return false;
         if(!authenticGuest_||pcmPrimed_)return true;
-        // One initial prefill: 8.7 ms at native rate, or one larger block.
+        // Add 192 native frames (4.35 ms) of initial reserve after the
+        // observed 48-kHz soak underrun. Demand clock stays unchanged.
         const auto target=demandLead_?static_cast<std::size_t>(demandLead_-2*rt::GuestDemandClock::maxTickFrames):
-            std::max<std::size_t>(384,std::min<std::size_t>(hostBlock,8192)+128);
+            std::max<std::size_t>(576,std::min<std::size_t>(hostBlock,8192)+320);
         if(!queues_||queues_->snapshot().audioFrames<target)return false;
         pcmPrimed_=true;
         return true;

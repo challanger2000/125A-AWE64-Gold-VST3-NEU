@@ -1,5 +1,13 @@
 # Änderungsverlauf
 
+## 25.11.2026 — ETW-CPU-Messung nativ bestanden; Echtzeit-Pufferreserve angepasst
+
+- Windows 45647772582 auf fbf0b1d9: ETW-CPU-Messung mit Busy-/Idle-Kontrollen bei 44,1/48/96 kHz PASS. Prozesslast 10,4782/11,7349/11,1827 % eines logischen Kerns, unter Polyphonie 12,0292/12,1302/12,7183 %. Keine Messung auf dem Besitzer-PC. p95 13,9002/14,6042/13,8646 ms. Alle Callback-Fristen eingehalten.
+- Experimenteller Offline-Zeitpfad erneut PASS (drei Raten), alle 128 Cheezoids-Presets im Vergleich, Send-/Effektregister und unabhängiger Original-Creative-DLL-Klangtest bestanden; Transport 45647772654 und Version 45647772761 SUCCESS.
+- Gesamt-FAIL: 48-kHz-60-s-Test meldet 59 fehlende native PCM-Frames bei minimal 73 gepufferten Frames, maximal 8,0011 ms Host-Wakeup-Verspätung; 44,1/96 kHz null Unterläufe. Ursache der konkreten Verzögerung noch nicht eindeutig isoliert.
+- Kandidat: anfängliche native PCM-Reserve des bisherigen Echtzeitpfads um 192 Frames (4,35 ms) erhöhen, von mindestens 384 auf mindestens 576 Frames. Für größere Blöcke ebenfalls +192. Originalkern, Treiber, GUI, Ringkapazität und experimenteller Host-Demand-Pfad unverändert. Null-Unterlauf-Gate und bisheriges p95-Ziel bleiben zwingend. Wirkung und Latenz noch nicht nativ geprüft.
+- Audit bleibt PARTIAL / NO-GO; offene Lebenszyklus-, State- und weitere Auditbefunde sowie unabhängiges Codex-Nachaudit nicht als bestanden ausgeben. 0.0.0-dev, nur main.
+
 ## 25.11.2026 — Native Offline-Zeitsteuerung PASS; CPU-Messung auf ETW-Kontextwechsel umgestellt
 
 - [Windows 45643787800](../../actions/runs/45643787800) auf a09c1751: experimenteller Host-Demand-Pfad besteht erstmals tatsächliches Windows-VST3-Offline-Rendering, NoteOn-Offset-Gegenprobe und Processing-Pause/Fortsetzung bei 44,1/48/96 kHz. Gemeldete Latenz 986/1047/1581 Hostsamples; beobachtete Offsetdifferenz 415/421/416 bei Soll 384 und bisheriger 2-ms-Toleranz. Kein samplegenauer Nachweis und keine Freigabe als produktiver Standardpfad.
