@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 25.11.2026 — Adversarialer Audit: nativer SF2-State-Negativtest ergänzt
+
+- Produktquellen, P165-GUI und DOSBox-X-Pin unverändert gegenüber `16d139b5d6602355e97c70d00ce6558a5ba8615f`. Neue separate datenfreie native Auditprüfung für A03 (ungültige Sample-Loop-Grenze) und A06 (erneute Auswahl/Recall einer gültigen, am selben Pfad ausgetauschten Bank); Positivkontrolle mit unterschiedlichen Bankpfaden und Negativkontrolle mit fehlender Bank/ungültigem Programm. Tatsächliche IComponent- und IEditController-Schnittstellen des gebauten VST3, kein Gaststart und kein Originalklang-PASS. Der isolierte Windows-Workflow nutzt ausschließlich generierte SF2 und startet einmal beim Audit-Testcommit; keine private Datei, kein Release und keine Änderung an bestehenden Produktgates.
+- Test neu, nativer Ausführungsnachweis noch offen. Bestehender Auditbefund PARTIAL / NO-GO unverändert; kein FULL AUDIT und keine Freigabe.
+
 ## 25.11.2026 — ETW-CPU-Messung nativ bestanden; Echtzeit-Pufferreserve angepasst
 
 - Windows 45647772582 auf fbf0b1d9: ETW-CPU-Messung mit Busy-/Idle-Kontrollen bei 44,1/48/96 kHz PASS. Prozesslast 10,4782/11,7349/11,1827 % eines logischen Kerns, unter Polyphonie 12,0292/12,1302/12,7183 %. Keine Messung auf dem Besitzer-PC. p95 13,9002/14,6042/13,8646 ms. Alle Callback-Fristen eingehalten.
