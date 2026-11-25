@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 25.11.2026 — SDL-Dummy-Start bestätigt; Direct3D-Neustart unterbunden
+
+- [Windows 45533700405](../../actions/runs/45533700405) FAIL nach 5:09, nun im frühen Dual-DLL-Gate ohne SDL-Umgebungsvariablen. Native Diagnose bestätigt ausdrücklich `Video dummy, Audio dummy`: vorheriger Hint-Fix wirkt. Erster Gast stürzt danach mit Access Violation 0x10 vor MIDI-Ready ab; VST3-Build und spätere Gates nicht erreicht. Transport 45533700459 und Version 45533700439 SUCCESS.
+- Entscheidender Logunterschied zum erfolgreichen Lauf 45531460147: nur im fehlschlagenden umgebungsfreien Lauf erscheint `Resetting to WINDIB mode`. Gepinnter Originalcode `src/output/output_direct3d.cpp:d3d_init` prüft getenv statt aktiven SDL-Treiber, beendet das Video-Subsystem und initialisiert es erneut; der zuvor erzeugte Dummy-Fensterzustand kann dadurch ungültig werden. Embedded-only frühe Rückkehr über vorhandenes `OUTPUT_SURFACE_Select()` vermeidet diesen gesamten unnötigen Direct3D-/WINDIB-Pfad und entspricht dem bisherigen erfolgreichen Surface-Fallback. Standalone-Code bleibt vorhanden; neuer Quelltest, unveränderte strenge Dual-DLL-Prüfung ohne Host-Variablen. EMU8000, Creative und P165 unverändert. Kausalität des Absturzes und neuer Windows-PASS noch zu bestätigen.
+
 ## 25.11.2026 — SDL-Dummy-Video-Bootstrap: fehlender interner Hint korrigiert
 
 - [Windows 45531460147](../../actions/runs/45531460147) FAIL im ersten synthetischen VST3-PCM-Test: native Diagnose `Can't init SDL dummy not available`, 40s Watchdog. Vorherige Original-DLL- und Dual-DLL-Gates sowie VST3-Build PASS; Transport 45531460136 und Version 45531460085 SUCCESS. Echter Dual-VST3-Test und Originalklangregression nicht erreicht.

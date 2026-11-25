@@ -523,6 +523,19 @@ def patch_sdl2_static(s):
     return once(s,'if (SDL_AudioInit(NULL) < 0) {',
                   'if (SDL_AudioInit("dummy") < 0) {')
 
+def patch_direct3d(s):
+    # The dummy SDL window has no native HWND. The standalone Direct3D
+    # init checks getenv rather than the active SDL driver, restarts video
+    # and invalidates the existing dummy window. Use the exact software
+    # surface fallback immediately in the embedded runtime.
+    anchor='void d3d_init(void)\n{'
+    return once(s,anchor,anchor+'''
+#ifdef AWE64_VST3_RUNTIME
+    OUTPUT_SURFACE_Select();
+    return;
+#endif
+''')
+
 def patch_project(s):
     cond="'$(Configuration)|$(Platform)'=='Release SDL2|x64'"
     pre='  <PropertyGroup Condition="'+cond+'" Label="Configuration">\n'
@@ -560,6 +573,7 @@ PATCHES={
     'src/hardware/mixer.cpp':patch_mixer,
     'src/hardware/mpu401.cpp':patch_mpu,
     'src/gui/sdlmain.cpp':patch_main,
+    'src/output/output_direct3d.cpp':patch_direct3d,
     'vs/dosbox-x.vcxproj':patch_project,
     'vs/sdl2/src/SDL.c':patch_sdl2_static
 }

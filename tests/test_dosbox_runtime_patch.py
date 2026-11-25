@@ -101,6 +101,12 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn(original,patched)
         with self.assertRaises(ValueError):
             patch.patch_sdl2_static(patched)
+    def test_embedded_direct3d_uses_surface_without_video_restart(self):
+        source='void d3d_init(void)\n{\n    sdl.desktop.want_type = SCREEN_DIRECT3D;'
+        result=patch.patch_direct3d(source)
+        self.assertIn('#ifdef AWE64_VST3_RUNTIME\n    OUTPUT_SURFACE_Select();\n    return;\n#endif',result)
+        self.assertIn('sdl.desktop.want_type = SCREEN_DIRECT3D;',result)
+        self.assertLess(result.index('OUTPUT_SURFACE_Select();'),result.index('SCREEN_DIRECT3D'))
     def test_native_win_x64_dll(self):
         cond="'$(Configuration)|$(Platform)'=='Release SDL2|x64'"
         s=f'  <PropertyGroup Condition="{cond}" Label="Configuration">\n    <ConfigurationType>Application</ConfigurationType>\n  </PropertyGroup>\n  <PropertyGroup Condition="{cond}">\n    <OutDir>x</OutDir>\n  </PropertyGroup>\n  <ItemDefinitionGroup Condition="{cond}">\n    <ClCompile><PreprocessorDefinitions>WIN32;C_SDL2=1</PreprocessorDefinitions></ClCompile>\n    <Link><AdditionalDependencies>kernel32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>\n  </ItemDefinitionGroup>'
