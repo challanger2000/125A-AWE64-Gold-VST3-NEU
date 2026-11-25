@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 25.11.2026 — Original-SF2 native repariert; CPU-Orakel und Timing-Gates unabhängig
+
+- [Windows 45639030249](../../actions/runs/45639030249) auf b59400f4: VST3-Build, 47/47 Validator, Dual-Original-Creative, SF2-Recall und aktiver SF2-Gastneustart, vier RAM-Spektralprüfungen, zehn Regler mit Neutralrestore, GUI/MOD RESET PASS. Transport [45639030223](../../actions/runs/45639030223) Linux/Windows und Version [45639030243](../../actions/runs/45639030243) SUCCESS.
+- Gesamt-FAIL: 44,1-kHz-Performance-Test meldete ungültige oder flache CPU-Zähler trotz bestandener Positivkontrolle; der genaue fehlerhafte Zähler war nicht protokolliert. 48/96 kHz: 28.522/14.269 Queue-Blöcke, 0 Audio-/MIDI-Drops und Unterläufe, p95 14,9375/14,6146 ms. Die sehr niedrigen gemeldeten CPU-Prozentwerte sind kein belastbarer Nachweis für die Besitzer-CPU. Experimentelles Timing und Cheezoids-Sweep wurden nicht erreicht.
+- Testkorrektur ohne Produkt-/DSP-/GUI-Änderung: Rohintervalle für Prozesszeit und Zyklen getrennt protokollieren; flache Zeit, flache Zyklen, rückläufige Zähler und Abfragefehler unterscheiden. Keine Umrechnung von CPU-Zyklen in CPU-Zeit. Lokaler Release- und ASan/UBSan-Test der Klassifikation PASS. Ungültige CPU-Messungen bleiben NOT VERIFIED und Gesamt-FAIL, aber unabhängige PCM-, Latenz-, Sustain-, Recall- und Queue-Prüfungen laufen samt regulärem Shutdown zu Ende.
+- Timing-Gate läuft unabhängig vom Performance-Ergebnis für alle drei Raten, mit begrenzter test-eigener Fehlerdiagnose; beide Gates bleiben zwingend vor langem Sweep. Native Bestätigung dieser Testkorrektur offen. Audit PARTIAL / NO-GO; 0.0.0-dev, kein Studio-Pro-Praxistest, kein Release.
+
 ## 25.11.2026 — Original-GM-SF2: belegte historische ROM-Zone kompatibel halten
 
 - [Windows 45634211957](../../actions/runs/45634211957) auf b9321a20: Gesamt-FAIL beim externen GM-SF2-Recall (IComponent::setState), noch vor Gaststart. DLL- und VST3-Build, Original-UART-/PCM-/Hardware-Smokes, synthetische Einzel-/Dual-VST3, Negativkontrolle, Steinberg-Validator, P165/MOD RESET, authentischer Original-Einzelklang (99 aktive Notenblöcke) und Dual-Creative-PCM/Lifecycle bestanden. [Transport 45634212099](../../actions/runs/45634212099) Linux/Windows und [Version 45634212149](../../actions/runs/45634212149) SUCCESS. Spätere Klang-, Timing-, CPU- und Performance-Gates wurden nicht erreicht.

@@ -12,6 +12,14 @@ int main(){
     CHECK(!cpuPositiveControl(a,b,{1000,10,true},{1000,50,true}));
     CHECK(!cpuPositiveControl(a,b,{1000,10,true},{1001,50,true}));
     CHECK(!cpuPositiveControl(a,b,{1000,10,true},{9999999,50,true}));
+    const auto flatTime=cpuInterval(a,{a.time100ns,200,true});
+    CHECK(flatTime.status==CpuCounterStatus::FlatTime&&flatTime.ticks==0&&flatTime.cycles==100);
+    const auto flatCycles=cpuInterval(a,{b.time100ns,a.cycles,true});
+    CHECK(flatCycles.status==CpuCounterStatus::FlatCycles&&flatCycles.ticks==1000000&&flatCycles.cycles==0);
+    CHECK(cpuInterval(b,a).status==CpuCounterStatus::Regressed);
+    CHECK(cpuInterval(a,{0,0,false}).status==CpuCounterStatus::QueryFailed);
+    CHECK(cpuInterval(a,b).status==CpuCounterStatus::Ok);
+    CHECK(cpuInterval(a,b).cycles==100&&cpuInterval(a,b).ticks==1000000);
     const auto saved=u;
     CHECK(!cpuUsage(a,a,1.,4,u));CHECK(!cpuUsage(a,{a.time100ns,200,true},1.,4,u));
     CHECK(!cpuUsage(a,{b.time100ns,a.cycles,true},1.,4,u));CHECK(!cpuUsage(b,a,1.,4,u));

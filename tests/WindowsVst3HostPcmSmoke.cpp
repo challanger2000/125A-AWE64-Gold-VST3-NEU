@@ -634,6 +634,7 @@ int main(int argc,char** argv) {
         auto value=[](FILETIME f){return (static_cast<std::uint64_t>(f.dwHighDateTime)<<32)|f.dwLowDateTime;};
         return {value(kernel)+value(user),cycles,true};
     };
+    bool cpuCalibrated=false;
     if(performance) {
         const auto processBefore=cpuCounters(false);
         const auto threadBefore=cpuCounters(true);
@@ -644,9 +645,8 @@ int main(int argc,char** argv) {
         } while(std::chrono::steady_clock::now()<until);
         const auto threadAfter=cpuCounters(true);
         const auto processAfter=cpuCounters(false);
-        if(!awe64::qa::cpuPositiveControl(processBefore,processAfter,threadBefore,threadAfter))
-            return fail("CPU counter positive control failed; no valid performance measurement");
-        std::cout<<"PERF_CPU_COUNTER_POSITIVE_CONTROL_PASS\n";
+        cpuCalibrated=awe64::qa::cpuPositiveControl(processBefore,processAfter,threadBefore,threadAfter);
+        std::cout<<(cpuCalibrated?"PERF_CPU_COUNTER_POSITIVE_CONTROL_PASS\n":"PERF_CPU_COUNTER_POSITIVE_CONTROL_NOT_VERIFIED\n");
     }
     // Windows runner embeds NO original Creative material. The fake DOS MZ
     // fixture merely drives the original DOSBox PC-speaker hardware.
@@ -1019,7 +1019,6 @@ int main(int argc,char** argv) {
         auto nblocks=[&](double seconds){return static_cast<unsigned>(std::ceil(seconds*hostRate/buffer));};
         for(unsigned i=0;i<nblocks(12.);++i)if(!tick(false,false))return fail("Performance warmup failed");
         const auto cpuStart=cpuCounters(false);
-        if(!cpuStart.valid)return fail("Process CPU counter unavailable");
         const auto wallStart=Clock::now();
         measure=true;
         std::vector<double> latencies;
@@ -1085,18 +1084,30 @@ int main(int argc,char** argv) {
         const double wallSeconds=std::chrono::duration<double>(Clock::now()-wallStart).count();
         const auto cores=GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
         awe64::qa::CpuUsage overall{},poly{};
-        if(!awe64::qa::cpuUsage(cpuStart,cpuEnd,wallSeconds,cores,overall)||
-           !awe64::qa::cpuUsage(polyCpuStart,polyCpuEnd,polySeconds,cores,poly))
-            return fail("Invalid or flat process CPU counters; no valid performance measurement");
-        const double corePercent=overall.oneCorePercent;
-        const double polyPercent=poly.oneCorePercent;
+        const bool overallValid=awe64::qa::cpuUsage(cpuStart,cpuEnd,wallSeconds,cores,overall);
+        const bool polyValid=awe64::qa::cpuUsage(polyCpuStart,polyCpuEnd,polySeconds,cores,poly);
+        const bool cpuValid=cpuCalibrated&&overallValid&&polyValid;
+        auto reportCpuInterval=[](const char* label,const auto& a,const auto& b,double seconds) {
+            const auto delta=awe64::qa::cpuInterval(a,b);
+            std::cout<<"PERF_CPU_RAW "<<label<<" STATUS="<<awe64::qa::cpuStatusName(delta.status)
+                     <<" TIME_100NS="<<delta.ticks<<" CYCLES="<<delta.cycles
+                     <<" WALL_SECONDS="<<seconds<<"\n";
+        };
+        reportCpuInterval("OVERALL",cpuStart,cpuEnd,wallSeconds);
+        reportCpuInterval("POLYPHONY",polyCpuStart,polyCpuEnd,polySeconds);
+        // Cycles are diagnostic only: variable-frequency hardware and VMs
+        // do not permit a reliable conversion from cycles to CPU time.
+        if(cpuValid) {
+            std::cout<<"PERF_PROCESS_ONE_CORE_PERCENT="<<overall.oneCorePercent<<" TOTAL_MACHINE_PERCENT="<<overall.machinePercent<<"\n"
+                     <<"PERF_32_NOTE_ONE_CORE_PERCENT="<<poly.oneCorePercent<<" TOTAL_MACHINE_PERCENT="<<poly.machinePercent<<"\n";
+        } else {
+            std::cout<<"PERF_CPU_TIME_NOT_VERIFIED\n";
+        }
         std::sort(latencies.begin(),latencies.end());
         const double p95=latencies[static_cast<unsigned>(std::ceil(.95*latencies.size()))-1];
         std::cout<<"PERF_HOST_RATE="<<hostRate<<" PERF_BLOCK="<<buffer<<" LOGICAL_CPUS="<<cores<<"\n"
                  <<"PERF_MIDI_TO_PCM_MEDIAN_MS="<<latencies[latencies.size()/2]
                  <<" P95_MS="<<p95<<" MAX_MS="<<latencies.back()<<"\n"
-                 <<"PERF_PROCESS_ONE_CORE_PERCENT="<<corePercent<<" TOTAL_MACHINE_PERCENT="<<corePercent/cores<<"\n"
-                 <<"PERF_32_NOTE_ONE_CORE_PERCENT="<<polyPercent<<" TOTAL_MACHINE_PERCENT="<<polyPercent/cores<<"\n"
                  <<"PERF_CALLBACK_MAX_MS="<<maxCallbackMs<<" CALLBACK_DEADLINE_OVERRUNS="<<lateCallbacks
                  <<" HOST_WAKE_MAX_LATE_MS="<<maxLateMs<<"\n"
                  <<"PERF_HELD_SILENT_BLOCKS="<<silentHeldBlocks<<" POLY_SILENT_BLOCKS="<<chordSilent
@@ -1189,6 +1200,8 @@ int main(int argc,char** argv) {
         processor->release();component->release();factory->release();if(!exitDll())return fail("Steinberg Windows module deinitialization failed");FreeLibrary(module);
         if(silentHeldBlocks||chordSilent||chordEnergy<=0.)return fail("Held-tone stability gate failed");
         if(p95>20.)return fail("MIDI-to-PCM p95 exceeds 20 ms target");
+        std::cout<<"REAL_VST3_TRANSPORT_LATENCY_PCM_PASS; QUEUE GATE SEPARATE\n";
+        if(!cpuValid)return fail("Invalid or flat process CPU counters; no valid performance measurement");
         std::cout<<"REAL_VST3_PERFORMANCE_MEASUREMENT_PASS; CI CPU NOT OWNER CPU\n";
         std::cout<<"PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED\n"
                  <<"VST3_HOST_NOTE_ON_EVENTS_SENT="<<actualOn<<"\n"

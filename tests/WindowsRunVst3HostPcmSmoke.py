@@ -159,6 +159,12 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
         blocks, audio_drop, midi_drop, underrun = map(int, rows[0])
         if not blocks or audio_drop or midi_drop or underrun:
             raise RuntimeError(f"Realtime queue stability failed: audio drops={audio_drop}, MIDI drops={midi_drop}, underrun frames={underrun}")
+        if proc.stdout.splitlines().count("REAL_VST3_TRANSPORT_LATENCY_PCM_PASS; QUEUE GATE SEPARATE") != 1:
+            raise RuntimeError("Native transport and latency evidence missing")
+        if ("PERF_CPU_TIME_NOT_VERIFIED" in proc.stdout.splitlines() or
+                proc.stdout.splitlines().count("PERF_CPU_COUNTER_POSITIVE_CONTROL_PASS") != 1 or
+                proc.stdout.splitlines().count("REAL_VST3_PERFORMANCE_MEASUREMENT_PASS; CI CPU NOT OWNER CPU") != 1):
+            raise RuntimeError("CPU time measurement NOT VERIFIED; transport/latency gates passed")
     if proc.returncode or expected not in proc.stdout:
         raise RuntimeError(f"Actual Windows VST3 factory/host process() PCM test FAILED; exit=0x{proc.returncode & 0xffffffff:08x}")
     def count(label: str) -> int:

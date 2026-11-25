@@ -5,9 +5,28 @@
 namespace awe64::qa {
 struct CpuCounters {std::uint64_t time100ns=0,cycles=0;bool valid=false;};
 struct CpuUsage {double oneCorePercent=0,machinePercent=0;};
+enum class CpuCounterStatus { Ok, QueryFailed, Regressed, FlatTime, FlatCycles };
+struct CpuInterval {std::uint64_t ticks=0,cycles=0;CpuCounterStatus status=CpuCounterStatus::QueryFailed;};
+inline CpuInterval cpuInterval(const CpuCounters& a,const CpuCounters& b) noexcept {
+    if(!a.valid||!b.valid)return {};
+    if(b.time100ns<a.time100ns||b.cycles<a.cycles)return {0,0,CpuCounterStatus::Regressed};
+    const auto t=b.time100ns-a.time100ns,c=b.cycles-a.cycles;
+    return {t,c,!t?CpuCounterStatus::FlatTime:(!c?CpuCounterStatus::FlatCycles:CpuCounterStatus::Ok)};
+}
+inline const char* cpuStatusName(CpuCounterStatus s) noexcept {
+    switch(s){
+        case CpuCounterStatus::Ok:return "OK";
+        case CpuCounterStatus::QueryFailed:return "QUERY_FAILED";
+        case CpuCounterStatus::Regressed:return "REGRESSED";
+        case CpuCounterStatus::FlatTime:return "FLAT_TIME";
+        case CpuCounterStatus::FlatCycles:return "FLAT_CYCLES";
+    }
+    return "UNKNOWN";
+}
 inline bool cpuDelta(const CpuCounters& a,const CpuCounters& b,std::uint64_t& ticks) noexcept {
-    if(!a.valid||!b.valid||b.time100ns<=a.time100ns||b.cycles<=a.cycles)return false;
-    ticks=b.time100ns-a.time100ns;return true;
+    const auto r=cpuInterval(a,b);
+    if(r.status!=CpuCounterStatus::Ok)return false;
+    ticks=r.ticks;return true;
 }
 inline bool cpuPositiveControl(const CpuCounters& processBefore,const CpuCounters& processAfter,
                               const CpuCounters& threadBefore,const CpuCounters& threadAfter) noexcept {
