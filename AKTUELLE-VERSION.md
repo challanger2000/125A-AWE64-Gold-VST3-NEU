@@ -9,6 +9,11 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 25.11.2026 — Native adversariale Laufzeitfehlerprüfungen
+
+- Audit-only, Produktquellen und Originalkern unverändert. Zusätzlicher separater Windows-Workflow mit echter VST3/DOSBox-Laufzeit, synthetischem MIDI/PC-Speaker-Gast und eigenem nativen Host: frühe Note, Processing-Pause mit Queue-Zählern, Master-Automation innerhalb eines Blocks, aktiver SF2-Wechsel bei absichtlich fehlender installierter Runtime-DLL. Positive PCM-Kontrolle, separate Kindprozesse/Timeouts, kein Originalklangnachweis aus PC-Speaker.
+- Native Ergebnisse offen. PARTIAL / NO-GO bleibt bis zur vollständigen Evidenzmatrix; kein Release, keine Änderung von GUI/EMU8000.
+
 ## 25.11.2026 — Adversarialer Audit: nativer SF2-State-Negativtest ergänzt
 
 - Produktquellen, P165-GUI und DOSBox-X-Pin unverändert gegenüber `16d139b5d6602355e97c70d00ce6558a5ba8615f`. Neue separate datenfreie native Auditprüfung für A03 (ungültige Sample-Loop-Grenze) und A06 (erneute Auswahl/Recall einer gültigen, am selben Pfad ausgetauschten Bank); Positivkontrolle mit unterschiedlichen Bankpfaden und Negativkontrolle mit fehlender Bank/ungültigem Programm. Tatsächliche IComponent- und IEditController-Schnittstellen des gebauten VST3, kein Gaststart und kein Originalklang-PASS. Der isolierte Windows-Workflow nutzt ausschließlich generierte SF2 und startet einmal beim Audit-Testcommit; keine private Datei, kein Release und keine Änderung an bestehenden Produktgates.
