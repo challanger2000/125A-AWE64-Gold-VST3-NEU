@@ -9,6 +9,10 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 25.11.2026 — MOD-RESET-Workflow-Syntax repariert
+
+- Run 45515877422 scheiterte bereits beim Einlesen der Workflow-Datei: versehentlich umgebrochener PowerShell-Regexabschluss in YAML. Kein Windows-Job und kein MOD-RESET-Funktionsbefund. Regex auf eine vollständige Zeile korrigiert; Bytezugriff im neuen State-Test vorsorglich mit explizitem reinterpret_cast unabhängig vom SDK-Pointertyp. Produkt und bisheriger SUCCESS-Prüfstand unverändert. Neuer Windows-Nachweis ausstehend.
+
 ## 25.11.2026 — Vollständiger Regler-Gesamtlauf SUCCESS; echtes MOD RESET GUI-Gate
 
 - [Windows 45512094711](../../actions/runs/45512094711) auf c00a9034e vollständig SUCCESS. LF/CRLF-Parser und Negativkontrollen PASS; echte PCM-Regler 10/10 bei Mitte/Maximum, Neutralrestore, Filter-Referenz, neun Ruhefenster und alle drei unabhängigen DCYSUS-Feldgates PASS. Steinberg 47/47, Cheezoids 128/128, P165-Lifecycle 1000x708 mit zweimaligem Open/Close. 9254/28522/14269 gemessene Blöcke bei 44,1/48/96 kHz ohne Audio-/MIDI-Drops und ohne Unterläufe. Transport 45512094470 und Version 45512094498 SUCCESS. Regler-Klangfunktion auf diesem Prüfstand bestätigt, keine weiteren Klangänderungen vorgesehen.

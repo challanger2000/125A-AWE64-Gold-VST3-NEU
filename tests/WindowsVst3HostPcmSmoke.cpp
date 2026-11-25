@@ -387,7 +387,7 @@ int main(int argc,char** argv) {
                 return fail("MOD RESET state save failed");
             // Effects types are nondefault, so a fully reset state must
             // use v3 (not v4 sends or v5 voice overlays).
-            if(static_cast<const unsigned char*>(resetState.getData())[4]!=3)
+            if(reinterpret_cast<const unsigned char*>(resetState.getData())[4]!=3)
                 return fail("MOD RESET left nonneutral controls in component state");
             std::cout<<"REAL_VST3_MOD_RESET_CLICK_PASS; PARAMS=12; GESTURES=12; PRESERVED=5; PASS="<<pass<<"\n";
             std::cout<<"EDITOR_REMOVE_ENTER "<<pass<<"\n";
