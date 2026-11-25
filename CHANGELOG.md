@@ -1,5 +1,10 @@
 # Änderungsverlauf
 
+## 25.11.2026 — MOD RESET und Gesamtregression SUCCESS; Mehrfachinstanz-Forschung
+
+- [Windows 45515971767](../../actions/runs/45515971767) auf 28b923e7 vollständig SUCCESS. Echter MOD RESET Klick zweimal bestanden, je 12 Parameter null, 12 ausgeglichene Host-Gesten, 5 unabhängige Werte erhalten, Zustandsversion korrekt. P165-Lifecycle 1000x708, Steinberg 47/47, Regler-PCM 10/10, Cheezoids 128/128, alle drei Performance-Raten ohne Audio-/MIDI-Drops und Unterläufe. Transport 45515971818 und Version 45515971748 SUCCESS. Dies ist der aktuell abgenommene Eininstanz-Referenzstand.
+- Mehrfachinstanzfähigkeit noch nicht vorhanden. Bestehendes exklusives Runtime-Ownership und Produktcode unverändert; keine Annahme, dass DLL-Kopien bereits sichere Instanzen ergeben. Neuer isolierter Windows-Forschungsprobe: zwei byteidentische, unterschiedlich benannte DLL-Kopien mit statischer SDL2 im selben Testprozess, getrennte temporäre DOS-Pfade, selbst erzeugte MIDI/PIT-EXE mit verschiedenen MIDI-Triggern/Tönen, Null-ROM. Beide gleichzeitig bereit, A allein getriggert (B muss stumm bleiben), dann B, A stoppen und entladen während B weiter PCM liefern muss, beide sauber schließen. Frühes Gate vor VST3-Build; kein Creative-/VST3-Mehrfachinstanznachweis und keine Freigabe. Mögliche gemeinsame Prozessressourcen (CWD, SDL/Win32, Umgebungsvariablen) bleiben zu untersuchen. Kein zusätzlicher externer Prozess im späteren Produkt; Testprozess ausschließlich zur Crash-/Hang-Isolation. Neuer Forschungsnachweis offen.
+
 ## 25.11.2026 — MOD-RESET-Workflow-Syntax repariert
 
 - Run 45515877422 scheiterte bereits beim Einlesen der Workflow-Datei: versehentlich umgebrochener PowerShell-Regexabschluss in YAML. Kein Windows-Job und kein MOD-RESET-Funktionsbefund. Regex auf eine vollständige Zeile korrigiert; Bytezugriff im neuen State-Test vorsorglich mit explizitem reinterpret_cast unabhängig vom SDK-Pointertyp. Produkt und bisheriger SUCCESS-Prüfstand unverändert. Neuer Windows-Nachweis ausstehend.

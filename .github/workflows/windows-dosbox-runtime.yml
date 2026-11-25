@@ -10,6 +10,7 @@ on:
       - 'tests/WindowsDosBoxGuestSmoke.py'
       - 'tests/MakeMpuCom.py'
       - 'tests/WindowsMpuGuestSmoke.py'
+      - 'tests/WindowsDualRuntimeSmoke.py'
       - 'tests/WindowsAweHardwareSmoke.py'
       - 'tests/MakeSpeakerCom.py'
       - 'tests/WindowsSpeakerPcmSmoke.py'
@@ -164,6 +165,13 @@ jobs:
           $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           python tests/WindowsMpuGuestSmoke.py --parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Original MPU401 guest hardware path failed" }
+      - name: Research two independent original runtime DLL mappings in one Windows process
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
+          python tests/WindowsDualRuntimeSmoke.py --parent $dll
+          if ($LASTEXITCODE -ne 0) { throw "Dual-runtime research failed; single-instance product remains unchanged" }
       - name: Compile VST3 host and stage original internal DOSBox-X runtime DLL
         shell: pwsh
         run: |
