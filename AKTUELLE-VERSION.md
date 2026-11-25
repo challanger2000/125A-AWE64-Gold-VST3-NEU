@@ -9,6 +9,10 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 25.11.2026 — Native Original-DLL-Fatalpfadprüfung
+
+- A22: gezielte isolierte Original-DOSBox-DLL-Prüfung mit synthetischem 1-MiB-ROM als Positivkontrolle und absichtlich fehlendem ROM plus blockierter temporärer ROM-Fallback-Datei. `-test` verhindert ROM-Downloadfrage; nur ein eigenes E_Exit-Dialogfenster des isolierten Kindprozesses wird quittiert, tatsächlicher Prozess-Exit/Timeout und Originaldiagnose werden getrennt geprüft. Keine Änderung am Originalkern/Produkt und keine privaten Daten. Direkte DLL-Fehlerinjektion, nicht behauptet, dass jede normale VST3-Aktivierung den Fehlerfall auslöst. Ergebnisse offen.
+
 ## 25.11.2026 — Native Windows-Paketgrenzen adversarial prüfen
 
 - Separate kurze datenfreie Windows-Gegenprobe A18/A21: echter Windows-Verzeichnisjunction, `..` und direkter Zielpfad mit derselben produktiven Paketierungsfunktion, Hashs ausschließlich für selbst erzeugte Fakedaten; unabhängige Git-ignore-Proben in einem temporären Git-Repository für die private Buildstruktur. Kein Besitzerinhalt, kein tatsächlicher Git-Add/Upload, kein Produktbuild. Native Ergebnisse noch offen.
