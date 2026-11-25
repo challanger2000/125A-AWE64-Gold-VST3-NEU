@@ -218,6 +218,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Safe synthetic test DOS EXE staging failed' }
           python tests/WindowsRunVst3HostPcmSmoke.py --exe $hostTestExe --plugin $plugin
           if ($LASTEXITCODE -ne 0) { throw 'VST3 process() failed to deliver original mixer audio' }
+      - name: Verify two actual VST3 components play and tear down independently
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $plugin=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3').Path
+          $hostTestExe=(Resolve-Path 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe').Path
+          $log = & $hostTestExe $plugin --dual 2>&1
+          $code=$LASTEXITCODE
+          $log | ForEach-Object { Write-Host $_ }
+          if ($code -ne 0 -or @($log | Where-Object { "$_" -eq 'REAL_VST3_DUAL_SYNTHETIC_PCM_LIFECYCLE_PASS' }).Count -ne 1) { throw "Native dual VST3 gate FAILED; exit=$code" }
       - name: NEGATIVE CONTROL real VST3 must silence PC-speaker+OPL in private-Creative-only mode
         shell: pwsh
         timeout-minutes: 2

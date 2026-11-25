@@ -489,9 +489,14 @@ def patch_sdl2_static(s):
     anchor='#if (!defined(HAVE_LIBC) || defined(__WATCOMC__)) && !defined(SDL_STATIC_LIB)'
     if s.count(anchor)!=1:
         raise ValueError('SDL2 startup anchor missing/duplicated')
-    return once(s,anchor,
+    s=once(s,anchor,
          '#define SDL_STATIC_LIB 1 /* 125A embedded DLL: SDL2 is a static library */\n'
          +anchor)
+    # The already-tested dummy video backend is mandatory for this private
+    # embedded SDL copy. Avoid shared Win32 window classes (SDL_app) and
+    # dependence on the host's SDL_VIDEODRIVER environment variable.
+    return once(s,'if (SDL_VideoInit(NULL) < 0) {',
+                  'if (SDL_VideoInit("dummy") < 0) {')
 
 def patch_project(s):
     cond="'$(Configuration)|$(Platform)'=='Release SDL2|x64'"

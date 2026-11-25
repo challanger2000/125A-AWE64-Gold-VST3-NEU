@@ -235,17 +235,19 @@ int main(int argc,char** argv) {
     const char* sendTest=std::getenv("AWE64_TEST_SEND_PAIR");
     const unsigned sendPair=sendTest?static_cast<unsigned>(std::strtoul(sendTest,nullptr,10)):0;
     if(sendPair>65535)return fail("Invalid send test pair");
+    const bool dualOriginal=(argc==3 && std::strcmp(argv[2],"--dual-original")==0);
+    const bool dualMode=dualOriginal||(argc==3 && std::strcmp(argv[2],"--dual")==0);
     const bool originalMode=(argc==4 && std::strcmp(argv[2],"--original")==0);
     const bool exclusionMode=(argc==3 && std::strcmp(argv[2],"--negative")==0);
     const bool editorMode=(argc==3 && std::strcmp(argv[2],"--editor")==0);
     const int originalSeconds=originalMode ? std::atoi(argv[3]) : 0;
-    if(!(argc==2 || exclusionMode || editorMode || (originalMode && originalSeconds>=15 && originalSeconds<=120)))
+    if(!(argc==2 || exclusionMode || editorMode || dualMode || (originalMode && originalSeconds>=15 && originalSeconds<=120)))
         return fail("usage: WindowsVst3HostPcmSmoke.exe Plugin.vst3 [--original 15..120 | --negative]");
     // Private mode runs exclusively on the owner's Windows computer after
     // the launcher verifies the original Creative EXE/SF2/ROM hashes.
     // Refuse a "Creative AWE sound" PASS if the guest could have produced
     // sound through PC speaker, OPL or a real SDL2 output device.
-    if(originalMode || exclusionMode) {
+    if(originalMode || exclusionMode || dualOriginal) {
         const char* originalOnly=std::getenv("AWE64_ORIGINAL_CREATIVE_ONLY");
         if(!originalOnly || std::strcmp(originalOnly,"1")!=0)
             return fail("Private Creative mode requires AWE64_ORIGINAL_CREATIVE_ONLY=1");
@@ -300,6 +302,119 @@ int main(int argc,char** argv) {
     MinimalHostApplication host;
     if(component->initialize(&host)!=S::kResultOk)
         return fail("VST3 initialize() failed");
+    if(dualMode) {
+        // Two instances of the same factory/class in the SAME native host.
+        // Distinct controller values, actual process() output, no direct
+        // calls into the DOSBox DLL. Exercise deactivation while peer lives.
+        V::IComponent* second=nullptr;
+        V::IAudioProcessor* secondProc=nullptr;
+        if(factory->createInstance(info.cid,V::IComponent::iid,reinterpret_cast<void**>(&second))!=S::kResultOk||
+           !second||second==component||second->initialize(&host)!=S::kResultOk||
+           second->queryInterface(V::IAudioProcessor::iid,reinterpret_cast<void**>(&secondProc))!=S::kResultOk||!secondProc)
+            return fail("Dual VST3 second component creation failed");
+        struct Slot {
+            V::IComponent* c;
+            V::IAudioProcessor* p;
+            V::IEditController* control=nullptr;
+            std::array<float,128> left{},right{};
+            float* channels[2]{left.data(),right.data()};
+            V::AudioBusBuffers out{};
+            V::ProcessData data{};
+            MidiNoteHostEvents midi{};
+            double energy=0.;
+            unsigned blocks=0;
+            bool live=false;
+            Slot(V::IComponent* c0,V::IAudioProcessor* p0):c(c0),p(p0){}
+            bool setup(bool original,double master) {
+                if(c->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&control))!=S::kResultOk||!control||
+                   control->setParamNormalized(1001,master)!=S::kResultOk)return false;
+                // GM drawbar organ for a held-note test; synthetic guest
+                // ignores program change and only accepts note 60.
+                if(original&&control->setParamNormalized(1000,16./127.)!=S::kResultOk)return false;
+                V::ProcessSetup config{};
+                config.processMode=V::kRealtime;config.symbolicSampleSize=V::kSample32;
+                config.sampleRate=44100.;config.maxSamplesPerBlock=128;
+                if(c->activateBus(V::kAudio,V::kOutput,0,true)!=S::kResultOk||
+                   p->setupProcessing(config)!=S::kResultOk)return false;
+                out.numChannels=2;out.channelBuffers32=channels;
+                data.processMode=V::kRealtime;data.symbolicSampleSize=V::kSample32;
+                data.numSamples=128;data.numOutputs=1;data.outputs=&out;data.inputEvents=&midi;
+                return true;
+            }
+            bool activate(){
+                live=c->setActive(true)==S::kResultOk;
+                return live&&p->setProcessing(true)==S::kResultOk;
+            }
+            bool tick(bool note){
+                if(!live)return true;
+                midi.setEnabled(note);
+                left.fill(0.f);right.fill(0.f);
+                if(p->process(data)!=S::kResultOk)return false;
+                for(unsigned i=0;i<left.size();++i){
+                    if(!std::isfinite(left[i])||!std::isfinite(right[i]))return false;
+                    energy+=.5*(double(left[i])*left[i]+double(right[i])*right[i]);
+                }
+                ++blocks;return true;
+            }
+            void clear(){energy=0.;blocks=0;}
+            double rms()const{return blocks?std::sqrt(energy/(blocks*128.)):0.;}
+            bool deactivate(){
+                if(p->setProcessing(false)!=S::kResultOk||c->setActive(false)!=S::kResultOk)return false;
+                live=false;return true;
+            }
+            bool finish(){
+                if(live&&!deactivate())return false;
+                if(c->terminate()!=S::kResultOk)return false;
+                if(control)control->release();
+                p->release();c->release();return true;
+            }
+        };
+        Slot a(component,processor),b(second,secondProc);
+        if(!a.setup(dualOriginal,1.)||!b.setup(dualOriginal,.6)||
+           !a.activate()||!b.activate())return fail("Dual VST3 activation failed");
+        if(std::abs(a.control->getParamNormalized(1001)-1.)>1.e-6||
+           std::abs(b.control->getParamNormalized(1001)-.6)>1.e-6)
+            return fail("Dual VST3 controller values leaked");
+        std::cout<<"REAL_VST3_TWO_ACTIVE_COMPONENTS_PASS\n";
+        auto window=[&](unsigned blocks,bool noteA=false,bool noteB=false){
+            a.clear();b.clear();
+            const auto start=std::chrono::steady_clock::now();
+            for(unsigned i=0;i<blocks;++i){
+                // Retry note events at 100ms while waiting for the guest.
+                // Real sustained AWE notes are sent just once.
+                const bool trigger=i==0||(!dualOriginal&&i<100&&i%34==0);
+                if(!a.tick(noteA&&trigger)||!b.tick(noteB&&trigger))return false;
+                std::this_thread::sleep_until(start+std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<double>((i+1)*128./44100.)));
+            }
+            return true;
+        };
+        if(!window(dualOriginal?3000:1200)||!window(100))
+            return fail("Dual VST3 warmup/idle failed");
+        const auto idleA=a.rms(),idleB=b.rms();
+        const double threshold=dualOriginal?.001:.005;
+        if(idleA>threshold*.25||idleB>threshold*.25)
+            return fail("Dual VST3 idle is not silent");
+        if(!window(130,true,false))return fail("Dual VST3 A-only processing failed");
+        const double aOnly=a.rms(),bSilent=b.rms();
+        std::cout<<"DUAL_VST3_A_ONLY RMS_A="<<aOnly<<" RMS_B="<<bSilent<<"\n";
+        if(aOnly<std::max(threshold,idleA*4.)||bSilent>std::max(threshold*.25,idleB*4.))
+            return fail("Dual VST3 A note missing or leaked into B");
+        if(!window(130,false,true))return fail("Dual VST3 simultaneous processing failed");
+        const double bothA=a.rms(),bothB=b.rms();
+        std::cout<<"DUAL_VST3_BOTH RMS_A="<<bothA<<" RMS_B="<<bothB<<"\n";
+        if(bothA<threshold||bothB<threshold)return fail("Dual VST3 simultaneous notes missing");
+        if(!a.finish())return fail("Dual VST3 A teardown failed");
+        if(!window(130))return fail("Dual VST3 B processing after A teardown failed");
+        std::cout<<"DUAL_VST3_B_SURVIVOR RMS="<<b.rms()<<"\n";
+        if(b.rms()<threshold)return fail("Dual VST3 B lost audio after A teardown");
+        if(!b.finish())return fail("Dual VST3 B teardown failed");
+        factory->release();
+        if(!exitDll())return fail("Dual VST3 module shutdown failed");
+        FreeLibrary(module);
+        std::cout<<(dualOriginal?"REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS":"REAL_VST3_DUAL_SYNTHETIC_PCM_LIFECYCLE_PASS")<<"\n";
+        return 0;
+    }
     // Exercise the actual VSTGUI editor against a real Win32 parent, once
     // in the synthetic run. This is a lifecycle/geometry gate, not a
     // substitute for interactive control or original sound verification.

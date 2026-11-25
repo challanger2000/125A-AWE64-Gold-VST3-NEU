@@ -133,7 +133,7 @@ bool DosBoxVst3Shell::requestSoundFont(const std::string& path,int expectedProgr
         const auto previous=requestedSoundFont();
         if(previous==path && (!runtime_||!runtime_->finished()))return true;
         if(runtime_) {
-            // Exactly one DOSBox instance. Restart the unmodified guest with
+            // Restart only this component's original DOSBox guest with
             // the new bank. Never call DOSBox on the real-time callback.
             stopRuntimeLocked();
             if(!startRuntimeLocked(path)) {

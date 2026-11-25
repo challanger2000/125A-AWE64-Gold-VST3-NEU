@@ -30,9 +30,9 @@
 
 namespace awe64::integration {
 class DosBoxRuntimeHost final {
-    // Original DOSBox-X source is single-instance global state. Never run
-    // two emulated PCs concurrently inside one DAW process.
-    static inline std::atomic<bool> ownership_{false};
+    // DOSBox globals are private to each independently mapped image.
+    // Use a unique DLL filename AND directory for every activation, never
+    // share the in-bundle module's writable globals between components.
     HMODULE module_=nullptr;
     AWE64_RegisterMidiFn registerMidi_=nullptr;
     AWE64_RegisterPCMFn registerPCM_=nullptr;
@@ -59,7 +59,6 @@ class DosBoxRuntimeHost final {
     std::atomic<bool> running_{false};
     std::atomic<bool> finished_{false};
     std::atomic<int> guestExitCode_{-1};
-    bool owns_=false;
     std::filesystem::path stagedDirectory_;
 
     static bool isUsableFile(const std::filesystem::path& p,
@@ -156,19 +155,21 @@ public:
            !isUsableFile(sf2))return false;
         const auto dll=binary.parent_path()/"AWE64DOSBoxRuntime.dll";
         if(!isUsableFile(dll))return false;
-        bool none=false;
-        if(!ownership_.compare_exchange_strong(none,true,
-                std::memory_order_acq_rel))return false;
-        owns_=true;
-        // A previous early shutdown must never re-enter a still-mapped
-        // DOSBox image with stale globals. Full absolute path; no extra ref.
-        if(GetModuleHandleW(dll.wstring().c_str())) {
-            std::fprintf(stderr,"AWE64_RUNTIME_RESTART_REFUSED_STALE_MODULE\n");
-            std::fflush(stderr);
+        // Non-RT: copy the installed original runtime into this activation's
+        // existing private staging directory. Fail rather than reuse a copy.
+        // Windows may match a loaded DLL by basename: make that unique too.
+        try {
+            if(!makeStagingDirectory())return false;
+            const auto isolated=stagedDirectory_/(stagedDirectory_.filename().wstring()+L".dll");
+            if(!CopyFileW(dll.c_str(),isolated.c_str(),TRUE)||
+               GetModuleHandleW(isolated.c_str())) {
+                stop();return false;
+            }
+            module_=LoadLibraryExW(isolated.c_str(),nullptr,
+                       LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+        } catch (...) {
             stop();return false;
         }
-        module_=LoadLibraryExW(dll.wstring().c_str(),nullptr,
-                   LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
         if(!module_){stop();return false;}
         registerMidi_=reinterpret_cast<AWE64_RegisterMidiFn>(
                           GetProcAddress(module_,"AWE64_HostRegisterMidi"));
@@ -258,7 +259,7 @@ public:
             // A per-run, validated DOS 8.3 log prevents stale results or
             // overwriting files in the owner's private VST3 directory.
             if(creativeOnly && std::strcmp(creativeOnly,"1")==0) {
-                std::string bootLog="AWEBOOT.LOG"; // synthetic CI fallback
+                std::string bootLog="D:\\AWEBOOT.LOG"; // per-activation fallback; no shared log
                 if(const char* requested=std::getenv("AWE64_CREATIVE_BOOT_LOG")) {
                     if(std::strlen(requested)!=12 || requested[0]!='B' ||
                        requested[8]!='.' || std::strcmp(requested+9,"LOG")!=0) {
@@ -359,10 +360,6 @@ public:
             stagedDirectory_.clear();
         }
         running_.store(false,std::memory_order_release);
-        if(owns_) {
-            ownership_.store(false,std::memory_order_release);
-            owns_=false;
-        }
     }
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
         if(!ready_||!ready_())return false;

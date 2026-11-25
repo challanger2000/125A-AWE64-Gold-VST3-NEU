@@ -117,6 +117,26 @@ try {
         [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
         [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
     }
+    # Two real VST3 components using the same verified original assets.
+    # No shared trace or boot log between simultaneous guests: fallback
+    # boot diagnostic is in each activation's distinct temporary D: drive.
+    try {
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $null, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $null, 'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', 'dummy', 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', '1', 'Process')
+        $dualLog = & $hostTestExe $pluginBinary --dual-original 2>&1
+        $dualCode = $LASTEXITCODE
+        $dualLog | ForEach-Object { Write-Host $_ }
+        if ($dualCode -ne 0 -or @($dualLog | Where-Object { "$_" -eq 'REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS' }).Count -ne 1) {
+            throw "Two real original Creative VST3 instances failed; exit=$dualCode"
+        }
+    } finally {
+        [Environment]::SetEnvironmentVariable('AWE64_CREATIVE_BOOT_LOG', $previousBootLog, 'Process')
+        [Environment]::SetEnvironmentVariable('AWE64_ORIGINAL_CREATIVE_ONLY', $previousOriginal, 'Process')
+        [Environment]::SetEnvironmentVariable('SDL_AUDIODRIVER', $previousSdl, 'Process')
+        [Environment]::SetEnvironmentVariable('EMU8K_TRACE', $previousTrace, 'Process')
+    }
     # Existing original Creative DOS diagnostics may be empty while the
     # interactive demo runs (redirected stdout buffering). The log must
     # at least exist, and explicit startup errors are always fatal.

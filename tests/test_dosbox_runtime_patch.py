@@ -90,7 +90,8 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('~AWE64GuestRunScope() { awe64_guest_can_stop=false; }',r)
     def test_sdl2_static_library_cannot_supply_dll_crt_entry(self):
         original='#if (!defined(HAVE_LIBC) || defined(__WATCOMC__)) && !defined(SDL_STATIC_LIB)'
-        patched=patch.patch_sdl2_static(original)
+        patched=patch.patch_sdl2_static(original+'\nif (SDL_VideoInit(NULL) < 0) {')
+        self.assertIn('if (SDL_VideoInit("dummy") < 0) {',patched)
         self.assertIn('#define SDL_STATIC_LIB 1',patched)
         self.assertIn(original,patched)
         with self.assertRaises(ValueError):
