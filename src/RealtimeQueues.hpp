@@ -48,6 +48,11 @@ public:
         read_.store(r + 1, std::memory_order_release);
         return true;
     }
+    // Consumer only: retire the currently published prefix in O(1).
+    // A concurrently publishing producer may still add a later entry.
+    void discardPublished() noexcept {
+        read_.store(written_.load(std::memory_order_acquire),std::memory_order_release);
+    }
     [[nodiscard]] std::size_t sizeApprox() const noexcept {
         const auto r = read_.load(std::memory_order_acquire);
         const auto w = written_.load(std::memory_order_acquire);
@@ -56,6 +61,18 @@ public:
 };
 
 struct StereoFrame final { float left; float right; };
+// Legacy asynchronous guest capture: even epochs admit PCM, odd epochs
+// suspend capture. Distinguish old in-flight callbacks on resume.
+class LegacyCaptureGate final {
+    std::atomic<std::uint32_t> epoch_{0};
+public:
+    std::uint32_t epoch() const noexcept {return epoch_.load(std::memory_order_acquire);}
+    void suspend() noexcept {epoch_.fetch_or(1u,std::memory_order_acq_rel);}
+    void resume() noexcept {
+        auto e=epoch();
+        if(e&1u)(void)epoch_.compare_exchange_strong(e,e+1u,std::memory_order_acq_rel);
+    }
+};
 enum class GuestCommand : std::uint8_t { Midi, VoiceControls, AbsoluteSends };
 struct MidiEvent final {
     std::uint64_t absoluteHostSample;
@@ -75,7 +92,8 @@ struct MidiEvent final {
 // All queues are per instance and never share mutable state.
 // Host-rate resampling and guest scheduling are NOT yet implemented.
 class RealtimeQueues final {
-    SpscQueue<StereoFrame, 32768> audio_{};
+    struct TaggedFrame {StereoFrame sample;std::uint32_t epoch;};
+    SpscQueue<TaggedFrame, 32768> audio_{};
     SpscQueue<MidiEvent, 4096> midi_{};
     std::atomic<std::uint64_t> audioDrops_{0};
     std::atomic<std::uint64_t> midiDrops_{0};
@@ -83,8 +101,8 @@ class RealtimeQueues final {
     std::atomic<std::uint64_t> midiRecoveryEpoch_{0};
     std::atomic<std::uint64_t> audioUnderruns_{0};
 public:
-    bool pushAudio(const StereoFrame& frame) noexcept {
-        if (audio_.tryPush(frame)) return true;
+    bool pushAudio(const StereoFrame& frame,std::uint32_t epoch=0) noexcept {
+        if (audio_.tryPush({frame,epoch})) return true;
         audioDrops_.fetch_add(1, std::memory_order_relaxed);
         return false;
     }
@@ -123,14 +141,15 @@ public:
     }
     bool peekMidi(MidiEvent& event) const noexcept {return midi_.tryPeek(event);}
     bool popMidi(MidiEvent& event) noexcept { return midi_.tryPop(event); }
-    std::size_t readAudio(float* left, float* right, std::size_t frames) noexcept {
+    void discardAudio() noexcept {audio_.discardPublished();}
+    std::size_t readAudio(float* left,float* right,std::size_t frames,std::uint32_t epoch=0) noexcept {
         if (!left || !right) return 0;
         std::size_t available = 0;
-        StereoFrame frame{};
+        TaggedFrame frame{};
         for (std::size_t i = 0; i < frames; ++i) {
-            if (audio_.tryPop(frame)) {
-                left[i] = frame.left;
-                right[i] = frame.right;
+            if (audio_.tryPop(frame)&&frame.epoch==epoch) {
+                left[i] = frame.sample.left;
+                right[i] = frame.sample.right;
                 ++available;
             } else {
                 left[i] = 0.f;

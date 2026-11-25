@@ -23,6 +23,7 @@
 #include <thread>
 #include <chrono>
 #include "pluginterfaces/vst/ivstevents.h"
+#include "pluginterfaces/vst/vstspeaker.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 namespace S=Steinberg;
 namespace V=Steinberg::Vst;
@@ -183,6 +184,13 @@ int main(int argc,char** argv){
     if(component->queryInterface(V::IEditController::iid,reinterpret_cast<void**>(&controller))!=S::kResultOk||!controller)
         return fail("controller unavailable");
 
+    // Reject a mono request without mutating the actual stereo configuration.
+    V::SpeakerArrangement mono=V::SpeakerArr::kMono,stereo=V::SpeakerArr::kStereo,actual{};
+    if(processor->setBusArrangements(nullptr,0,&mono,1)==S::kResultOk||
+       processor->getBusArrangement(V::kOutput,0,actual)!=S::kResultOk||actual!=stereo||
+       processor->setBusArrangements(nullptr,0,&stereo,1)!=S::kResultOk)
+        return fail("stereo-only bus negotiation");
+    std::cout<<"AUDIT_STEREO_BUS_CONTRACT PASS\n";
     using Clock=std::chrono::steady_clock;
     using namespace std::chrono;
     if(component->activateBus(V::kAudio,V::kOutput,0,true)!=S::kResultOk||

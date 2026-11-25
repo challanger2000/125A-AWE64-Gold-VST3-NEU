@@ -52,4 +52,13 @@ int main(){
  CHECK(b.readAudio(lb,rb,1)==0);
  CHECK(integration::DosBoxHostAdapter::readPort(nullptr,0xBEE0)==0xffu);
  integration::DosBoxHostAdapter::receivePCM(nullptr,pcm.data(),4);
+ auto gate=std::make_shared<rt::LegacyCaptureGate>();
+ auto pausedQueue=std::make_unique<rt::RealtimeQueues>();
+ integration::DosBoxHostAdapter paused(*pausedQueue,nullptr,false,nullptr,nullptr,gate);
+ gate->suspend();
+ for(unsigned i=0;i<10000;++i)integration::DosBoxHostAdapter::receivePCM(&paused,pcm.data(),4);
+ CHECK(pausedQueue->snapshot().audioFrames==0&&pausedQueue->audioDrops()==0&&paused.suspendedFrames()==40000);
+ pausedQueue->discardAudio();gate->resume();
+ integration::DosBoxHostAdapter::receivePCM(&paused,pcm.data(),4);
+ CHECK(pausedQueue->readAudio(l,r,4,gate->epoch())==4&&l[2]==.5f&&r[2]==-.5f);
 }

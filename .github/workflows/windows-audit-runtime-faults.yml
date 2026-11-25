@@ -114,6 +114,10 @@ jobs:
                       print('AUDIT_A04_PAUSE NOT_VERIFIED missing counters');failed.append(mode)
                   else:
                       drops=int(counters[0][1]); print('AUDIT_A04_PAUSE', 'PASS' if drops==0 else 'FAIL', 'audio_drops='+str(drops))
+                      suspended=re.findall(r'PERF_SUSPENDED_FRAMES=(\d+)',p.stdout)
+                      if len(suspended)!=1 or int(suspended[0])<=0:
+                          print('AUDIT_A04_SUSPEND_ACCOUNTING NOT_VERIFIED');failed.append(mode)
+                      else:print('AUDIT_A04_SUSPEND_ACCOUNTING PASS intentional_frames='+suspended[0])
                       if drops:failed.append(mode)
           print('AUDIT_RUNTIME_CASES_FAILED',failed,flush=True)
           sys.exit(bool(failed))

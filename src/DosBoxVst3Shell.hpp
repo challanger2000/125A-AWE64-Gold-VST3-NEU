@@ -25,6 +25,8 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     AWE125::PresetCatalog unusedFmCatalog_{};
     // The worker owns all true original DOSBox-X guest audio/MIDI queues.
     // Constructed on the non-real-time VST3 activation thread.
+    std::shared_ptr<rt::LegacyCaptureGate> captureGate_=std::make_shared<rt::LegacyCaptureGate>();
+    std::atomic<bool> legacyProcessing_{true};
     std::unique_ptr<integration::DosBoxRuntimeHost> runtime_;
     std::atomic<int> guestStatus_{0};
     std::uint64_t absoluteSamplePosition_=0;
@@ -78,6 +80,8 @@ public:
         Steinberg::Vst::CtrlNumber number,Steinberg::Vst::ParamID& id) override;
     Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown*) override;
     Steinberg::tresult PLUGIN_API setActive(Steinberg::TBool) override;
+    Steinberg::tresult PLUGIN_API setBusArrangements(Steinberg::Vst::SpeakerArrangement*,Steinberg::int32,
+        Steinberg::Vst::SpeakerArrangement*,Steinberg::int32) override;
     Steinberg::tresult PLUGIN_API canProcessSampleSize(Steinberg::int32) override;
     Steinberg::uint32 PLUGIN_API getLatencySamples() override;
     Steinberg::tresult PLUGIN_API setupProcessing(Steinberg::Vst::ProcessSetup&) override;

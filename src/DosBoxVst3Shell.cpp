@@ -183,7 +183,7 @@ bool DosBoxVst3Shell::startRuntimeLocked(const std::string& selected,
         if(preparedCatalog)candidate=std::move(*preparedCatalog);
         else if(!loadCatalog(selected,candidate,validatedBank))return false;
         if(ownBinary.empty()||!engine->begin(ownBinary,privateDir,selected,
-                demandRequested_?hostDemand_.lead():0u,validatedBank)) {
+                demandRequested_?hostDemand_.lead():0u,validatedBank,captureGate_)) {
             if(!runtime_)guestStatus_.store(-1,std::memory_order_release);
             return false;
         }
@@ -222,6 +222,13 @@ tresult PLUGIN_API DosBoxVst3Shell::setActive(TBool state) {
     stopRuntimeLocked();
     return SingleComponentEffect::setActive(false);
 }
+tresult PLUGIN_API DosBoxVst3Shell::setBusArrangements(SpeakerArrangement* inputs,int32 numIns,
+    SpeakerArrangement* outputs,int32 numOuts) {
+    // Native mixer and every process path are stereo-only. Decline unsupported
+    // requests without changing the bus metadata or later process buffer shape.
+    if(numIns!=0||numOuts!=1||!outputs||outputs[0]!=SpeakerArr::kStereo)return kResultFalse;
+    return SingleComponentEffect::setBusArrangements(inputs,numIns,outputs,numOuts);
+}
 tresult PLUGIN_API DosBoxVst3Shell::canProcessSampleSize(int32 size) {
     return size==kSample32?kResultTrue:kResultFalse;
 }
@@ -234,6 +241,13 @@ tresult PLUGIN_API DosBoxVst3Shell::setProcessing(TBool state) {
     // Full deactivate/reactivate is a separate reset; this is not a seek.
     if(demandActive_.load(std::memory_order_acquire))
         timedProcessing_.store(state!=0,std::memory_order_release);
+    else {
+        // The legacy guest stays on its original asynchronous timebase.
+        // Do not accumulate PCM when the host requests no callbacks.
+        if(!state)captureGate_->suspend();
+        legacyProcessing_.store(state!=0,std::memory_order_release);
+        // Resume/reprime only on the first actual process callback.
+    }
     return kResultOk;
 }
 uint32 PLUGIN_API DosBoxVst3Shell::getLatencySamples() {
@@ -276,6 +290,14 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         guestStatus_.store(-2,std::memory_order_release);
         silence();
         return kResultFalse; // original DOS guest exited; no fake playback
+    }
+    if(data.numSamples>0&&!legacyProcessing_.load(std::memory_order_acquire)){
+        silence();return kResultFalse;
+    }
+    if(data.numSamples>0&&(captureGate_->epoch()&1u)){
+        engine.discardLegacyAudio();
+        rateConverter_.reset();
+        captureGate_->resume();
     }
     const bool ready=engine.ready(data.numSamples>0?static_cast<std::size_t>(data.numSamples):0u);
     if(ready)guestStatus_.store(2,std::memory_order_release);

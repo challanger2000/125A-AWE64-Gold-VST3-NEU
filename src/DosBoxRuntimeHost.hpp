@@ -13,6 +13,7 @@
 #endif
 #include <windows.h>
 #include <bcrypt.h>
+#include <process.h>
 #include "CreativeSysexRepair.hpp"
 #include "DosBoxHostAdapter.hpp"
 #include "ExternalSoundFont.hpp"
@@ -33,7 +34,7 @@
 #include <utility>
 
 namespace awe64::integration {
-class DosBoxRuntimeHost final {
+class DosBoxRuntimeCore final {
     // DOSBox globals are private to each independently mapped image.
     // Use a unique DLL filename AND directory for every activation, never
     // share the in-bundle module's writable globals between components.
@@ -82,6 +83,7 @@ class DosBoxRuntimeHost final {
         const int slot=persistentControllerSlot(e);
         if(slot>=0){lostControllers_[static_cast<unsigned>(slot)]=e;haveLostControllers_=true;}
     }
+    std::shared_ptr<rt::LegacyCaptureGate> captureGate_;
     std::unique_ptr<rt::RealtimeQueues> queues_;
     std::unique_ptr<DosBoxHostAdapter> adapter_;
     std::thread worker_;
@@ -152,10 +154,10 @@ class DosBoxRuntimeHost final {
     }
 
 public:
-    DosBoxRuntimeHost()=default;
-    DosBoxRuntimeHost(DosBoxRuntimeHost const&)=delete;
-    DosBoxRuntimeHost& operator=(DosBoxRuntimeHost const&)=delete;
-    ~DosBoxRuntimeHost(){stop();}
+    DosBoxRuntimeCore()=default;
+    DosBoxRuntimeCore(DosBoxRuntimeCore const&)=delete;
+    DosBoxRuntimeCore& operator=(DosBoxRuntimeCore const&)=delete;
+    ~DosBoxRuntimeCore(){(void)stop(false);}
 
     static std::filesystem::path pluginBinaryPath() noexcept {
         static const int addressAnchor=0;
@@ -176,8 +178,10 @@ public:
     bool begin(const std::filesystem::path& binary,
                const std::filesystem::path& privateDir,
                const std::string& externalBank={},unsigned demandLead=0,
-               const std::vector<std::uint8_t>* validatedBank=nullptr) {
+               const std::vector<std::uint8_t>* validatedBank=nullptr,
+               std::shared_ptr<rt::LegacyCaptureGate> captureGate={}) {
         if(module_ || worker_.joinable())return false;
+        captureGate_=demandLead?nullptr:std::move(captureGate);
         if(demandLead && (demandLead<=2*rt::GuestDemandClock::maxTickFrames ||
                          demandLead>=rt::GuestDemandClock::ringFrames/2))return false;
         demandLead_=demandLead;
@@ -260,7 +264,7 @@ public:
             lostControllers_.fill({});haveLostControllers_=false;
             queues_=std::make_unique<rt::RealtimeQueues>();
             if(demandLead_&&!authenticGuest_){stop();return false;}
-            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_,demandLead_!=0,voiceControls_,sends_);
+            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_,demandLead_!=0,voiceControls_,sends_,captureGate_);
             if(demandLead_ && !adapter_->publishDemand(demandLead_-2*rt::GuestDemandClock::maxTickFrames)) {
                 stop();return false;
             }
@@ -338,20 +342,25 @@ public:
         }
     }
 
-    void stop() noexcept {
-        // Called ONLY during non-RT VST3 deactivation or destruction.
+    bool stop(bool bounded=true) noexcept {
+        // Non-RT only. An OS-signalled thread handle proves that it is
+        // safe to join/unregister callbacks/unload the original DLL.
         if(worker_.joinable()) {
-            // An immediate host deactivate (SDK state transition) can arrive
-            // before BIOS/DOS initialization. Prefer the actual UART-ready
-            // boundary rather than aborting a half-booted emulated PC.
-            // Bounded non-RT wait; no added delay for an already ready guest.
-            const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(3);
-            while(ready_&&!ready_()&&!finished_.load(std::memory_order_acquire)&&
-                  std::chrono::steady_clock::now()<deadline)
-                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            using Clock=std::chrono::steady_clock;
+            using namespace std::chrono;
+            const auto deadline=Clock::now()+milliseconds(2500);
+            if(bounded){
+                const auto bootDeadline=Clock::now()+milliseconds(1500);
+                while(ready_&&!ready_()&&!finished_.load(std::memory_order_acquire)&&Clock::now()<bootDeadline)
+                    std::this_thread::sleep_for(milliseconds(5));
+            }
             if(requestStop_)requestStop_();
-            // Cooperative join requires original DOSBox to poll GFX_Events;
-            // a permanently blocked guest remains an unresolved risk.
+            if(bounded){
+                const auto remaining=duration_cast<milliseconds>(deadline-Clock::now()).count();
+                const DWORD waitMs=static_cast<DWORD>(std::max<std::int64_t>(0,remaining));
+                if(WaitForSingleObject(worker_.native_handle(),waitMs)!=WAIT_OBJECT_0)return false;
+            }
+            // Unbounded wait only in the reaper or fail-closed OS failure path.
             worker_.join();
             const int code=guestExitCode_.load(std::memory_order_acquire);
             if(code!=0) {
@@ -371,6 +380,8 @@ public:
                 depthMin_,depthMax_,double(depthTotal_)/double(measuredBlocks_),midiDepthMax_);
             std::fflush(stdout);
         }
+        if(performanceStats_&&adapter_)
+            std::printf("PERF_SUSPENDED_FRAMES=%llu\n",static_cast<unsigned long long>(adapter_->suspendedFrames()));
         performanceStats_=measurementStarted_=false;
         if(sends_)sends_(0x10000u);
         if(voiceControls_)voiceControls_(0,0);
@@ -382,6 +393,7 @@ public:
         if(registerClock_)registerClock_(nullptr,nullptr);
         adapter_.reset();
         queues_.reset();
+        captureGate_.reset();
         if(module_) {
             // Diagnose unexpected retained loader references; never force
             // unload a module owned by another Windows subsystem.
@@ -405,6 +417,7 @@ public:
             stagedDirectory_.clear();
         }
         running_.store(false,std::memory_order_release);
+        return true;
     }
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
         if(!ready_||!ready_()||(clockFault_&&clockFault_()))return false;
@@ -509,11 +522,94 @@ public:
     void measureQueueAfterBlock() noexcept {
         if(measurementStarted_&&queues_)measurementEnd_=queues_->snapshot();
     }
+    // Consumer only, while capture is still suspended. Old-generation
+    // frames from an in-flight callback are rejected by the epoch check.
+    void discardLegacyAudio() noexcept {if(queues_)queues_->discardAudio();pcmPrimed_=false;}
     std::size_t readAudio(float* left,float* right,std::size_t n) noexcept {
-        return queues_?queues_->readAudio(left,right,n):0u;
+        return queues_?queues_->readAudio(left,right,n,captureGate_?captureGate_->epoch():0u):0u;
     }
     std::uint64_t underruns() const noexcept {
         return queues_?queues_->audioUnderruns():0;
     }
+};
+
+// Exceptional shutdown: retain the entire core, including callbacks,
+// queues, thread, staged DLL and paths, until actual thread termination.
+// Pin this VST3 module on timeout only so its code cannot unload while
+// the reaper or original guest calls it. No forced thread termination.
+// This is bounded-worker shutdown containment, not arbitrary crash isolation.
+class DosBoxRuntimeHost final {
+    std::unique_ptr<DosBoxRuntimeCore> core_;
+    inline static std::atomic<unsigned> quarantined_{0};
+    static unsigned __stdcall reap(void* ptr) noexcept {
+        auto* core=static_cast<DosBoxRuntimeCore*>(ptr);
+        (void)core->stop(false);
+        delete core;
+        quarantined_.fetch_sub(1,std::memory_order_acq_rel);
+        return 0;
+    }
+    static bool pinContainingModule() noexcept {
+        static const int anchor=0;
+        HMODULE module=nullptr;
+        return GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|
+                                  GET_MODULE_HANDLE_EX_FLAG_PIN,
+                                  reinterpret_cast<LPCWSTR>(&anchor),&module)!=0;
+    }
+public:
+    DosBoxRuntimeHost()=default;
+    DosBoxRuntimeHost(const DosBoxRuntimeHost&)=delete;
+    DosBoxRuntimeHost& operator=(const DosBoxRuntimeHost&)=delete;
+    ~DosBoxRuntimeHost(){stop();}
+    static std::filesystem::path pluginBinaryPath() noexcept {return DosBoxRuntimeCore::pluginBinaryPath();}
+    static std::filesystem::path privateAssetsDir(const std::filesystem::path& p){return DosBoxRuntimeCore::privateAssetsDir(p);}
+    static unsigned quarantinedRuntimeCount() noexcept {return quarantined_.load(std::memory_order_acquire);}
+    bool begin(const std::filesystem::path& binary,const std::filesystem::path& dir,
+               const std::string& bank={},unsigned demandLead=0,
+               const std::vector<std::uint8_t>* validatedBank=nullptr,
+               std::shared_ptr<rt::LegacyCaptureGate> captureGate={}) {
+        if(core_||quarantinedRuntimeCount())return false;
+        try{
+            auto core=std::make_unique<DosBoxRuntimeCore>();
+            if(!core->begin(binary,dir,bank,demandLead,validatedBank,std::move(captureGate)))return false;
+            core_=std::move(core);return true;
+        }catch(...){return false;}
+    }
+    void stop() noexcept {
+        if(!core_)return;
+        if(core_->stop()){core_.reset();return;}
+        if(!pinContainingModule()){
+            // If the OS refuses the lifetime guard, never free live code.
+            std::fprintf(stderr,"AWE64_RUNTIME_QUARANTINE_PIN_FAILED\n");
+            (void)core_->stop(false);core_.reset();return;
+        }
+        auto* stranded=core_.release();
+        quarantined_.fetch_add(1,std::memory_order_acq_rel);
+        const auto thread=_beginthreadex(nullptr,0,&DosBoxRuntimeHost::reap,stranded,0,nullptr);
+        if(thread)CloseHandle(reinterpret_cast<HANDLE>(thread));
+        // Reaper creation failure retains the entire core until process exit.
+        std::fprintf(stderr,"AWE64_RUNTIME_QUARANTINED reaper=%s\n",thread?"started":"unavailable");
+    }
+    bool ready(std::size_t frames=0) noexcept {return core_&&core_->ready(frames);}
+    bool running() const noexcept {return core_&&core_->running();}
+    bool finished() const noexcept {return !core_||core_->finished();}
+    int guestExitCode() const noexcept {return core_?core_->guestExitCode():-1;}
+    void setVoiceControls(std::uint64_t lo,unsigned hi) noexcept {if(core_)core_->setVoiceControls(lo,hi);}
+    void setAbsoluteSends(unsigned r,unsigned c) noexcept {if(core_)core_->setAbsoluteSends(r,c);}
+    bool clocked() const noexcept {return core_&&core_->clocked();}
+    unsigned demandLead() const noexcept {return core_?core_->demandLead():0;}
+    std::uint64_t guestFrames() const noexcept {return core_?core_->guestFrames():0;}
+    bool publishDemand(std::uint64_t horizon) noexcept {return core_&&core_->publishDemand(horizon);}
+    bool submitTimed(rt::MidiBlockBatch& b,const rt::MidiTimeline& t) noexcept {return core_&&core_->submitTimed(b,t);}
+    void requestMidiRecovery() noexcept {if(core_)core_->requestMidiRecovery();}
+    std::size_t audioFramesAvailable() const noexcept {return core_?core_->audioFramesAvailable():0;}
+    bool waitForAudio(std::size_t n,bool offline) noexcept {return core_&&core_->waitForAudio(n,offline);}
+    std::uint64_t midiRecoveryEpoch() const noexcept {return core_?core_->midiRecoveryEpoch():0;}
+    bool midiRecoveryPending() const noexcept {return core_&&core_->midiRecoveryPending();}
+    bool sendMidi(const rt::MidiEvent& e) noexcept {return core_&&core_->sendMidi(e);}
+    void measureQueueBeforeBlock() noexcept {if(core_)core_->measureQueueBeforeBlock();}
+    void measureQueueAfterBlock() noexcept {if(core_)core_->measureQueueAfterBlock();}
+    void discardLegacyAudio() noexcept {if(core_)core_->discardLegacyAudio();}
+    std::size_t readAudio(float* l,float* r,std::size_t n) noexcept {return core_?core_->readAudio(l,r,n):0;}
+    std::uint64_t underruns() const noexcept {return core_?core_->underruns():0;}
 };
 } // namespace awe64::integration

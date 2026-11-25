@@ -68,8 +68,12 @@ int main(int argc,char** argv){
             // to hold the calling host thread beyond the existing 3-s
             // boot-wait bound. This is a bounded synthetic fault, not a
             // claim about natural DOSBox hang frequency.
-            const bool pass=elapsed<=3000;
-            std::cout<<"AUDIT_A05_NATIVE_STOP_BOUND "<<(pass?"PASS":"FAIL")<<std::endl;
+            const auto count=awe64::integration::DosBoxRuntimeHost::quarantinedRuntimeCount();
+            const bool refused=!h.begin(exe,dir);
+            const bool reaped=wait([]{return awe64::integration::DosBoxRuntimeHost::quarantinedRuntimeCount()==0;});
+            const bool pass=elapsed<=3000&&count==1&&refused&&reaped;
+            std::cout<<"AUDIT_A05_NATIVE_STOP_BOUND "<<(pass?"PASS":"FAIL")
+                     <<" quarantined="<<count<<" new_begin_refused="<<refused<<" reaped="<<reaped<<std::endl;
             failures+=!pass;
         }
     }

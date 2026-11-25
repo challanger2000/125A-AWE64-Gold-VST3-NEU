@@ -9,6 +9,24 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 25.11.2026 — Stabilisierung 1: ausgeführter Nachtest und Bus-Vertrag
+
+- Commit `88273211`: [22/22 auf Linux und Windows](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45705048430); [Paketierung 3/3](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45705048428); [SF2 Loopgrenzen + Same-Path-Recall PASS](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45705048568).
+- [Nativer VST3-Fehlertest](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45705048493): frühe Note hörbar (Peak 0,304901), Master-Hälfte exakt 0, zweite 0,247589; synchron fehlgeschlagener Bankwechsel erhält State und laufendes Audio (Peak 0,248596). Alle drei PASS. Pause weiterhin FAIL (19.968 Overflow-Frames) auf 88273211.
+- [Native ABI](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45705048544): CC7-Recovery PASS; blockierender Shutdown 5.999 ms FAIL. Stabilisierung 2 adressiert beide Restfälle.
+- [Vollständiger nativer Lauf](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45705048512): echter DOSBox-DLL/MPU-/PCM-/Dual-Instanz-Transport PASS, Validator jedoch 44/47 statt 47/47. Die geerbte SDK-Methode akzeptierte Mono und änderte den Bus dauerhaft; neue strikte Stereo-Prüfung im process() wies danach Mono-Buffer zurück, auch die nachfolgenden Automationstests. SDK-Quellstand geprüft; diese Ursache wird durch explizite Stereo-only-Busverhandlung und realen Host-Negativtest adressiert. Keine Validator- oder Automationstest-Abschwächung. Neuer Nachweis offen.
+- Shutdown-Kandidat nutzt 1,5 s Bootreserve innerhalb des 2,5-s-Wait-Budgets, um die normale UART-Initialisierung zu ermöglichen. Keine Freigabe, kein Originalklang- oder vollständiger Auditnachweis; A22 Fatalausgang bleibt offen.
+
+## 25.11.2026 — Stabilisierung 2: Legacy-Processing-Pause ohne FIFO-Überlauf und Alt-PCM
+
+- A04: bei Processing-Suspend stoppt die Erfassung von PCM aus dem asynchronen Gast, absichtlich nicht angeforderte Frames separat gezählt. Auf Resume published Audioqueue in O(1) als Consumer leeren, SRC/Priming resetten, epoch-markierte PCM-Einträge verhindern Ausgabe verspäteter alter Producer-Frames. Shared CaptureGate bleibt auch bei quarantänisiertem Core gültig. Kein Lock/Heap/Wait in setProcessing; bisherige Original-Gast-Zeitbasis läuft im Legacy-Modus bewusst weiter (keine Behauptung eines virtuellen Freeze). Experimenteller Demand-Pfad bleibt unverändert.
+- Neue portable Pause-/Resume-Tests inklusive absichtlich verspäteter Callback-Generation und 40.000 suspendierter Frames; vorhandener nativer Pausentest muss 0 Overflow-Drops plus explizite Suspend-Zähler nachweisen. Native/portable Ergebnisse offen.
+
+## 25.11.2026 — Stabilisierung 2: Begrenztes Shutdown bei nichtkooperativem Worker
+
+- A05: reale Windows-Threadbeendigung mit WaitForSingleObject statt unbeschränktem Join auf dem Hostthread; 2,5-s-Wait-Budget (mit 1,5-s-Bootreserve innerhalb des Budgets). Bei Timeout gesamte RuntimeCore-Lebensdauer an Hintergrund-Reaper übertragen, um Callback-Kontext, DLL, Thread und Staging nicht vor Ende zu zerstören. Nur im Fehlerfall VST3-Modulabbildung bis Prozessende pinnen; keine neuen Aktivierungen bis Quarantäne geräumt. Kein TerminateThread, kein Unload eines laufenden DLL-Threads. Bei OS-Pin-Fehler sicherer blockierender Fallback, bei Reaper-Startfehler bewusst Quarantäne bis Hostprozessende. Keine allgemeine Crash-Isolation (A22 bleibt offen).
+- Erweiterter nativer Shim-Test: kooperativer Stop, 6-s-Stall mit tatsächlichem Timeout/Quarantäne, abgelehntem Neu-Start und anschließendem Reaping. Windows-Nachweis ausstehend. Original-DOSBox/EMU8000 und GUI unverändert.
+
 ## 25.11.2026 — Stabilisierung 1 ergänzt: Host-Master, frühe MIDI-Eingaben, CC-Recovery
 
 - A01: Master-Gain-Punkte im Defaultpfad linear im Host-Samplebereich anwenden, mit fester 4096-Punkte-Kapazität, Flush- und Grenztests. Nicht gleichbedeutend mit samplegenauer MPU/Overlay-Zeitplanung.

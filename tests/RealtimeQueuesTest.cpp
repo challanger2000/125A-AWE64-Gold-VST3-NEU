@@ -33,6 +33,19 @@ int main() {
     CHECK(left[1] == 0.f && right[3] == 0.f);
     CHECK(b.audioUnderruns() == 0 && b.audioDrops() == 0);
 
+    // A delayed callback from before suspension must never emit old PCM
+    // after resume, even if it publishes after the consumer's O(1) discard.
+    LegacyCaptureGate gate;
+    const auto oldEpoch=gate.epoch();
+    CHECK(a.pushAudio({.75f,-.75f},oldEpoch));
+    gate.suspend();gate.suspend();CHECK((gate.epoch()&1u)==1u);
+    a.discardAudio();
+    gate.resume();gate.resume();CHECK(gate.epoch()==oldEpoch+2);
+    CHECK(a.pushAudio({.9f,.9f},oldEpoch)); // deliberately late producer
+    CHECK(a.pushAudio({.25f,-.25f},gate.epoch()));
+    CHECK(a.readAudio(left,right,2,gate.epoch())==1);
+    CHECK(left[0]==0.f&&right[0]==0.f&&left[1]==.25f&&right[1]==-.25f);
+
     const MidiEvent midi{729, 0x90, 60, 127, 3};
     CHECK(a.pushMidi(midi));
     CHECK(a.snapshot().midiEvents==1);

@@ -1,4 +1,5 @@
 #pragma once
+#include <utility>
 // Same-process DOSBox-X C ABI -> original Creative DOS mailbox / real mixer PCM.
 #include "CreativeDosMailbox.hpp"
 #include "CreativeEffectMidi.hpp"
@@ -6,6 +7,7 @@
 #include "AWE64_DOSBOX_ABI.h"
 #include <cstdint>
 #include <array>
+#include <memory>
 #if defined(_WIN32)
 #define AWE64_ABI_CALL __cdecl
 #else
@@ -21,6 +23,8 @@ class DosBoxHostAdapter final {
     const bool clocked_;
     const AWE64_SetVoiceControlsFn voiceControls_;
     const AWE64_SetAbsoluteSendsFn sends_;
+    const std::shared_ptr<rt::LegacyCaptureGate> captureGate_;
+    std::atomic<std::uint64_t> suspendedFrames_{0};
     rt::GuestDemandClock demand_;
     std::atomic<std::uint64_t> guestFrames_{0};
     std::atomic<std::uint64_t> lateMidi_{0};
@@ -85,9 +89,11 @@ public:
     explicit DosBoxHostAdapter(rt::RealtimeQueues& q,AWE64_IsGuestMidiReadyFn ready=nullptr,
                                bool clocked=false,
                                AWE64_SetVoiceControlsFn voiceControls=nullptr,
-                               AWE64_SetAbsoluteSendsFn sends=nullptr) noexcept:
+                               AWE64_SetAbsoluteSendsFn sends=nullptr,
+                               std::shared_ptr<rt::LegacyCaptureGate> captureGate={}) noexcept:
         queues_(q),mailbox_(q),ready_(ready),clocked_(clocked),
-        voiceControls_(voiceControls),sends_(sends){}
+        voiceControls_(voiceControls),sends_(sends),captureGate_(clocked?nullptr:std::move(captureGate)){}
+    std::uint64_t suspendedFrames() const noexcept {return suspendedFrames_.load(std::memory_order_relaxed);}
     std::uint64_t guestFrames() const noexcept {return guestFrames_.load(std::memory_order_acquire);}
     bool publishDemand(std::uint64_t horizon) noexcept {
         return clocked_&&demand_.publish(horizon);
@@ -181,7 +187,16 @@ public:
         if(self->ready_&&!self->ready_())return;
         auto& ring=self->queues_;
         constexpr float scale=1.f/32768.f;
-        for(unsigned int i=0;i<frames;i++)
+        if(self->captureGate_){
+            const auto epoch=self->captureGate_->epoch();
+            if(epoch&1u){self->suspendedFrames_.fetch_add(frames,std::memory_order_relaxed);return;}
+            for(unsigned int i=0;i<frames;++i){
+                if(self->captureGate_->epoch()!=epoch){
+                    self->suspendedFrames_.fetch_add(frames-i,std::memory_order_relaxed);break;
+                }
+                (void)ring.pushAudio({float(s[2u*i])*scale,float(s[2u*i+1u])*scale},epoch);
+            }
+        }else for(unsigned int i=0;i<frames;i++)
             (void)ring.pushAudio({float(s[2u*i])*scale,float(s[2u*i+1u])*scale});
         // Count generated frames, including dropped PCM; never pretend
         // the guest clock stopped when the host queue was full.
