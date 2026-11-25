@@ -68,6 +68,48 @@ public:
     }
 };
 
+// Independent host-side gesture recorder. A genuine GUI click must
+// update the component AND report exactly one balanced edit per parameter.
+class ResetHostHandler final : public V::IComponentHandler {
+    std::atomic<S::uint32> refs_{1};
+public:
+    std::array<unsigned,12> begin{},perform{},end{};
+    bool invalid=false, armed=false;
+    S::tresult PLUGIN_API queryInterface(const S::TUID iid,void** obj) override {
+        if(!obj)return S::kInvalidArgument;
+        *obj=nullptr;
+        if(S::FUnknownPrivate::iidEqual(iid,V::IComponentHandler::iid)||
+           S::FUnknownPrivate::iidEqual(iid,S::FUnknown::iid)){
+            *obj=static_cast<V::IComponentHandler*>(this);addRef();return S::kResultOk;
+        }
+        return S::kNoInterface;
+    }
+    S::uint32 PLUGIN_API addRef() override{return ++refs_;}
+    S::uint32 PLUGIN_API release() override{return --refs_;}
+    S::tresult PLUGIN_API beginEdit(V::ParamID id) override {
+        if(armed){if(id<1100u||id>=1112u)invalid=true;else ++begin[id-1100u];}
+        return S::kResultOk;
+    }
+    S::tresult PLUGIN_API performEdit(V::ParamID id,V::ParamValue value) override {
+        if(armed){
+            if(id<1100u||id>=1112u||value!=0.)invalid=true;
+            else ++perform[id-1100u];
+        }
+        return S::kResultOk;
+    }
+    S::tresult PLUGIN_API endEdit(V::ParamID id) override {
+        if(armed){if(id<1100u||id>=1112u)invalid=true;else ++end[id-1100u];}
+        return S::kResultOk;
+    }
+    S::tresult PLUGIN_API restartComponent(S::int32) override{return S::kResultOk;}
+    void arm(){begin.fill(0);perform.fill(0);end.fill(0);invalid=false;armed=true;}
+    bool passed() const {
+        if(invalid)return false;
+        for(unsigned i=0;i<12;++i)if(begin[i]!=1||perform[i]!=1||end[i]!=1)return false;
+        return true;
+    }
+};
+
 // The actual SDK host contract includes IPlugFrame: VSTGUI requests the
 // enclosing host to resize its HWND and acknowledge via IPlugView::onSize.
 class NativeEditorFrame final : public S::IPlugFrame {
@@ -270,7 +312,22 @@ int main(int argc,char** argv) {
             0,0,1050,780,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
         if(!parent)return fail("Native editor parent HWND creation failed");
         NativeEditorFrame frame(parent);
+        ResetHostHandler resetHandler;
+        if(controller->setComponentHandler(&resetHandler)!=S::kResultOk)
+            return fail("Editor host gesture handler refused");
         for(unsigned pass=0;pass<2;++pass) {
+            for(unsigned i=0;i<12;++i)
+                if(controller->setParamNormalized(1100u+i,(i+1)/13.)!=S::kResultOk||
+                   controller->getParamNormalized(1100u+i)<=0.)
+                    return fail("MOD RESET nonzero parameter precondition failed");
+            if(controller->setParamNormalized(1001,.63)!=S::kResultOk||
+               controller->setParamNormalized(1200,5./7.)!=S::kResultOk||
+               controller->setParamNormalized(1201,3./7.)!=S::kResultOk)
+                return fail("MOD RESET preserved parameter precondition failed");
+            constexpr std::array<V::ParamID,5> preservedIds{1000,1001,1002,1200,1201};
+            std::array<double,5> preserved{};
+            for(unsigned i=0;i<preserved.size();++i)
+                preserved[i]=controller->getParamNormalized(preservedIds[i]);
             std::cout<<"EDITOR_CREATE_ENTER "<<pass<<"\n";
             S::IPlugView* view=controller->createView(V::ViewType::kEditor);
             if(!view||view->isPlatformTypeSupported(S::kPlatformTypeHWND)!=S::kResultTrue)
@@ -294,12 +351,53 @@ int main(int argc,char** argv) {
                 return fail("Actual P165 editor geometry differs from approved 1000x708");
             MSG msg{};
             while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
+            // Original P165 panel starts at y=287, local coordinates
+            // subtract 232. Button rect 808,513,960,549 -> center 884,586.
+            // Deliver ordinary Win32 mouse messages to the actual VSTGUI
+            // child, not a private reset method or controller shortcut.
+            HWND surface=nullptr;
+            RECT surfaceRect{};
+            for(HWND child=GetWindow(parent,GW_CHILD);child;child=GetWindow(child,GW_HWNDNEXT)){
+                RECT cr{};
+                if(!GetClientRect(child,&cr)||cr.right<=0||cr.bottom<=0)continue;
+                const double sx=cr.right/1000.,sy=cr.bottom/708.;
+                if(sx<.5||sx>3.||std::abs(sx-sy)>.025)continue;
+                if(surface)return fail("MOD RESET ambiguous editor surface");
+                surface=child;surfaceRect=cr;
+            }
+            if(!surface)return fail("MOD RESET actual VSTGUI child window missing");
+            const auto x=static_cast<WORD>(std::lround(884.*surfaceRect.right/1000.));
+            const auto y=static_cast<WORD>(std::lround(586.*surfaceRect.bottom/708.));
+            const LPARAM xy=MAKELPARAM(x,y);
+            resetHandler.arm();
+            SendMessageW(surface,WM_MOUSEMOVE,0,xy);
+            SendMessageW(surface,WM_LBUTTONDOWN,MK_LBUTTON,xy);
+            SendMessageW(surface,WM_LBUTTONUP,0,xy);
+            while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
+            resetHandler.armed=false;
+            for(unsigned i=0;i<12;++i)
+                if(controller->getParamNormalized(1100u+i)!=0.)
+                    return fail("MOD RESET click did not zero parameter "+std::to_string(1100u+i));
+            for(unsigned i=0;i<preserved.size();++i)
+                if(controller->getParamNormalized(preservedIds[i])!=preserved[i])
+                    return fail("MOD RESET changed unrelated parameter");
+            if(!resetHandler.passed())return fail("MOD RESET host gesture contract failed");
+            S::MemoryStream resetState;
+            if(component->getState(&resetState)!=S::kResultOk||resetState.getSize()<11)
+                return fail("MOD RESET state save failed");
+            // Effects types are nondefault, so a fully reset state must
+            // use v3 (not v4 sends or v5 voice overlays).
+            if(static_cast<const unsigned char*>(resetState.getData())[4]!=3)
+                return fail("MOD RESET left nonneutral controls in component state");
+            std::cout<<"REAL_VST3_MOD_RESET_CLICK_PASS; PARAMS=12; GESTURES=12; PRESERVED=5; PASS="<<pass<<"\n";
             std::cout<<"EDITOR_REMOVE_ENTER "<<pass<<"\n";
             if(view->removed()!=S::kResultOk)return fail("Actual P165 editor detach failed");
             if(view->setFrame(nullptr)!=S::kResultOk)return fail("Actual editor clearFrame failed");
             view->release();
         }
         DestroyWindow(parent);
+        if(controller->setComponentHandler(nullptr)!=S::kResultOk)
+            return fail("Editor host gesture handler detach failed");
         controller->release();
         if(component->terminate()!=S::kResultOk)return fail("Editor component termination failed");
         processor->release();component->release();factory->release();

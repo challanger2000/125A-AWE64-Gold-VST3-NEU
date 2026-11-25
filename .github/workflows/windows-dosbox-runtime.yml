@@ -239,6 +239,18 @@ jobs:
           }
           $code=$LASTEXITCODE
           if ($code -ne 0 -or $summary.Count -ne 1) { throw "Full SDK validator failed; exit=$code" }
+      - name: Verify actual P165 editor lifecycle and MOD RESET click in independent Win32 host
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $plugin=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3').Path
+          $hostTestExe=(Resolve-Path 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe').Path
+          $log = & $hostTestExe $plugin --editor 2>&1
+          $code=$LASTEXITCODE
+          $log | ForEach-Object { Write-Host $_ }
+          $reset = @($log | Where-Object { "$_" -match '^REAL_VST3_MOD_RESET_CLICK_PASS; PARAMS=12; GESTURES=12; PRESERVED=5; PASS=[01]
+ })
+          if ($code -ne 0 -or $reset.Count -ne 2 -or ($reset | Select-Object -Unique).Count -ne 2) { throw "Native editor/MOD RESET gate FAILED; exit=$code" }
       - name: Original Creative archival-reference research in actual Windows VST3 (no private owner files)
         shell: pwsh
         timeout-minutes: 28
@@ -267,15 +279,6 @@ jobs:
           } finally {
             Remove-Item -LiteralPath $research -Recurse -Force -ErrorAction SilentlyContinue
           }
-      - name: Verify actual P165 editor open and close in independent Win32 host
-        shell: pwsh
-        timeout-minutes: 2
-        if: ${{ !cancelled() }}
-        run: |
-          $plugin=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3').Path
-          $hostTestExe=(Resolve-Path 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe').Path
-          & $hostTestExe $plugin --editor
-          if ($LASTEXITCODE -ne 0) { throw "Native editor lifecycle FAILED; exit=$LASTEXITCODE" }
       # The source repo is public. Never publish the developer binaries until
       # distribution permissions are cleared. A private-repo runner can
       # deliver the prebuilt asset-free package after BOTH existing gates.
