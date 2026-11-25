@@ -485,9 +485,49 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
 '''+run)
     return s+'''
 #ifdef AWE64_VST3_RUNTIME
+#include <cstring>
+#include <cstdio>
+// Embedded callers have a deliberately small, explicit command-line contract.
+// Fail before DOSBox initializes devices if an AWE ROM is missing or malformed.
+// Do not enter the standalone fallback/ROM-download or temporary-empty-ROM path.
+struct AWE64RomEntryGuard {
+    HANDLE file=INVALID_HANDLE_VALUE;
+    ~AWE64RomEntryGuard(){if(file!=INVALID_HANDLE_VALUE)CloseHandle(file);}
+    bool open(const char* path) {
+        if(!path||!*path)return false;
+        file=CreateFileA(path,GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,
+                         FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(file==INVALID_HANDLE_VALUE)return false;
+        LARGE_INTEGER size{};
+        return GetFileType(file)==FILE_TYPE_DISK&&GetFileSizeEx(file,&size)&&size.QuadPart==1048576;
+    }
+};
+static bool AWE64_ValidateExplicitRom(int argc,char** argv,AWE64RomEntryGuard& guard) {
+    if(argc<1||!argv||!argv[0])return false;
+    const char* rom=nullptr;
+    bool awe=false;
+    for(int i=1;i<argc;++i){
+        if(!argv[i])return false;
+        if(std::strcmp(argv[i],"-set")!=0)continue;
+        if(++i>=argc||!argv[i])return false;
+        constexpr char prefix[]="sblaster awe32rom=";
+        if(std::strncmp(argv[i],prefix,sizeof(prefix)-1)==0){
+            if(rom)return false; // ambiguous duplicate path
+            rom=argv[i]+sizeof(prefix)-1;
+        }else if(std::strcmp(argv[i],"sblaster sbtype=sbawe")==0)awe=true;
+    }
+    if(rom)return guard.open(rom);
+    return !awe;
+}
 // Must be invoked on a dedicated host-owned worker, inside the VST3 process.
 extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
     int argc,char** argv) {
+    AWE64RomEntryGuard rom;
+    if(!AWE64_ValidateExplicitRom(argc,argv,rom)){
+        std::fputs("AWE64_EMBEDDED_ROM_PREFLIGHT_REJECTED\\n",stderr);
+        std::fflush(stderr);
+        return -12564;
+    }
     // Never reset a stop request here: the VST3 host can deactivate before
     // the worker has entered this call. A late reset would cause join() hang.
     // The DLL is loaded afresh for each activation, so the flag starts false.

@@ -15,6 +15,7 @@ on:
       - 'tests/WindowsMpuGuestSmoke.py'
       - 'tests/WindowsDualRuntimeSmoke.py'
       - 'tests/WindowsAweHardwareSmoke.py'
+      - 'tools/audit_dosbox_fatal.py'
       - 'tests/MakeSpeakerCom.py'
       - 'tests/WindowsSpeakerPcmSmoke.py'
       - 'tests/MakeSyntheticDemoExe.py'
@@ -156,6 +157,13 @@ jobs:
           $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           python tests/WindowsAweHardwareSmoke.py --parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Original AWE32 EMU8000 hardware register smoke FAILED" }
+      - name: Reject invalid explicit ROM at real DLL entry and prove same-DLL recovery
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
+          python tools/audit_dosbox_fatal.py $dll
+          if ($LASTEXITCODE -ne 0) { throw "Embedded ROM entry/recovery regression failed" }
       - name: Prove non-silent PCM from real DOS PC-speaker hardware through ORIGINAL DOSBox-X mixer
         shell: pwsh
         run: |

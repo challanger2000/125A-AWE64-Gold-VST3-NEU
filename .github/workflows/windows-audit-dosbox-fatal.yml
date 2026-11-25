@@ -1,10 +1,7 @@
 name: Native audit - DOSBox fatal error isolation
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'tools/audit_dosbox_fatal.py'
-      - '.github/workflows/windows-audit-dosbox-fatal.yml'
+  # Normal regression is now in the main native workflow, avoiding two
+  # expensive original-core builds for the same commit.
   workflow_dispatch:
 permissions:
   contents: read
