@@ -28,6 +28,34 @@ EXPORT int AWE64_CALL AWE64_StartGuest(int argc,char** argv){
     const char* p=std::getenv("AWE64_AUDIT_SHIM_DIR");
     if(!m||!p)return 91;
     const std::string mode=m;const std::filesystem::path dir=p;
+    if(mode=="startup"){
+        if(!pcm||!midi)return 98;
+        ready.store(true,std::memory_order_release);
+        unsigned char bytes[11]{};
+        // Poll repeatedly before PCM is produced; the host's early packets
+        // must remain untouched until the actual PCM reserve is published.
+        for(unsigned n=0;n<100;++n){
+            if(midi(midiContext,bytes,11))std::ofstream(dir/"startup-premature").put('1');
+            std::this_thread::sleep_for(milliseconds(2));
+        }
+        std::ofstream(dir/"startup-polled").put('1');
+        while(!stop.load(std::memory_order_acquire)&&!std::filesystem::exists(dir/"resume"))
+            std::this_thread::sleep_for(milliseconds(1));
+        const int16_t frames[2048]{};
+        if(!stop.load(std::memory_order_acquire))pcm(pcmContext,frames,1024);
+        unsigned stage=0;
+        while(!stop.load(std::memory_order_acquire)){
+            const auto n=midi(midiContext,bytes,11);
+            if(n){
+                if(stage==0&&n==3&&bytes[0]==0xb0&&bytes[1]==0&&bytes[2]==0)++stage;
+                else if(stage==1&&n==2&&bytes[0]==0xc0&&bytes[1]==0)++stage;
+                else if(stage==2&&n==3&&bytes[0]==0x90&&bytes[1]==60&&bytes[2]==100){
+                    ++stage;std::ofstream(dir/"startup-delivered").put('1');
+                }else return 99;
+            }else std::this_thread::sleep_for(milliseconds(1));
+        }
+        return stage==3?0:99;
+    }
     if(mode=="candidate"){
         if(!pcm)return 97;
         ready.store(true,std::memory_order_release);

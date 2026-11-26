@@ -105,7 +105,9 @@ jobs:
           exe,plugin,bank=sys.argv[1:]
           failed=[]
           switch_control=False
-          for mode in ('early','pause','automation','switch','rollback','bootfail'):
+          # Cold startup is timing-sensitive; three independent fresh hosts
+          # must all preserve the exact first NoteOn. No retries-to-green.
+          for mode in ('early','early','early','pause','automation','switch','rollback','bootfail'):
               print('AUDIT_CASE_BEGIN',mode,flush=True)
               try:
                   p=subprocess.run([exe,plugin,mode,bank],capture_output=True,text=True,errors='replace',timeout=40)

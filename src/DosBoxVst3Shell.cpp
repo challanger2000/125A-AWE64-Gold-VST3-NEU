@@ -333,7 +333,10 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     // capture. Until then, even a ready candidate cannot build latency.
     if(data.numSamples>0)engine.startReplacementCapture();
     const bool ready=engine.ready(data.numSamples>0?static_cast<std::size_t>(data.numSamples):0u);
-    if(ready)guestStatus_.store(2,std::memory_order_release);
+    if(ready){
+        guestStatus_.store(2,std::memory_order_release);
+        if(data.numSamples>0)engine.startLegacyMidi();
+    }
     if(data.numSamples>0&&(!data.outputs||data.numOutputs!=1||data.outputs[0].numChannels!=2||
        !data.outputs[0].channelBuffers32||!data.outputs[0].channelBuffers32[0]||!data.outputs[0].channelBuffers32[1])){
         silence();return kResultFalse;

@@ -82,4 +82,20 @@ int main(){
  integration::DosBoxHostAdapter clocked(*clockQueue,nullptr,true,nullptr,nullptr,gate,true);
  integration::DosBoxHostAdapter::receivePCM(&clocked,pcm.data(),4);
  CHECK(clocked.guestFrames()==4&&clockQueue->readAudio(l,r,4)==4);
+ // Early packet stays in its original FIFO until the host explicitly
+ // arms the primed PCM transport. No retransmit or fabricated note.
+ auto startupQueue=std::make_unique<rt::RealtimeQueues>();
+ integration::DosBoxHostAdapter startup(*startupQueue,nullptr,false,nullptr,nullptr,gate,false,true);
+ CHECK(startupQueue->pushMidi({0,0xb0,0,0,3}));
+ CHECK(startupQueue->pushMidi({0,0xc0,0,0,2}));
+ CHECK(startupQueue->pushMidi({0,0x90,60,100,3}));
+ for(unsigned n=0;n<1000;++n)CHECK(integration::DosBoxHostAdapter::pullMidi(&startup,packet,3)==0);
+ CHECK(startupQueue->snapshot().midiEvents==3&&startup.pulledNoteOns()==0);
+ integration::DosBoxHostAdapter::receivePCM(&startup,pcm.data(),4);
+ CHECK(startupQueue->snapshot().audioFrames==4);
+ startup.startLegacyMidi();
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&startup,packet,3)==3&&packet[0]==0xb0);
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&startup,packet,3)==2&&packet[0]==0xc0);
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&startup,packet,3)==3&&packet[0]==0x90&&packet[1]==60&&packet[2]==100);
+ CHECK(integration::DosBoxHostAdapter::pullMidi(&startup,packet,3)==0&&startup.pulledNoteOns()==1);
 }

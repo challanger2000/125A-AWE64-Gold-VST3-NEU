@@ -18,7 +18,7 @@ int main(int argc,char** argv){
     if(argc!=3)return infra("usage: host mode synthetic-fixture-dir");
     const std::string mode=argv[1];
     const auto dir=std::filesystem::absolute(argv[2]);
-    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom"&&mode!="candidate")return infra("mode");
+    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom"&&mode!="candidate"&&mode!="startup")return infra("mode");
     // These files contain only self-generated fake bytes; use a fresh directory.
     if(!std::filesystem::create_directory(dir))return infra("fresh fixture dir");
     {std::ofstream f(dir/"awe32.raw",std::ios::binary);std::vector<char> zero(1048576,0);f.write(zero.data(),zero.size());}
@@ -32,7 +32,23 @@ int main(int argc,char** argv){
         return infra("real production RuntimeHost::begin");
     if(!wait([&]{return h.ready();}))return infra("shim readiness not observed");
     unsigned failures=0;
-    if(mode=="candidate"){
+    if(mode=="startup"){
+        if(!h.sendMidi({0,0xb0,0,0,3})||!h.sendMidi({0,0xc0,0,0,2})||
+           !h.sendMidi({0,0x90,60,100,3}))return infra("early startup MIDI queue");
+        if(!wait([&]{return std::filesystem::exists(dir/"startup-polled");}))
+            return infra("startup guest did not poll");
+        const bool noEarlyPull=!std::filesystem::exists(dir/"startup-premature");
+        const bool notPrimed=!h.ready(128);
+        std::ofstream(dir/"resume").put('1');
+        const bool primed=wait([&]{return h.ready(128);});
+        if(primed)h.startLegacyMidi();
+        const bool delivered=wait([&]{return std::filesystem::exists(dir/"startup-delivered");});
+        h.stop();
+        const bool pass=noEarlyPull&&notPrimed&&primed&&delivered;
+        std::cout<<"AUDIT_STARTUP_MIDI_PRIME "<<(pass?"PASS":"FAIL")<<" no_early_pull="<<noEarlyPull
+                 <<" not_primed="<<notPrimed<<" primed="<<primed<<" delivered="<<delivered<<std::endl;
+        failures+=!pass;
+    }else if(mode=="candidate"){
         if(!wait([&]{return std::filesystem::exists(dir/"candidate-burst-done");}))
             return infra("candidate PCM burst not produced");
         const auto before=h.audioFramesAvailable();
@@ -74,6 +90,9 @@ int main(int argc,char** argv){
                  <<" missing_rejected="<<missingRejected<<std::endl;
         failures+=!pass;
     }else if(mode=="recovery"){
+        // The explicit ABI fixture has no PCM source; arm the consumer
+        // directly for this independent overflow/recovery test.
+        h.startLegacyMidi();
         if(!h.sendMidi({0,0xb0,7,0,3})||!wait([&]{return std::filesystem::exists(dir/"baseline-received");}))
             return infra("CC7 baseline not consumed");
         for(unsigned n=0;n<4096;++n)

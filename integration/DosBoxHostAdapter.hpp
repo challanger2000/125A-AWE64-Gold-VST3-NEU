@@ -28,6 +28,10 @@ class DosBoxHostAdapter final {
     // Independent of the host pause gate: a replacement guest may boot
     // while the old guest is playing. It must not accumulate pre-handover PCM.
     std::atomic<bool> captureStarted_{true};
+    // Queue early MIDI immediately but do not hand it to the legacy UART
+    // before the host has a primed PCM transport. Independent of capture.
+    std::atomic<bool> legacyMidiStarted_{true};
+    std::atomic<std::uint64_t> pulledNoteOns_{0};
     std::atomic<std::uint64_t> replacementSuppressedFrames_{0};
     rt::GuestDemandClock demand_;
     std::atomic<std::uint64_t> guestFrames_{0};
@@ -95,10 +99,13 @@ public:
                                AWE64_SetVoiceControlsFn voiceControls=nullptr,
                                AWE64_SetAbsoluteSendsFn sends=nullptr,
                                std::shared_ptr<rt::LegacyCaptureGate> captureGate={},
-                               bool deferCapture=false) noexcept:
+                               bool deferCapture=false,bool deferLegacyMidi=false) noexcept:
         queues_(q),mailbox_(q),ready_(ready),clocked_(clocked),
         voiceControls_(voiceControls),sends_(sends),captureGate_(clocked?nullptr:std::move(captureGate)),
-        captureStarted_(clocked||!deferCapture){}
+        captureStarted_(clocked||!deferCapture),
+        legacyMidiStarted_(clocked||!deferLegacyMidi){}
+    void startLegacyMidi() noexcept {legacyMidiStarted_.store(true,std::memory_order_release);}
+    std::uint64_t pulledNoteOns() const noexcept {return pulledNoteOns_.load(std::memory_order_relaxed);}
     void startReplacementCapture() noexcept {captureStarted_.store(true,std::memory_order_release);}
     std::uint64_t replacementSuppressedFrames() const noexcept {
         return replacementSuppressedFrames_.load(std::memory_order_relaxed);
@@ -136,6 +143,7 @@ public:
         rt::MidiEvent ev{};
         auto* self=static_cast<DosBoxHostAdapter*>(ctx);
         auto& queue=self->queues_;
+        if(!self->legacyMidiStarted_.load(std::memory_order_acquire))return 0u;
         // In clocked mode, abort undelivered packets on overflow instead
         // of playing an arbitrarily far-future backlog before recovery.
         // Already delivered notes remain tracked and are explicitly released.
@@ -187,6 +195,7 @@ public:
         if(ev.size==3u)out[2]=ev.data2;
         recordLate();
         self->observeMidi(ev);
+        if(category==0x90u&&ev.data2)self->pulledNoteOns_.fetch_add(1,std::memory_order_relaxed);
         return ev.size;
     }
     static void AWE64_ABI_CALL receivePCM(void* ctx,const std::int16_t* s,

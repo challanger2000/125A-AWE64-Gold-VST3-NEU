@@ -306,7 +306,7 @@ public:
             lostControllers_.fill({});haveLostControllers_=false;
             queues_=std::make_unique<rt::RealtimeQueues>();
             if(demandLead_&&!authenticGuest_){stop();return false;}
-            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_,demandLead_!=0,voiceControls_,sends_,captureGate_,deferCapture);
+            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_,demandLead_!=0,voiceControls_,sends_,captureGate_,deferCapture,true);
             if(demandLead_ && !adapter_->publishDemand(demandLead_-2*rt::GuestDemandClock::maxTickFrames)) {
                 stop();return false;
             }
@@ -426,6 +426,8 @@ public:
             std::printf("PERF_SUSPENDED_FRAMES=%llu\n",static_cast<unsigned long long>(adapter_->suspendedFrames()));
             std::printf("PERF_REPLACEMENT_SUPPRESSED_FRAMES=%llu\n",
                         static_cast<unsigned long long>(adapter_->replacementSuppressedFrames()));
+            std::printf("PERF_ADAPTER_PULLED_NOTE_ONS=%llu\n",
+                        static_cast<unsigned long long>(adapter_->pulledNoteOns()));
         }
         performanceStats_=measurementStarted_=false;
         if(sends_)sends_(0x10000u);
@@ -485,9 +487,14 @@ public:
         return false;
     }
     void startReplacementCapture() noexcept {if(adapter_)adapter_->startReplacementCapture();}
+    void startLegacyMidi() noexcept {if(adapter_)adapter_->startLegacyMidi();}
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
         if(!ready_||!ready_()||(clockFault_&&clockFault_()))return false;
-        if(!authenticGuest_||pcmPrimed_)return true;
+        if(pcmPrimed_)return true;
+        // The ABI-only fixture may query the UART with no audio block.
+        // A real nonempty legacy host block needs PCM reserve even for a
+        // synthetic DOS guest, and a zero-sample flush never opens MIDI.
+        if(!authenticGuest_&&hostBlock==0)return true;
         // Add 192 native frames (4.35 ms) of initial reserve after the
         // observed 48-kHz soak underrun. Demand clock stays unchanged.
         const auto target=demandLead_?static_cast<std::size_t>(demandLead_-2*rt::GuestDemandClock::maxTickFrames):
@@ -657,6 +664,7 @@ public:
     }
     bool waitForGuestMidiReady() noexcept {return core_&&core_->waitForGuestMidiReady();}
     void startReplacementCapture() noexcept {if(core_)core_->startReplacementCapture();}
+    void startLegacyMidi() noexcept {if(core_)core_->startLegacyMidi();}
     bool ready(std::size_t frames=0) noexcept {return core_&&core_->ready(frames);}
     bool running() const noexcept {return core_&&core_->running();}
     bool finished() const noexcept {return !core_||core_->finished();}
