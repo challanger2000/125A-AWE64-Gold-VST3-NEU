@@ -33,9 +33,11 @@ class PrivateBuildRunnerContract(unittest.TestCase):
         self.assertIn("PRIVATE", source)
         self.assertIn("Get-FileHash -Algorithm SHA256", source)
         # Original pinned owner-submodule must never be patched or rebuilt.
-        self.assertIn("working-upstream/dosbox-x-AWE32", source)
-        self.assertIn("git clone --local --no-hardlinks", source)
-        self.assertIn("checkout --detach $pinned", source)
+        self.assertIn("tools/prepare_private_source.py", source)
+        self.assertIn("Join-Path $runRoot 'build-vst3'", source)
+        self.assertIn("build-provenance.json", source)
+        self.assertIn("source-provenance.json", source)
+        self.assertNotIn("AWE64_HostRegisterPCM", source)
 
     def test_no_auto_overwrite_or_public_rom_upload(self):
         root = Path(__file__).resolve().parents[1]
@@ -48,7 +50,7 @@ class PrivateBuildRunnerContract(unittest.TestCase):
             "86box", "qemu", "win95", "synthesizer replacement",
         ):
             self.assertNotIn(forbidden, lower)
-        self.assertIn("Refusing to apply source patch over owner modifications", source)
+        self.assertIn("Staged runtime SHA-256 differs from freshly built DLL.", source)
         self.assertIn("Get-FileHash -Algorithm SHA256 -LiteralPath $romPath", source)
         self.assertIn("no release", lower)
 

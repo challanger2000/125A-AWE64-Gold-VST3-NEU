@@ -15,6 +15,7 @@ on:
       - 'tools/test_private_vst3.py'
       - 'tools/Run-Private-Creative-AWE-Test.ps1'
       - 'tools/Build-And-Test-Private-AWE64.ps1'
+      - 'tools/prepare_private_source.py'
       - 'guest/**'
       - 'CMakeLists.txt'
       - '.github/workflows/audio-bridge-tests.yml'
@@ -43,6 +44,8 @@ jobs:
         run: python -m unittest discover -s tests -p test_private_boot_diagnostic.py -v
       - name: Verify local-only original-AWE64 Windows build script privacy contract
         run: python -m unittest discover -s tests -p test_private_build_runner.py -v
+      - name: Exercise fresh private source preparation with generated Git repositories
+        run: python -m unittest discover -s tests -p test_private_source.py -v
       - name: Parse private Windows PowerShell scripts without executing owner files
         if: runner.os == 'Windows'
         shell: pwsh
