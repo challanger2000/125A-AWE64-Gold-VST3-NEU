@@ -9,6 +9,14 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 26.11.2026 — Unabhängiger Codex-Nachaudit: Programm-Automation und ETW-Gegenprobe (Kandidat)
+
+- Unabhängige Meldung auf `0630e30`: NO-GO (EMU8000-Init-Fatal, fehlende SF2-Inhaltsidentität im Recall, blockierende alte Gastabschaltung beim Bankwechsel, Programm-/Notenoffset-Reihenfolge, ETW-Nullzeit). Vollständiger Codex-Bericht nur in dessen Checkout, auf GitHub 404; Auftrag und Befunde aus Besitzer-Nachricht übernommen, nicht als vollständiger Bericht ausgegeben.
+- Originalregression `3a53c1d` [45883848769](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45883848769): 47/47, 128/128 Hüllkurven, Original PCM, Dual, 20/20 Fehlerfälle; Gesamt FAIL wegen einer 96-kHz-Callback-Deadline (2,2166 ms/1,33333 ms). Gezielter Nachlauf [45889779835](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45889779835) 3/3 PASS, 0 Queue-Verluste, max callback 0,1437/0,0937/0,2432 ms. Historischer Ausreißer nicht reproduziert. Keine Retro-PASS-Wertung.
+- Legacy-Programm-Automation: gültige Programmpunkte werden mit realem Offset in bestehendem MidiBlockBatch als Setup einsortiert; vorheriger Controllerwert dient als Initial-Setup, keine Vorwegnahme des letzten Programms; nach tatsächlichem akzeptiertem Programmpaket lastProgram_ aktualisiert. Andere Blockregler unverändert. Native Gegenprobe tatsächliche FIFO-Bytefolge PNQRNNZ mit zwei Punkten im selben Block, Note vor späterem Programm und Setup bei gleichem Offset. Noch keine Sample-exakte Gastzeit im Legacy-Pfad behauptet.
+- ETW-Diagnose: nur nachgewiesene positive Scheduled-Ticks des tatsächlichen Callback-Threads werden als Verhältnis ausgegeben; fehlende Spur, Nullzeit, ungültiges Fenster bleiben -1/NOT VERIFIED. Portable Tests mit fremder/fehlender Spur und gültigem Intervall. Bestehende strikte Walltime-Deadline unverändert.
+- Korrekturen und neue Tests NOT RUN bis tatsächliche Logs. EMU8000-Init-Fatal, SF2-Recall und aktiver Bankwechsel bleiben separat offen. Kein GO.
+
 ## 26.11.2026 — Abschlussregression nach A09/A22-Sicherheitskorrekturen (ausstehend)
 
 - `f513c0db`: [45879596716](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45879596716) SUCCESS, 20/20 gezielte native DLL-Fälle, config-isolation unverändert=1, SDL und Host-Policy PASS; Bridge, Adversarial und Version SUCCESS. Vollständige Originalregression damals NOT RUN.

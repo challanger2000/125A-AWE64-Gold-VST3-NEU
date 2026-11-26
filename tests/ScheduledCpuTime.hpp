@@ -16,7 +16,7 @@ struct SchedWindow {std::uint64_t begin,end;};
 template<std::size_t N>
 bool scheduledTime(std::vector<SchedEvent>& events,std::uint32_t pid,
                    const std::array<SchedWindow,N>& windows,
-                   std::array<std::uint64_t,N>& totals) {
+                   std::array<std::uint64_t,N>& totals,std::uint32_t onlyTid=0) {
     totals.fill(0);
     if(!pid||events.empty())return false;
     for(auto w:windows)if(w.begin>=w.end)return false;
@@ -33,7 +33,7 @@ bool scheduledTime(std::vector<SchedEvent>& events,std::uint32_t pid,
     };
     for(auto e:events){
         if(e.tick>end)break;
-        if(e.kind==SchedKind::Start){if(e.b==pid)owned.insert(e.a);else owned.erase(e.a);continue;}
+        if(e.kind==SchedKind::Start){if(e.b==pid&&(!onlyTid||onlyTid==e.a))owned.insert(e.a);else owned.erase(e.a);continue;}
         if(e.kind==SchedKind::End){if(e.b==pid)owned.erase(e.a);continue;}
         if(e.a==e.b)continue;
         auto out=active.find(e.a);
@@ -43,5 +43,14 @@ bool scheduledTime(std::vector<SchedEvent>& events,std::uint32_t pid,
     }
     for(auto [tid,start]:active)if(!add(start,end))return false;
     return true;
+}
+// Callback executes at both QPC endpoints. Zero scheduled ticks cannot
+// be a valid observation of that thread, even if unrelated ETW data exist.
+inline bool callbackScheduledRatio(std::vector<SchedEvent>& events,std::uint32_t pid,std::uint32_t tid,SchedWindow window,double& ratio) {
+    ratio=-1.;
+    if(!tid||window.begin>=window.end)return false;
+    std::array<SchedWindow,1> w{window};std::array<std::uint64_t,1> t{};
+    if(!scheduledTime(events,pid,w,t,tid)||!t[0]||t[0]>window.end-window.begin)return false;
+    ratio=double(t[0])/double(window.end-window.begin);return true;
 }
 }

@@ -386,7 +386,8 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     };
     legacyMaster_.begin(data.numSamples,master_.load(std::memory_order_acquire));
     legacyMidi_.reset();
-    // 15 blockwise controls: program, 12 overlays/sends, 2 effect types.
+    // Program points are time-ordered MIDI setup; other controls remain blockwise.
+    const auto initialProgram=program_.load(std::memory_order_acquire);
     std::array<double,15> values{};
     std::array<bool,15> present{};
     auto slot=[](ParamID id) noexcept -> int {
@@ -416,6 +417,12 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
                 previous=offset;
                 if(id==kMaster){
                     if(!legacyMaster_.add(offset,v))return rejectBlock();
+                }else if(id==kProgram){
+                    const auto p=static_cast<std::uint8_t>(std::lround(std::clamp(v,0.,1.)*127.));
+                    if(startedCatalog_.Find(0,p)){
+                        if(!legacyMidi_.add(rt::makeCreativeProgramChange(absoluteSamplePosition_+static_cast<std::uint64_t>(offset),p),rt::MidiPhase::Setup))return rejectBlock();
+                        values[0]=p/127.;present[0]=true;
+                    }
                 }else if(id>=rt::midiControllerBase){
                     rt::MidiEvent midi{};
                     if(!rt::makeMappedController(id,v,absoluteSamplePosition_+static_cast<std::uint64_t>(offset),midi)||
@@ -484,7 +491,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         accepted=engine.setVoiceControls(lo,hi)&&accepted;
     }
     const auto bank=bank_.load(std::memory_order_acquire);
-    const auto program=program_.load(std::memory_order_acquire);
+    const auto program=initialProgram;
     // The patched MPU pump waits for the original guest UART handshake.
     // Queue setup and notes even while PCM is still priming.
     if(!initialProgramSent_||lastBank_!=bank||lastProgram_!=program) {
@@ -509,8 +516,15 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         if(engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,true,chorus)))lastChorusType_=chorus;
         else accepted=false;
     }
-    if(!legacyMidi_.submitLegacy([&engine](const rt::MidiEvent& e) noexcept {return engine.sendMidi(e);}))
-        accepted=false;
+    if(!legacyMidi_.submitLegacy([&](const rt::MidiEvent& e) noexcept {
+        const bool programChange=e.command==rt::GuestCommand::Midi&&e.status==0xc0u;
+        // Never skip a setup during recovery; lastProgram_ tracks actual
+        // accepted FIFO messages, not the last automation point in the block.
+        if(programChange&&initialProgramSent_&&lastProgram_==e.data1&&!engine.midiRecoveryPending())return true;
+        const bool sent=engine.sendMidi(e);
+        if(programChange&&sent)lastProgram_=e.data1;
+        return sent;
+    }))accepted=false;
     if(data.outputs&&data.numOutputs>0&&data.outputs[0].channelBuffers32&&
        data.outputs[0].numChannels>=2&&data.numSamples>0){
         auto* left=data.outputs[0].channelBuffers32[0];

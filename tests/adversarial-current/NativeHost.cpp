@@ -312,6 +312,32 @@ int main(int argc,char** argv){
         std::cout<<"AUDIT_DEFAULT_MIDI_ORDER sequence="<<sequence<<" expected=vNNV"<<std::endl;
         if(sequence.size()!=4||sequence.substr(0,2)!="vN"||unexpected||nonfinite)return fail("positive event-order control");
         verdict("AUDIT_DEFAULT_MIDI_ORDER",sequence=="vNNV");
+        // Program points must follow note offsets, including multiple
+        // points in one queue and setup-before-note at equal offsets.
+        auto packets=[&](){
+            std::ifstream input(std::filesystem::path(logdir)/"events.txt");
+            std::vector<std::array<unsigned,3>> result;
+            unsigned st,x,y;while(input>>st>>x>>y)result.push_back({st,x,y});
+            return result;
+        };
+        const auto prefix=packets().size();
+        for(unsigned trial=0;trial<3;++trial){
+            V::ParameterChanges changes(1);S::int32 index=0,point=0;
+            auto* q=changes.addParameterData(1000u,index);
+            if(!q||q->addPoint(trial==2?511:0,(trial==0?17.:trial==1?42.:0.)/127.,point)!=S::kResultOk)
+                return fail("program ordering fixture");
+            if(trial==0&&q->addPoint(511,23./127.,point)!=S::kResultOk)return fail("second program point");
+            event.setOffset(trial==0?256:0);
+            (void)block(true,&changes);(void)pump(25);
+        }
+        const auto all=packets();std::string programOrder;
+        for(std::size_t n=prefix;n<all.size();++n){
+            const auto& p=all[n];
+            if(p[0]==0x90&&p[1]==60&&p[2]==100)programOrder+='N';
+            else if(p[0]==0xc0)programOrder+=p[1]==17?'P':p[1]==23?'Q':p[1]==42?'R':p[1]==0?'Z':'?';
+        }
+        std::cout<<"AUDIT_PROGRAM_ORDER sequence="<<programOrder<<" expected=PNQRNNZ"<<std::endl;
+        verdict("AUDIT_PROGRAM_ORDER",programOrder=="PNQRNNZ"&&controller->getParamNormalized(1000u)==0.&&!unexpected&&!nonfinite);
     }else if(mode=="invalidblock"){
         // Actual plugin with the synthetic MIDI recorder. Invalid normal
         // parameter and note offsets must reject even a valid prefix.

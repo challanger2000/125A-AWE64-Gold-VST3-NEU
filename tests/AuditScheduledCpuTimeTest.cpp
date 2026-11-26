@@ -14,6 +14,12 @@ int main(){
     auto duplicate=e;duplicate.push_back({9,K::Switch,0,10});CHECK(!scheduledTime(duplicate,7,w,t));
     auto truncated=e;truncated.pop_back();CHECK(!scheduledTime(truncated,7,w,t));
     std::reverse(e.begin(),e.end());CHECK(scheduledTime(e,7,w,t));CHECK(t[0]==25&&t[1]==9);
+    double ratio=0.;
+    CHECK(callbackScheduledRatio(e,7,10,{6,24},ratio));CHECK(ratio==13./18.);
+    CHECK(!callbackScheduledRatio(e,7,99,{6,24},ratio)&&ratio==-1.);
+    CHECK(!callbackScheduledRatio(e,7,10,{11,14},ratio)&&ratio==-1.);
+    CHECK(!callbackScheduledRatio(missing,7,10,{6,24},ratio)&&ratio==-1.);
+    CHECK(!callbackScheduledRatio(e,7,0,{6,24},ratio)&&ratio==-1.);
     w[0]={8,8};CHECK(!scheduledTime(e,7,w,t));
     std::puts("SCHEDULED_CPU_TIME_PASS");
 }
