@@ -14,6 +14,8 @@ from pathlib import Path
 REJECTED=-12564
 ARG_REJECTED=-12565
 SDL_INIT_REJECTED=-12566
+EMU_INIT_REJECTED=-12567
+EMU_CASES=('emu-open','emu-rom','emu-read','emu-empty','emu-ram','emu-chip')
 ARG_CASES={
     'printconf':['-printconf'],
     'resetconf':['-resetconf'],
@@ -25,7 +27,7 @@ ARG_CASES={
     'missing-command':['-c'],
     'no-noconfig':[],
 }
-MODES=('positive','missing','short','oversize','empty','duplicate','absent','directory','sdl-init','host-policy','config-isolation',*ARG_CASES)
+MODES=('positive','missing','short','oversize','empty','duplicate','absent','directory','sdl-init','host-policy','config-isolation',*EMU_CASES,*ARG_CASES)
 
 def child(dll_path,root,mode):
     faulthandler.enable()
@@ -93,17 +95,19 @@ def child(dll_path,root,mode):
             encoded=[v.encode('mbcs') for v in values]
             argv=(ctypes.c_char_p*(len(encoded)+1))(*encoded,None)
             return start(len(encoded),argv)
-        if mode=='sdl-init':
-            print('AUDIT_SDL_INIT_CALL_BEGIN',flush=True)
-            rc=invoke(args(rom)+['-awe64-audit-sdl-init'])
-            print('AUDIT_SDL_INIT_REJECTION rc='+str(rc),flush=True)
-            if rc!=SDL_INIT_REJECTED or trace.exists():return 1
+        if mode=='sdl-init' or mode in EMU_CASES:
+            tag='SDL_INIT' if mode=='sdl-init' else 'EMU_INIT'
+            print('AUDIT_'+tag+'_CALL_BEGIN '+mode,flush=True)
+            rc=invoke(args(rom)+['-awe64-audit-'+mode])
+            print('AUDIT_'+tag+'_REJECTION rc='+str(rc),flush=True)
+            expected=SDL_INIT_REJECTED if mode=='sdl-init' else EMU_INIT_REJECTED
+            if rc!=expected or trace.exists():return 1
             # This was an actual original main invocation. Dispose that
             # image and start a fresh copy, as VST3 does per activation.
             free=ctypes.WinDLL('kernel32',use_last_error=True).FreeLibrary
             free.argtypes=[ctypes.c_void_p];free.restype=ctypes.c_int
             if not free(dll._handle):return 1
-            print('AUDIT_SDL_INIT_DLL_RELEASED',flush=True)
+            print('AUDIT_'+tag+'_DLL_RELEASED',flush=True)
             fresh=root/'fresh-runtime.dll'
             shutil.copyfile(dll_path,fresh)
             dll=ctypes.WinDLL(str(fresh))
@@ -169,6 +173,7 @@ def parent(dll):
                     'AWE64_EMBEDDED_ROM_PREFLIGHT_REJECTED' in line or
                     'AWE64_EMBEDDED_ARG_PREFLIGHT_REJECTED' in line or
                     'AUDIT_SDL_INIT_' in line or 'AWE64_EMBEDDED_SDL_' in line or
+                    'AUDIT_EMU_INIT_' in line or 'AWE64_EMBEDDED_EMU_' in line or
                     'AUDIT_HOST_POLICY_' in line or 'AUDIT_CONFIG_ISOLATION_' in line):
                     print(line,flush=True)
             ok=(p.returncode==0 and ('AUDIT_ROM_ENTRY_HOST_SURVIVED mode='+mode+' rc=0 writes=') in logs)
@@ -177,6 +182,11 @@ def parent(dll):
                 ok=ok and logs.count('AWE64_EMBEDDED_SDL_INIT_FAILED')==1
                 ok=ok and logs.count('AWE64_EMBEDDED_SDL_CLEANUP_RETURN')==1
                 ok=ok and logs.count('AUDIT_SDL_INIT_DLL_RELEASED')==1
+            elif mode in EMU_CASES:
+                ok=ok and 'AUDIT_EMU_INIT_REJECTION rc=-12567' in logs
+                ok=ok and logs.count('AWE64_EMBEDDED_EMU_INIT_FAILED')==1
+                ok=ok and logs.count('AWE64_EMBEDDED_EMU_CLEANUP_RETURN')==1
+                ok=ok and logs.count('AUDIT_EMU_INIT_DLL_RELEASED')==1
             elif mode in ARG_CASES:
                 ok=ok and ('AUDIT_ARG_ENTRY_REJECTION mode='+mode+' rc='+str(ARG_REJECTED)) in logs
                 ok=ok and logs.count('AWE64_EMBEDDED_ARG_PREFLIGHT_REJECTED')==1

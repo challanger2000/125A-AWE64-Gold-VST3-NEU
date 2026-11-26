@@ -14,7 +14,11 @@ class DosBoxPatchTests(unittest.TestCase):
            '\tchan = MixerChan.Install(emu8000_callback, EMU_RATE, EMU8000_MIXER_CHANNEL);\n'
            'void EMU8000_Device::Write(Bitu port, Bitu val, Bitu iolen) {\n\tSync();\n}\n'
            'void EMU8000_Device::Mix(Bitu len) {\n\t/* synthetic mixer anchor */\n}')
+        s+="\n#include <stdlib.h>\n\tunsigned int Base(void) const { return (unsigned int)base; }\n\tstd::string empty_rom;\n\tif (rom.empty()) {\n\t\trom_file = rom;\n\t}\n\n\temu = (emu8k_t *)calloc(1, sizeof(emu8k_t));\n\tif (emu == NULL) E_Exit(\"EMU8000: out of memory\");\n\temu8k_init(emu, (uint16_t)base, ram_kb);\n\twavetable_pos_global = emu->pos;\n\tconst std::string rom = AWE32ROM_Locate(rom_path);\n\temu8000 = new EMU8000_Device(sb_base, rom, ram_kb);"
         r=patch.patch_emu(s)
+        self.assertIn('if(!candidate||!candidate->Valid())',r)
+        self.assertIn('if(!emu->rom||!emu->empty',r)
+        self.assertIn('AWE64_ReportEmuInitFailure();return;',r)
         self.assertIn('AweHostRead.Install(0xBEE0u',r)
         self.assertIn('AweHostWrite.Install(0xBEF0u',r)
         self.assertIn('AWE64_HostRegisterIO',r)
@@ -29,6 +33,16 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('\nextern uint64_t AWE64_OverlayMidiContext() noexcept;\n#endif',r)
         self.assertIn('voice<30 && !(emu->voice[voice].ccca&0x04000000u)',r)
         with self.assertRaises(ValueError):patch.patch_emu(r)
+    def test_emu_c_partial_initialization(self):
+        s="/* onboard_ram in kilobytes */\nvoid\nemu8k_init\n    fp = rom_fopen(EMU8K_ROM_PATH, \"rb\");\n    if (!fp)\n        fatal(\"AWE32.RAW not found\\n\");\n\n    emu8k->rom = calloc(1024, 1024);\n    /* AWE32Emu: also accept a card dump without the leading AWE-DUMP word\n     * (1048574 bytes); the missing last word stays zero. */\n    if (fread(emu8k->rom, 1, 1048576, fp) < 1048574)\n        fatal(\"emu8k_init(): Error reading data\\n\");\n    fclose(fp);\n    emu8k->empty = calloc(2, BLOCK_SIZE_WORDS);\n        emu8k->ram = calloc(1024, onboard_ram);"
+        r=patch.patch_emu_c_init(s)
+        self.assertIn('if(!fp)return;',r)
+        self.assertIn('if(!emu8k->rom){fclose(fp);return;}',r)
+        self.assertIn('if(bad||count!=1048576){awe64_release_init_memory(emu8k);return;}',r)
+        self.assertIn('if(!emu8k->empty){awe64_release_init_memory(emu8k);return;}',r)
+        self.assertIn('if(!emu8k->ram){awe64_release_init_memory(emu8k);return;}',r)
+        self.assertIn('emu8k->rom=NULL; e->empty=NULL; e->ram=NULL;'.replace('emu8k->rom','e->rom'),r)
+        with self.assertRaises(ValueError):patch.patch_emu_c_init(r)
     def test_true_pcm_tap(self):
         s=('#define MIXER_SSIZE 4\n'
            'SDL_AudioDeviceID SDL2_AudioDevice = 0; /* valid IDs are 2 or higher, 1 for compat, 0 is never a valid ID */\n'
@@ -114,6 +128,9 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('"-awe64-audit-sdl-init"',r)
         self.assertIn('AWE64_EMBEDDED_SDL_CLEANUP_RETURN',r)
         self.assertIn('return -12566;',r)
+        self.assertIn('return -12567;',r)
+        self.assertIn('awe64_emu_init_failed=true;',r)
+        self.assertIn('AWE64_EMBEDDED_EMU_CLEANUP_RETURN',r)
         self.assertIn('SDL_Quit();\n            sdl.inited=false;',r)
         self.assertIn('~AWE64ComScope(){if(SUCCEEDED(hr))CoUninitialize();}',r)
         self.assertIn('control=nullptr; // Config stack object has already been destroyed',r)

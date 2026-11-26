@@ -9,6 +9,13 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 26.11.2026 — Codex-Nachaudit: EMU8000-Initialisierungsfehler (Kandidat)
+
+- Gepinnter snd_emu8k.c 2935–2964: fehlender ROM-Stream und Short-Read rufen fatal() -> E_Exit -> exit auf; ROM/Empty/RAM-calloc ungeprüft. emu8000.cpp:268/277 weitere E_Exit-Pfade. AWE32ROM_Locate kann bei fehlender expliziter Datei auf Host-Suchpfade/Download-Prompt ausweichen. SBLASTER 4305 init im Original-VM-Power-on.
+- Eingebettete C-Initialisierung prüft ROM-Open, exakt 1 MiB fread, alle drei calloc, räumt Teilressourcen vor IO-Handler-Registrierung ab. C++-Device prüft Chip-calloc und Init-Erfolg, veröffentlicht keinen ungültigen Chip, expliziter ROM-Pfad ohne Locator-Fallback; new(nothrow) behandelt Objektallokation. Fehler latcht bestehenden kooperativen Stop; nach abgeschlossener VM-Initialisierung wird der etablierte Run-Machine-Cleanup benutzt; Wrapper liefert -12567 erst nach Rückkehr aus main. Keine generelle SEH-/E_Exit-Umschreibung, keine Klangalgorithmusänderung, Standalone unverändert.
+- Sechs gezielte neue native Provokationen (Open, ROM-calloc, tatsächlicher Short-Read, Empty-calloc, RAM-calloc, Chip-calloc). Kein EMU-Trace aus fehlgeschlagenem Start, Rückgabecode/normaler Cleanup/FreeLibrary, frische DLL im selben Prozess muss echte AWEUTIL-Schreibvorgänge nachweisen. Synthetische OOM-Injektion ist keine vollständige System-OOM-Absicherung. Arbiträre weitere Exceptions und Prozesscrashs bleiben offen. Tests NOT RUN.
+- Zusammen mit Programm-Ordering und ETW-Gegenprobe auf demselben main-Stand. SF2-Recall und Bankwechsel noch offen. Keine Freigabe.
+
 ## 26.11.2026 — Unabhängiger Codex-Nachaudit: Programm-Automation und ETW-Gegenprobe (Kandidat)
 
 - Unabhängige Meldung auf `0630e30`: NO-GO (EMU8000-Init-Fatal, fehlende SF2-Inhaltsidentität im Recall, blockierende alte Gastabschaltung beim Bankwechsel, Programm-/Notenoffset-Reihenfolge, ETW-Nullzeit). Vollständiger Codex-Bericht nur in dessen Checkout, auf GitHub 404; Auftrag und Befunde aus Besitzer-Nachricht übernommen, nicht als vollständiger Bericht ausgegeben.

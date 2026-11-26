@@ -72,6 +72,12 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_HostRegisterPCM(
 '''
 def patch_emu(s):
     if 'AWE64_HostRegisterIO(' in s:raise ValueError('Already patched EMU8000')
+    s=once(s,"#include <stdlib.h>","#include <stdlib.h>\n#ifdef AWE64_VST3_RUNTIME\n#include <new>\nextern void AWE64_ReportEmuInitFailure() noexcept;\nextern \"C\" int AWE64_AuditEmuInitFailure() noexcept;\n#endif")
+    s=once(s,"\tunsigned int Base(void) const { return (unsigned int)base; }","\tunsigned int Base(void) const { return (unsigned int)base; }\n#ifdef AWE64_VST3_RUNTIME\n    bool Valid() const noexcept {return emu!=nullptr;}\n#endif")
+    s=once(s,"\tstd::string empty_rom;\n\tif (rom.empty()) {","\tstd::string empty_rom;\n#ifdef AWE64_VST3_RUNTIME\n    if(rom.empty())return; // explicit ROM only, never create a fallback\n    rom_file=rom;\n#else\n\tif (rom.empty()) {")
+    s=once(s,"\t\trom_file = rom;\n\t}\n\n\temu = (emu8k_t *)calloc(1, sizeof(emu8k_t));\n\tif (emu == NULL) E_Exit(\"EMU8000: out of memory\");","\t\trom_file = rom;\n\t}\n#endif\n#ifdef AWE64_VST3_RUNTIME\n    emu=AWE64_AuditEmuInitFailure()==6?nullptr:static_cast<emu8k_t*>(calloc(1,sizeof(emu8k_t)));\n    if(!emu)return;\n#else\n\temu = (emu8k_t *)calloc(1, sizeof(emu8k_t));\n\tif (emu == NULL) E_Exit(\"EMU8000: out of memory\");\n#endif")
+    s=once(s,"\temu8k_init(emu, (uint16_t)base, ram_kb);\n\twavetable_pos_global = emu->pos;","\temu8k_init(emu, (uint16_t)base, ram_kb);\n#ifdef AWE64_VST3_RUNTIME\n    // Failed C initialization released all partially acquired resources.\n    if(!emu->rom||!emu->empty||(ram_kb>0&&!emu->ram)){free(emu);emu=nullptr;return;}\n#endif\n\twavetable_pos_global = emu->pos;")
+    s=once(s,"\tconst std::string rom = AWE32ROM_Locate(rom_path);\n\temu8000 = new EMU8000_Device(sb_base, rom, ram_kb);","#ifdef AWE64_VST3_RUNTIME\n    AWE32ROM_AddMessages();\n    // Entry guard already validated the exact ROM. Do not search or prompt.\n    auto* candidate=new(std::nothrow) EMU8000_Device(sb_base,rom_path,ram_kb);\n    if(!candidate||!candidate->Valid()){\n        delete candidate;AWE64_ReportEmuInitFailure();return;\n    }\n    emu8000=candidate;\n#else\n\tconst std::string rom = AWE32ROM_Locate(rom_path);\n\temu8000 = new EMU8000_Device(sb_base, rom, ram_kb);\n#endif")
     math=(Path(__file__).resolve().parents[1]/"research/p165-control-port/VoiceOverlay.hpp").read_text(encoding="utf-8").replace("#pragma once\n","",1)
     s=once(s,'#include <string>','#include <string>\n#ifdef AWE64_VST3_RUNTIME\n#include <atomic>\n'+math+'\nextern uint64_t AWE64_OverlayMidiContext() noexcept;\n#endif')
     s=once(s,'class EMU8000_Device {',PORT_BRIDGE+'\nclass EMU8000_Device {')
@@ -407,6 +413,13 @@ static void AWE64_PumpGuestMidi() {
 #endif''')
     return s
 
+def patch_emu_c_init(s):
+    s=once(s,"/* onboard_ram in kilobytes */\nvoid\nemu8k_init","#ifdef AWE64_VST3_RUNTIME\nextern int AWE64_AuditEmuInitFailure(void);\nstatic void awe64_release_init_memory(emu8k_t *e)\n{\n    free(e->rom); free(e->empty); free(e->ram);\n    e->rom=NULL; e->empty=NULL; e->ram=NULL;\n}\n#endif\n/* onboard_ram in kilobytes */\nvoid\nemu8k_init")
+    s=once(s,"    fp = rom_fopen(EMU8K_ROM_PATH, \"rb\");\n    if (!fp)\n        fatal(\"AWE32.RAW not found\\n\");\n\n    emu8k->rom = calloc(1024, 1024);\n    /* AWE32Emu: also accept a card dump without the leading AWE-DUMP word\n     * (1048574 bytes); the missing last word stays zero. */\n    if (fread(emu8k->rom, 1, 1048576, fp) < 1048574)\n        fatal(\"emu8k_init(): Error reading data\\n\");\n    fclose(fp);","#ifdef AWE64_VST3_RUNTIME\n    const int failure=AWE64_AuditEmuInitFailure();\n    fp=failure==1?NULL:rom_fopen(EMU8K_ROM_PATH,\"rb\");\n    if(!fp)return;\n    emu8k->rom=failure==2?NULL:calloc(1024,1024);\n    if(!emu8k->rom){fclose(fp);return;}\n    /* Exact locked 1 MiB image. Diagnostic short read uses the actual CRT. */\n    const size_t count=fread(emu8k->rom,1,failure==3?1024:1048576,fp);\n    const int bad=ferror(fp);\n    fclose(fp);\n    if(bad||count!=1048576){awe64_release_init_memory(emu8k);return;}\n#else\n    fp = rom_fopen(EMU8K_ROM_PATH, \"rb\");\n    if (!fp)\n        fatal(\"AWE32.RAW not found\\n\");\n\n    emu8k->rom = calloc(1024, 1024);\n    /* AWE32Emu: also accept a card dump without the leading AWE-DUMP word\n     * (1048574 bytes); the missing last word stays zero. */\n    if (fread(emu8k->rom, 1, 1048576, fp) < 1048574)\n        fatal(\"emu8k_init(): Error reading data\\n\");\n    fclose(fp);\n#endif")
+    s=once(s,"    emu8k->empty = calloc(2, BLOCK_SIZE_WORDS);","#ifdef AWE64_VST3_RUNTIME\n    emu8k->empty=failure==4?NULL:calloc(2,BLOCK_SIZE_WORDS);\n    if(!emu8k->empty){awe64_release_init_memory(emu8k);return;}\n#else\n    emu8k->empty = calloc(2, BLOCK_SIZE_WORDS);\n#endif")
+    s=once(s,"        emu8k->ram = calloc(1024, onboard_ram);","#ifdef AWE64_VST3_RUNTIME\n        emu8k->ram=failure==5?NULL:calloc(1024,onboard_ram);\n        if(!emu8k->ram){awe64_release_init_memory(emu8k);return;}\n#else\n        emu8k->ram = calloc(1024, onboard_ram);\n#endif")
+    return s
+
 def patch_main(s):
     a='int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {'
     if s.count(a)!=1 or 'AWE64_StartGuest(' in s:
@@ -421,6 +434,17 @@ static std::atomic<bool> awe64_guest_stop{false};
 // try/catch is an established safe cancellation boundary.
 static thread_local bool awe64_guest_can_stop=false;
 static thread_local bool awe64_audit_sdl_init_failure=false;
+static thread_local int awe64_audit_emu_init_failure=0;
+static thread_local bool awe64_emu_init_failed=false;
+extern "C" int AWE64_AuditEmuInitFailure() noexcept {return awe64_audit_emu_init_failure;}
+void AWE64_ReportEmuInitFailure() noexcept {
+    awe64_emu_init_failed=true;
+    // The existing run-machine cancellation boundary performs normal
+    // shutdown after the original VM initialization has completed.
+    awe64_guest_stop.store(true,std::memory_order_release);
+    fputs("AWE64_EMBEDDED_EMU_INIT_FAILED\\n",stderr);
+    fflush(stderr);
+}
 struct AWE64GuestRunScope {
     AWE64GuestRunScope() noexcept { awe64_guest_can_stop=true; }
     ~AWE64GuestRunScope() { awe64_guest_can_stop=false; }
@@ -564,6 +588,13 @@ struct AWE64RomEntryGuard {
 // Embedded entry accepts only options actually used by the product and its
 // documented direct-DLL diagnostics. Standalone config/editor/reset options
 // can call exit() or launch external programs before guest initialization.
+static int AWE64_EmuAuditMode(const char* arg) noexcept {
+    const char* names[]={"-awe64-audit-emu-open","-awe64-audit-emu-rom",
+                         "-awe64-audit-emu-read","-awe64-audit-emu-empty",
+                         "-awe64-audit-emu-ram","-awe64-audit-emu-chip"};
+    for(int i=0;i<6;++i)if(std::strcmp(arg,names[i])==0)return i+1;
+    return 0;
+}
 static bool AWE64_ValidateEmbeddedArgs(int argc,char** argv) noexcept {
     if(argc<1||argc>128||!argv||!argv[0])return false;
     bool noConfig=false;
@@ -571,7 +602,7 @@ static bool AWE64_ValidateEmbeddedArgs(int argc,char** argv) noexcept {
         const char* arg=argv[i];
         if(!arg)return false;
         if(std::strcmp(arg,"-noconfig")==0){noConfig=true;continue;}
-        if(std::strcmp(arg,"-awe64-audit-sdl-init")==0)continue;
+        if(std::strcmp(arg,"-awe64-audit-sdl-init")==0||AWE64_EmuAuditMode(arg))continue;
         if(std::strcmp(arg,"-nogui")==0||std::strcmp(arg,"-nomenu")==0||
            std::strcmp(arg,"-noconsole")==0||std::strcmp(arg,"-silent")==0||
            std::strcmp(arg,"-test")==0)continue;
@@ -633,19 +664,25 @@ extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
     char* forwarded[129]{};
     int count=0;
     bool inject=false;
+    int emuInject=0;
     forwarded[count++]=argv[0];
     for(int i=1;i<argc;++i){
         if(std::strcmp(argv[i],"-awe64-audit-sdl-init")==0){inject=true;continue;}
+        if(const int mode=AWE64_EmuAuditMode(argv[i])){emuInject=mode;continue;}
         forwarded[count++]=argv[i];
         if(std::strcmp(argv[i],"-c")==0||std::strcmp(argv[i],"-set")==0)
             forwarded[count++]=argv[++i];
     }
     struct AWE64AuditScope {
-        explicit AWE64AuditScope(bool enabled){awe64_audit_sdl_init_failure=enabled;}
-        ~AWE64AuditScope(){awe64_audit_sdl_init_failure=false;}
-    } audit(inject);
+        AWE64AuditScope(bool enabled,int emu){awe64_audit_sdl_init_failure=enabled;awe64_audit_emu_init_failure=emu;}
+        ~AWE64AuditScope(){awe64_audit_sdl_init_failure=false;awe64_audit_emu_init_failure=0;}
+    } audit(inject,emuInject);
     const int result=main(count,forwarded);
     control=nullptr; // Config stack object has already been destroyed
+    if(awe64_emu_init_failed){
+        std::fputs("AWE64_EMBEDDED_EMU_CLEANUP_RETURN\\n",stderr);
+        std::fflush(stderr);return -12567;
+    }
     return result;
 }
 #endif
@@ -843,6 +880,7 @@ static int AWE64_HostTickDecision() noexcept {
 PATCHES={
     'src/dosbox.cpp':patch_dosbox_clock,
     'src/hardware/emu8000.cpp':patch_emu,
+    'src/hardware/emu8k/snd_emu8k.c':patch_emu_c_init,
     'src/hardware/mixer.cpp':patch_mixer,
     'src/hardware/mpu401.cpp':patch_mpu,
     'src/gui/sdlmain.cpp':patch_main,
