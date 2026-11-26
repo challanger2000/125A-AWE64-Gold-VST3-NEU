@@ -79,9 +79,16 @@ class PrivateCreativeBootDiagnosticTests(unittest.TestCase):
 
 class DualCreativeRunnerTests(unittest.TestCase):
     def test_normal_native_stderr_is_not_failure(self):
-        code = ("import sys; print('LOG: Early LOG Init complete', file=sys.stderr); "
+        code = ("import os,sys; print('LOG: Early LOG Init complete', file=sys.stderr); "
+                "print('DUAL_VST3_DIRECTION='+('SECOND_TO_FIRST' if os.environ['AWE64_TEST_DUAL_REVERSE']=='1' else 'FIRST_TO_SECOND')); "
                 "print('REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS')")
         self.assertTrue(runner.run_dual_creative_command([sys.executable, "-c", code]))
+
+    def test_reverse_direction_is_required_in_second_process(self):
+        code = ("print('DUAL_VST3_DIRECTION=FIRST_TO_SECOND'); "
+                "print('REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS')")
+        with self.assertRaisesRegex(RuntimeError, "SECOND_TO_FIRST"):
+            runner.run_dual_creative_command([sys.executable, "-c", code])
 
     def test_exit_and_exact_unique_marker_are_required(self):
         for code in (
