@@ -178,8 +178,13 @@ bool DosBoxVst3Shell::requestSoundFont(const std::string& path,int expectedProgr
             for(unsigned i=0;i<10;++i)(void)setParamNormalized(1100u+i,recall->voice[i]/255.);
             return true;
         };
-        const auto previous=requestedSoundFont();
-        if(previous==path&&bytes==requestedBankBytes_&&(!runtime_||!runtime_->finished()))return applyRecall();
+        bool sameSelection=false;
+        {
+            std::lock_guard<std::mutex> lock(selectionMutex_);
+            sameSelection=requestedBank_==path&&requestedBankDigestValid_==haveBytes&&
+                          (!haveBytes||requestedBankDigest_==digest);
+        }
+        if(sameSelection&&(!runtime_||!runtime_->finished()))return applyRecall();
         if(runtime_) {
             if(!startRuntimeLocked(lifecycle,path,&bytes,&candidate,&retired))return false;
         } else publishCatalogLocked(std::move(candidate));

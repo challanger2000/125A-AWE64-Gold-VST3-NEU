@@ -350,10 +350,11 @@ int main(int argc,char** argv){
         (void)pump(50);
         const auto oldPeak=pump(4);
         if(oldPeak<.4f||unexpected||nonfinite)return fail("old guest positive PCM");
-        const auto n=static_cast<std::uint32_t>(bank.size());
+        const auto handoverBank=(std::filesystem::path(bank).parent_path()/"program17.sf2").string();
+        const auto n=static_cast<std::uint32_t>(handoverBank.size());
         std::vector<std::uint8_t> b{'D','B','X','D',2,0,17,0x10,0x27,0x5a,0xa5,
             std::uint8_t(n),std::uint8_t(n>>8),std::uint8_t(n>>16),std::uint8_t(n>>24)};
-        b.insert(b.end(),bank.begin(),bank.end());
+        b.insert(b.end(),handoverBank.begin(),handoverBank.end());
         S::MemoryStream incoming(b.data(),b.size());
         std::atomic<bool> done{false};S::tresult switched=S::kResultFalse;
         std::thread transition([&]{

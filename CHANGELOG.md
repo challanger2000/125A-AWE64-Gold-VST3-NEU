@@ -1,11 +1,19 @@
 # Änderungsverlauf
 
+## 26.11.2026 — Codex-Nachaudit: SF2-Inhaltsidentität und alter Gast außerhalb Audiosperre (Kandidat)
+
+- V6-Projektzustand speichert SHA-256 der tatsächlich akzeptierten SF2-Gastbytes und Pfad sowie alle bisherigen Parameter. V6-Recall verlangt identische Inhalte vor Zustandsänderung; fehlende oder veränderte Dateien werden abgelehnt. V1–V5 bleiben als Legacy lesbar, ohne rückwirkende Inhaltsidentität. Kein eingebettetes SoundFont-Abbild, keine automatische Ersatzbank. Assetfreier Validator-Fallback bleibt separat.
+- Native Gegenprobe: gleicher Presetkatalog mit anderem Sampleinhalt, frische Instanz, alter State abgelehnt, Zustand unverändert, identische Originaldatei erneut akzeptiert. State-Oracles unterscheiden V2-Eingabe und V6-Ausgabe.
+- Bankwechsel: bisherige Runtime unter Lifecycle-Sperre aus dem aktiven Besitzer verschoben, neue Runtime und Recall-Parameter publiziert, alter Gast erst nach Freigabe der Audiosperre gestoppt. Gegenprobe mit 600 ms verzögertem altem Gast-Stop, neuen NoteOns und Master-Automation. Kurze Publikationssperre, Primingphase und alte gehaltene Stimmen separat zu bewerten; kein Versprechen einer nahtlosen oder samplegenauen Übergabe.
+- Alle fünf Codex-Befunde als Korrekturkandidaten zusammengeführt. Originaler EMU8000-Klangpfad und P165-GUI unverändert. Neue native Tests noch NOT RUN. Der vollständige unabhängige Bericht ist auf GitHub nicht vorhanden; Grundlage sind die vom Besitzer übermittelten fünf Befunde.
+- Expliziter Push-Marker `[audit-targeted]`: gezielte native/portable Prüfungen einschließlich Validator, ohne vollständigen Original-Archiv-Sweep; normale Pushes und manueller Workflow behalten vollständige Regression. Kein Release, weiterhin NO-GO bis tatsächliche Nachweise und erneute Bewertung.
+
 ## 26.11.2026 — Codex-Nachaudit: EMU8000-Initialisierungsfehler (Kandidat)
 
 - Gepinnter snd_emu8k.c 2935–2964: fehlender ROM-Stream und Short-Read rufen fatal() -> E_Exit -> exit auf; ROM/Empty/RAM-calloc ungeprüft. emu8000.cpp:268/277 weitere E_Exit-Pfade. AWE32ROM_Locate kann bei fehlender expliziter Datei auf Host-Suchpfade/Download-Prompt ausweichen. SBLASTER 4305 init im Original-VM-Power-on.
 - Eingebettete C-Initialisierung prüft ROM-Open, exakt 1 MiB fread, alle drei calloc, räumt Teilressourcen vor IO-Handler-Registrierung ab. C++-Device prüft Chip-calloc und Init-Erfolg, veröffentlicht keinen ungültigen Chip, expliziter ROM-Pfad ohne Locator-Fallback; new(nothrow) behandelt Objektallokation. Fehler latcht bestehenden kooperativen Stop; nach abgeschlossener VM-Initialisierung wird der etablierte Run-Machine-Cleanup benutzt; Wrapper liefert -12567 erst nach Rückkehr aus main. Keine generelle SEH-/E_Exit-Umschreibung, keine Klangalgorithmusänderung, Standalone unverändert.
 - Sechs gezielte neue native Provokationen (Open, ROM-calloc, tatsächlicher Short-Read, Empty-calloc, RAM-calloc, Chip-calloc). Kein EMU-Trace aus fehlgeschlagenem Start, Rückgabecode/normaler Cleanup/FreeLibrary, frische DLL im selben Prozess muss echte AWEUTIL-Schreibvorgänge nachweisen. Synthetische OOM-Injektion ist keine vollständige System-OOM-Absicherung. Arbiträre weitere Exceptions und Prozesscrashs bleiben offen. Tests NOT RUN.
-- Zusammen mit Programm-Ordering und ETW-Gegenprobe auf demselben main-Stand. SF2-Recall und Bankwechsel noch offen. Keine Freigabe.
+- Zusammen mit Programm-Ordering und ETW-Gegenprobe auf demselben main-Stand. SF2-Recall und Bankwechsel im nachfolgenden gemeinsamen Kandidaten enthalten; native Nachweise offen. Keine Freigabe.
 
 ## 26.11.2026 — Unabhängiger Codex-Nachaudit: Programm-Automation und ETW-Gegenprobe (Kandidat)
 
