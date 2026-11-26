@@ -16,6 +16,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <cmath>
+#include <limits>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -134,7 +135,7 @@ int main(int argc,char** argv){
     std::cout<<std::unitbuf;std::cerr<<std::unitbuf;
     if(argc!=4)return fail("usage: host plugin mode bank.sf2");
     const std::string mode=argv[2], bank=argv[3];
-    if(mode!="early"&&mode!="pause"&&mode!="rollback"&&mode!="switch"&&mode!="automation"&&mode!="bootfail"&&mode!="offline"&&mode!="eventorder"&&mode!="bankreplace")return fail("unknown mode");
+    if(mode!="early"&&mode!="pause"&&mode!="rollback"&&mode!="switch"&&mode!="automation"&&mode!="bootfail"&&mode!="offline"&&mode!="eventorder"&&mode!="bankreplace"&&mode!="invalidblock")return fail("unknown mode");
         // Match the SDK's actual Windows hosting module: OLE is initialized
     // on the host UI thread before loading/initializing the plug-in.
     struct OleScope {
@@ -311,6 +312,67 @@ int main(int argc,char** argv){
         std::cout<<"AUDIT_DEFAULT_MIDI_ORDER sequence="<<sequence<<" expected=vNNV"<<std::endl;
         if(sequence.size()!=4||sequence.substr(0,2)!="vN"||unexpected||nonfinite)return fail("positive event-order control");
         verdict("AUDIT_DEFAULT_MIDI_ORDER",sequence=="vNNV");
+    }else if(mode=="invalidblock"){
+        // Actual plugin with the synthetic MIDI recorder. Invalid normal
+        // parameter and note offsets must reject even a valid prefix.
+        auto* logdir=std::getenv("AWE64_AUDIT_SHIM_DIR");
+        if(!logdir)return fail("missing MIDI capture dir");
+        V::IMidiMapping* mapping=nullptr;
+        if(component->queryInterface(V::IMidiMapping::iid,reinterpret_cast<void**>(&mapping))!=S::kResultOk||!mapping)return fail("MIDI mapping");
+        V::ParamID cc7=0;
+        const bool mapped=mapping->getMidiControllerAssignment(0,0,7,cc7)==S::kResultOk;
+        mapping->release();
+        if(!mapped)return fail("CC7 mapping");
+        (void)pump(50);
+        if(unexpected||nonfinite)return fail("invalid-block warmup");
+        if(controller->setParamNormalized(1001u,.75)!=S::kResultOk||
+           controller->setParamNormalized(1100u,.25)!=S::kResultOk)return fail("invalid-block initial controls");
+        auto capture=[&](){
+            std::ifstream f(std::filesystem::path(logdir)/"events.txt");
+            unsigned status,a,b;unsigned notes=0,volumes=0;
+            while(f>>status>>a>>b){if(status==0x90&&b)++notes;if(status==0xb0&&a==7)++volumes;}
+            return std::array<unsigned,2>{notes,volumes};
+        };
+        for(unsigned trial=0;trial<3;++trial){
+            V::ParameterChanges changes(3);S::int32 index=0,point=0;
+            auto* master=changes.addParameterData(1001u,index);
+            auto* voice=changes.addParameterData(1100u,index);
+            auto* volume=changes.addParameterData(cc7,index);
+            if(!master||!voice||!volume||master->addPoint(0,.1,point)!=S::kResultOk||
+               voice->addPoint(0,.8,point)!=S::kResultOk||volume->addPoint(0,.2,point)!=S::kResultOk)
+                return fail("invalid-block fixture valid prefix");
+            if(trial==0&&voice->addPoint(512,.9,point)!=S::kResultOk)return fail("invalid offset fixture");
+            if(trial==1&&voice->addPoint(10,std::numeric_limits<double>::quiet_NaN(),point)!=S::kResultOk)return fail("NaN fixture");
+            event.setOffset(trial==2?512:20);
+            S::MemoryStream before,after;
+            if(component->getState(&before)!=S::kResultOk)return fail("invalid-block before state");
+            const auto counts=capture();
+            const auto peak=block(true,&changes);
+            const bool rejected=lastResult!=S::kResultOk&&peak==0.f&&output.silenceFlags==3;
+            const bool unchanged=component->getState(&after)==S::kResultOk&&
+                before.getSize()==after.getSize()&&std::memcmp(before.getData(),after.getData(),before.getSize())==0;
+            (void)pump(30);
+            const bool noPackets=capture()==counts;
+            verdict("AUDIT_INVALID_BLOCK_ATOMIC_REJECT",rejected&&unchanged&&noPackets);
+        }
+        // Positive control: same valid prefix with legal note offset must
+        // reach both component state and actual MIDI bytes after recovery.
+        const auto counts=capture();
+        V::ParameterChanges changes(3);S::int32 index=0,point=0;
+        auto* master=changes.addParameterData(1001u,index);
+        auto* voice=changes.addParameterData(1100u,index);
+        auto* volume=changes.addParameterData(cc7,index);
+        if(!master||!voice||!volume||master->addPoint(0,.1,point)!=S::kResultOk||
+           voice->addPoint(0,.8,point)!=S::kResultOk||volume->addPoint(0,.2,point)!=S::kResultOk)
+            return fail("invalid-block recovery fixture");
+        event.setOffset(20);
+        (void)block(true,&changes);
+        const bool success=lastResult==S::kResultOk;
+        (void)pump(40);
+        const auto later=capture();
+        verdict("AUDIT_INVALID_BLOCK_RECOVERY",success&&later[0]==counts[0]+1&&later[1]==counts[1]+1&&
+            std::abs(controller->getParamNormalized(1001u)-.1)<.0001&&
+            std::abs(controller->getParamNormalized(1100u)-.8)<.005);
     }else if(mode=="early"){
         // Exactly one note, in the first process callback after activation.
         const auto first=block(true);

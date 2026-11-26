@@ -358,63 +358,105 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
        !data.outputs[0].channelBuffers32||!data.outputs[0].channelBuffers32[0]||!data.outputs[0].channelBuffers32[1])){
         silence();return kResultFalse;
     }
-    bool accepted=true;
+    // Stage every point and MIDI event before committing any parameter or
+    // publishing any guest message. A malformed block cannot partly change
+    // controller state or enqueue its valid prefix. Fixed storage only.
+    auto rejectBlock=[&]() noexcept -> tresult {
+        legacyMidi_.reset();engine.requestMidiRecovery();silence();return kResultFalse;
+    };
     legacyMaster_.begin(data.numSamples,master_.load(std::memory_order_acquire));
-    // Validate/count all incoming points before consuming any. Bounded work,
-    // including invalid host-supplied counts and nonfinite master values.
+    legacyMidi_.reset();
+    // 15 blockwise controls: program, 12 overlays/sends, 2 effect types.
+    std::array<double,15> values{};
+    std::array<bool,15> present{};
+    auto slot=[](ParamID id) noexcept -> int {
+        if(id==kProgram)return 0;
+        if(id>=1100u&&id<=1111u)return 1+static_cast<int>(id-1100u);
+        if(id==kReverbType)return 13;
+        if(id==kChorusType)return 14;
+        return -1;
+    };
     unsigned total=0;
     if(data.inputParameterChanges){
         const auto count=data.inputParameterChanges->getParameterCount();
-        if(count<0||count>4096){silence();return kResultFalse;}
+        if(count<0||count>4096)return rejectBlock();
         for(int32 i=0;i<count;++i){
             auto* q=data.inputParameterChanges->getParameterData(i);
-            if(!q||q->getPointCount()<0||static_cast<unsigned>(q->getPointCount())>4096-total){
-                silence();return kResultFalse;
-            }
-            total+=static_cast<unsigned>(q->getPointCount());
-            if(q->getParameterId()==kMaster)for(int32 j=0;j<q->getPointCount();++j){
-                int32 offset=0;ParamValue value=0.;
-                if(q->getPoint(j,offset,value)!=kResultOk||!legacyMaster_.add(offset,value)){
-                    silence();return kResultFalse;
+            if(!q)return rejectBlock();
+            const auto points=q->getPointCount();
+            if(points<0||static_cast<unsigned>(points)>4096-total)return rejectBlock();
+            total+=static_cast<unsigned>(points);
+            const auto id=q->getParameterId();
+            int32 previous=-1;
+            for(int32 j=0;j<points;++j){
+                int32 offset=0;ParamValue v=0.;
+                if(q->getPoint(j,offset,v)!=kResultOk||!std::isfinite(v)||
+                   offset<0||offset<previous||(data.numSamples?offset>=data.numSamples:offset!=0))
+                    return rejectBlock();
+                previous=offset;
+                if(id==kMaster){
+                    if(!legacyMaster_.add(offset,v))return rejectBlock();
+                }else if(id>=rt::midiControllerBase){
+                    rt::MidiEvent midi{};
+                    if(!rt::makeMappedController(id,v,absoluteSamplePosition_+static_cast<std::uint64_t>(offset),midi)||
+                       !legacyMidi_.add(midi,rt::MidiPhase::Controller))return rejectBlock();
+                }else{
+                    const int index=slot(id);
+                    if(index>=0){
+                        values[static_cast<unsigned>(index)]=std::clamp(v,0.,1.);
+                        present[static_cast<unsigned>(index)]=true;
+                    }
+                    // Bank zero and unknown regular IDs retain previous policy.
                 }
             }
         }
     }
-    if(data.inputEvents&&(data.inputEvents->getEventCount()<0||
-        static_cast<unsigned>(data.inputEvents->getEventCount())>4096-total)){
-        engine.requestMidiRecovery();silence();return kResultFalse;
+    if(data.inputEvents){
+        const int32 count=data.inputEvents->getEventCount();
+        if(count<0||static_cast<unsigned>(count)>4096-total)return rejectBlock();
+        for(int32 i=0;i<count;++i){
+            Event event{};
+            if(data.inputEvents->getEvent(i,event)!=kResultOk){return rejectBlock();}
+            std::uint8_t status=0,note=0,velocity=0;
+            int32 channel=0,offset=0,pitch=0;
+            if(event.type==Event::kNoteOnEvent){
+                const auto& on=event.noteOn;
+                channel=on.channel;offset=event.sampleOffset;pitch=on.pitch;
+                status=0x90u;
+                if(!std::isfinite(on.velocity)){return rejectBlock();}
+                velocity=static_cast<std::uint8_t>(std::lround(
+                    std::clamp(double(on.velocity),0.,1.)*127.));
+            } else if(event.type==Event::kNoteOffEvent){
+                const auto& off=event.noteOff;
+                channel=off.channel;offset=event.sampleOffset;pitch=off.pitch;
+                status=0x80u;
+                if(!std::isfinite(off.velocity)){return rejectBlock();}
+                velocity=static_cast<std::uint8_t>(std::lround(
+                    std::clamp(double(off.velocity),0.,1.)*127.));
+            } else continue;
+            if(event.busIndex!=0||channel<0||channel>15||pitch<0||pitch>127||
+               offset<0||(data.numSamples?offset>=data.numSamples:offset!=0)){
+                return rejectBlock();
+            }
+            note=static_cast<std::uint8_t>(pitch);
+            const auto when=absoluteSamplePosition_+
+                static_cast<std::uint64_t>(std::clamp(offset,0,data.numSamples));
+            if(!legacyMidi_.add({when,static_cast<std::uint8_t>(status|channel),note,velocity,3},rt::MidiPhase::Note))return rejectBlock();
+        }
     }
+    // No invalid inputs remain. Preserve existing blockwise semantics.
+    bool accepted=true;
     master_.store(legacyMaster_.last(),std::memory_order_release);
-
-    if(data.inputParameterChanges) {
-        for(int32 i=0;i<data.inputParameterChanges->getParameterCount();++i) {
-            auto* q=data.inputParameterChanges->getParameterData(i);
-            if(!q || q->getPointCount()<1)continue;
-            if(q->getParameterId()>=rt::midiControllerBase||q->getParameterId()==kMaster)continue;
-            int32 offset=0;ParamValue normalized=0.;
-            if(q->getPoint(q->getPointCount()-1,offset,normalized)!=kResultOk)
-                continue;
-            if(!std::isfinite(normalized))continue;
-            const double value=std::clamp(normalized,0.,1.);
-            switch(q->getParameterId()) {
-                case kProgram: {
-                    if(!std::isfinite(value))break;
-                    const auto p=static_cast<std::uint8_t>(std::lround(value*127.));
-                    if(startedCatalog_.Find(0,p))program_.store(p,std::memory_order_release);
-                    break;
-                }
-                case kBank:break; // only physical bank zero is currently proven
-                 case kReverbSend:reverbSend_.store(static_cast<std::uint8_t>(std::lround(value*255.)),std::memory_order_release);break;
-                case kChorusSend:chorusSend_.store(static_cast<std::uint8_t>(std::lround(value*255.)),std::memory_order_release);break;
-                case kReverbType:reverbType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);break;
-                case kChorusType:chorusType_.store(static_cast<std::uint8_t>(std::lround(value*7.)),std::memory_order_release);break;
-                default:
-                    if(q->getParameterId()>=1100u&&q->getParameterId()<1110u)
-                        voiceControls_[q->getParameterId()-1100u].store(static_cast<std::uint8_t>(std::lround(value*255.)),std::memory_order_release);
-                    break;
-            }
-        }
+    if(present[0]){
+        const auto p=static_cast<std::uint8_t>(std::lround(values[0]*127.));
+        if(startedCatalog_.Find(0,p))program_.store(p,std::memory_order_release);
     }
+    for(unsigned i=0;i<10;++i)if(present[i+1])
+        voiceControls_[i].store(static_cast<std::uint8_t>(std::lround(values[i+1]*255.)),std::memory_order_release);
+    if(present[11])reverbSend_.store(static_cast<std::uint8_t>(std::lround(values[11]*255.)),std::memory_order_release);
+    if(present[12])chorusSend_.store(static_cast<std::uint8_t>(std::lround(values[12]*255.)),std::memory_order_release);
+    if(present[13])reverbType_.store(static_cast<std::uint8_t>(std::lround(values[13]*7.)),std::memory_order_release);
+    if(present[14])chorusType_.store(static_cast<std::uint8_t>(std::lround(values[14]*7.)),std::memory_order_release);
     {
         std::uint64_t lo=0;
         for(unsigned i=0;i<8;++i)lo|=std::uint64_t(voiceControls_[i].load(std::memory_order_acquire))<<(i*8);
@@ -446,52 +488,6 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     if(chorus!=lastChorusType_){
         if(engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,true,chorus)))lastChorusType_=chorus;
         else accepted=false;
-    }
-    legacyMidi_.reset();
-    if(data.inputParameterChanges)for(int32 i=0;i<data.inputParameterChanges->getParameterCount();++i){
-        auto* q=data.inputParameterChanges->getParameterData(i);
-        if(q->getParameterId()<rt::midiControllerBase)continue;
-        for(int32 n=0;n<q->getPointCount();++n){
-            int32 offset=0;ParamValue v=0.;rt::MidiEvent midi{};
-            if(q->getPoint(n,offset,v)!=kResultOk||offset<0||
-               (data.numSamples?offset>=data.numSamples:offset!=0)||
-               !rt::makeMappedController(q->getParameterId(),v,absoluteSamplePosition_+static_cast<std::uint64_t>(offset),midi)){
-                accepted=false;continue;
-            }
-            if(!legacyMidi_.add(midi,rt::MidiPhase::Controller))accepted=false;
-        }
-    }
-    if(data.inputEvents){
-        const int32 count=data.inputEvents->getEventCount();
-        for(int32 i=0;i<count;++i){
-            Event event{};
-            if(data.inputEvents->getEvent(i,event)!=kResultOk){accepted=false;continue;}
-            std::uint8_t status=0,note=0,velocity=0;
-            int32 channel=0,offset=0,pitch=0;
-            if(event.type==Event::kNoteOnEvent){
-                const auto& on=event.noteOn;
-                channel=on.channel;offset=event.sampleOffset;pitch=on.pitch;
-                status=0x90u;
-                if(!std::isfinite(on.velocity)){accepted=false;continue;}
-                velocity=static_cast<std::uint8_t>(std::lround(
-                    std::clamp(double(on.velocity),0.,1.)*127.));
-            } else if(event.type==Event::kNoteOffEvent){
-                const auto& off=event.noteOff;
-                channel=off.channel;offset=event.sampleOffset;pitch=off.pitch;
-                status=0x80u;
-                if(!std::isfinite(off.velocity)){accepted=false;continue;}
-                velocity=static_cast<std::uint8_t>(std::lround(
-                    std::clamp(double(off.velocity),0.,1.)*127.));
-            } else continue;
-            if(event.busIndex!=0||channel<0||channel>15||pitch<0||pitch>127||
-               offset<0||(data.numSamples?offset>=data.numSamples:offset!=0)){
-                accepted=false;continue;
-            }
-            note=static_cast<std::uint8_t>(pitch);
-            const auto when=absoluteSamplePosition_+
-                static_cast<std::uint64_t>(std::clamp(offset,0,data.numSamples));
-            if(!legacyMidi_.add({when,static_cast<std::uint8_t>(status|channel),note,velocity,3},rt::MidiPhase::Note))accepted=false;
-        }
     }
     if(!legacyMidi_.submitLegacy([&engine](const rt::MidiEvent& e) noexcept {return engine.sendMidi(e);}))
         accepted=false;

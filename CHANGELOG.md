@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 26.11.2026 — A09: vollständige Eingabeprüfung vor Legacy-Blockübernahme (Kandidat)
+
+- A12 Windows [45812591813](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45812591813) SUCCESS: vier native echte HWND-Ablehnungsfälle (begin/perform × zwei Editor-Instanzen), unveränderter State, Wiederanlauf, 47/47 Validator, Creative-Dual und 128/128 Cheezoids; p95 17,619/18,6042/17,6354 ms, keine gemeldeten Drops/Underruns. Transport und Version SUCCESS. Keine vollständige GUI-Abnahme.
+- A09: im Legacy-process wurden bisher Master/Voice/Programmwerte veröffentlicht, bevor alle Punkte und MIDI-Ereignisse validiert waren; fehlerhafte reguläre Queue-Offets/NaN wurden teilweise ignoriert, gültige MIDI-Präfixe konnten bereits gesendet werden. Jetzt vollständige feste, begrenzte Blockvorbereitung (4096 Gesamteingaben), jede Queue einmal lesen, alle Punkte auf finite Werte, Offsetgrenzen und aufsteigende Reihenfolge prüfen; MIDI und Blockwerte erst nach erfolgreicher Strukturprüfung übernehmen. Fehlerhafte Blöcke liefern Stille + kResultFalse und vorhandene MIDI-Recovery. Bestehendes Clamping, Bank-0-/unbekannte reguläre-ID-Verhalten und blockweise Nicht-Master-Automation bleiben. Kein Claim samplegenauer Legacy-Gastzeit oder atomarer Rollback bei späterem Queue-Overflow.
+- Native Gegenprobe mit echter VST3 und synthetischem ABI-Recorder: gültiger Master/Voice/CC-Präfix plus falscher Voice-Offset, NaN oder falscher Note-Offset; State bytegleich, Ausgänge stumm, kein NoteOn/CC7 des verworfenen Blocks, danach positive Wiederholung. Windows-Ausführung NOT RUN. Originalkern, Creative und GUI unverändert. Allgemeiner in-process Fatalpfad, weitere QA und Studio Pro offen.
+
 ## 26.11.2026 — A12: GUI-Host-Ablehnung und Rollback (Kandidat)
 
 - A19 [45811475200](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45811475200) Linux/Windows SUCCESS: tatsächliche neue Git-Fixture-Regression und Windows-PowerShell-Syntax bestanden; Version 45811475148 SUCCESS. Privater Besitzer-Build nicht ausgeführt.

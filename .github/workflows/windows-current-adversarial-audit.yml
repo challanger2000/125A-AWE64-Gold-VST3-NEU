@@ -134,5 +134,9 @@ jobs:
           New-Item -ItemType Directory $env:AWE64_AUDIT_SHIM_DIR | Out-Null
           & $exe $plugin eventorder $bank
           if ($LASTEXITCODE -ne 0) { $failed += "eventorder=$LASTEXITCODE" }
+          $env:AWE64_AUDIT_SHIM_DIR=Join-Path $env:RUNNER_TEMP 'current-audit-invalid-block'
+          New-Item -ItemType Directory $env:AWE64_AUDIT_SHIM_DIR | Out-Null
+          & $exe $plugin invalidblock $bank
+          if ($LASTEXITCODE -ne 0) { $failed += "invalidblock=$LASTEXITCODE" }
           Write-Host "ADVERSARIAL_NATIVE_FAILURES=$failed"
           if ($failed.Count -ne 0) { throw 'Actual native adversarial audit found failures or infrastructure gaps; inspect individual evidence' }
