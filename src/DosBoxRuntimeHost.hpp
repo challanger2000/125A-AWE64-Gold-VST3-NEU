@@ -489,7 +489,7 @@ public:
     void startReplacementCapture() noexcept {if(adapter_)adapter_->startReplacementCapture();}
     void startLegacyMidi() noexcept {if(adapter_)adapter_->startLegacyMidi();}
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
-        if(!ready_||!ready_()||(clockFault_&&clockFault_()))return false;
+        if(finished()||!ready_||!ready_()||finished())return false;
         if(pcmPrimed_)return true;
         // The ABI-only fixture may query the UART with no audio block.
         // A real nonempty legacy host block needs PCM reserve even for a
@@ -532,10 +532,10 @@ public:
     [[nodiscard]] unsigned demandLead() const noexcept {return demandLead_;}
     [[nodiscard]] std::uint64_t guestFrames() const noexcept {return adapter_?adapter_->guestFrames():0;}
     [[nodiscard]] bool publishDemand(std::uint64_t horizon) noexcept {
-        return adapter_&&adapter_->publishDemand(horizon);
+        return !finished()&&adapter_&&adapter_->publishDemand(horizon);
     }
     [[nodiscard]] bool submitTimed(rt::MidiBlockBatch& batch,const rt::MidiTimeline& timeline) noexcept {
-        if(!demandLead_||!queues_)return false;
+        if(finished()||!demandLead_||!queues_)return false;
         if(performanceStats_&&!measurementStarted_&&batch.hasNoteOn()) {
             measurementStart_=measurementEnd_=queues_->snapshot();
             measurementStarted_=true;
@@ -545,11 +545,12 @@ public:
     void requestMidiRecovery() noexcept {if(queues_)queues_->requestMidiRecovery();}
     std::size_t audioFramesAvailable() const noexcept {return queues_?queues_->snapshot().audioFrames:0;}
     bool waitForAudio(std::size_t frames,bool offline) noexcept {
-        if(audioFramesAvailable()>=frames)return true;
+        if(finished())return false;
+        if(audioFramesAvailable()>=frames)return !finished();
         if(!offline)return false; // NEVER wait on realtime path
         const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(2);
         while(!finished()&&std::chrono::steady_clock::now()<until) {
-            if(audioFramesAvailable()>=frames)return true;
+            if(audioFramesAvailable()>=frames)return !finished();
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         return false;
@@ -557,7 +558,7 @@ public:
     [[nodiscard]] std::uint64_t midiRecoveryEpoch() const noexcept {return queues_?queues_->midiRecoveryEpoch():0;}
     [[nodiscard]] bool midiRecoveryPending() const noexcept {return queues_&&queues_->midiRecoveryPending();}
     bool sendMidi(const rt::MidiEvent& e) noexcept {
-        if(!queues_)return false;
+        if(finished()||!queues_)return false;
         if(performanceStats_&&!measurementStarted_&&(e.status&0xf0u)==0x90u&&e.data2) {
             // First actual NoteOn after warm-up establishes the baseline.
             measurementStart_=measurementEnd_=queues_->snapshot();
@@ -604,6 +605,11 @@ public:
     // frames from an in-flight callback are rejected by the epoch check.
     void discardLegacyAudio() noexcept {if(queues_)queues_->discardAudio();pcmPrimed_=false;}
     std::size_t readAudio(float* left,float* right,std::size_t n) noexcept {
+        if(finished()){
+            if(left)std::fill_n(left,n,0.f);
+            if(right)std::fill_n(right,n,0.f);
+            return 0;
+        }
         return queues_?queues_->readAudio(left,right,n,captureGate_?captureGate_->epoch():0u):0u;
     }
     std::uint64_t underruns() const noexcept {

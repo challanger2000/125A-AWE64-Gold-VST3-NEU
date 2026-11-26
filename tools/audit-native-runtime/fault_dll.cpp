@@ -28,6 +28,17 @@ EXPORT int AWE64_CALL AWE64_StartGuest(int argc,char** argv){
     const char* p=std::getenv("AWE64_AUDIT_SHIM_DIR");
     if(!m||!p)return 91;
     const std::string mode=m;const std::filesystem::path dir=p;
+    if(mode=="exitready"){
+        if(!pcm||!midi)return 98;
+        ready.store(true,std::memory_order_release);
+        int16_t samples[2048];
+        for(auto& x:samples)x=8192;
+        pcm(pcmContext,samples,1024);
+        while(!stop.load(std::memory_order_acquire)&&!std::filesystem::exists(dir/"resume"))
+            std::this_thread::sleep_for(milliseconds(1));
+        // Preserve the deliberately stale readiness and nonzero PCM.
+        return 97;
+    }
     if(mode=="startup"){
         if(!pcm||!midi)return 98;
         ready.store(true,std::memory_order_release);

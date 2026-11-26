@@ -348,8 +348,12 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             ready=engine.ready(hostBlock);
         }
-        if(!ready){silence();return kResultFalse;}
+        if(!ready){
+            if(engine.finished())guestStatus_.store(-2,std::memory_order_release);
+            silence();return kResultFalse;
+        }
     }
+    if(engine.finished()){guestStatus_.store(-2,std::memory_order_release);silence();return kResultFalse;}
     if(ready){
         guestStatus_.store(2,std::memory_order_release);
         if(data.numSamples>0)engine.startLegacyMidi();
@@ -524,6 +528,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     }
     if(data.numSamples>0)
         absoluteSamplePosition_+=static_cast<std::uint64_t>(data.numSamples);
+    if(engine.finished()){guestStatus_.store(-2,std::memory_order_release);silence();return kResultFalse;}
     if(!accepted){engine.requestMidiRecovery();return kResultFalse;}
     return kResultOk;
 }
@@ -634,7 +639,7 @@ tresult DosBoxVst3Shell::processTimed(ProcessData& data,integration::DosBoxRunti
         rt::StereoFrame f{};if(engine.readAudio(&f.left,&f.right,1)!=1)full=false;return f;
     });
     engine.measureQueueAfterBlock();
-    if(!full)return fault();
+    if(!full||engine.finished())return fault();
     hostDemand_.applyMaster(l,r,prior.master);
     // Truthful silence flags for both channels.
     out.silenceFlags=0;

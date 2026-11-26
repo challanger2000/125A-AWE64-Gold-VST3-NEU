@@ -18,7 +18,7 @@ int main(int argc,char** argv){
     if(argc!=3)return infra("usage: host mode synthetic-fixture-dir");
     const std::string mode=argv[1];
     const auto dir=std::filesystem::absolute(argv[2]);
-    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom"&&mode!="candidate"&&mode!="startup")return infra("mode");
+    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom"&&mode!="candidate"&&mode!="startup"&&mode!="exitready")return infra("mode");
     // These files contain only self-generated fake bytes; use a fresh directory.
     if(!std::filesystem::create_directory(dir))return infra("fresh fixture dir");
     {std::ofstream f(dir/"awe32.raw",std::ios::binary);std::vector<char> zero(1048576,0);f.write(zero.data(),zero.size());}
@@ -32,7 +32,31 @@ int main(int argc,char** argv){
         return infra("real production RuntimeHost::begin");
     if(!wait([&]{return h.ready();}))return infra("shim readiness not observed");
     unsigned failures=0;
-    if(mode=="startup"){
+    if(mode=="exitready"){
+        // Deliberately leave stale ready=true and a full audio reserve
+        // after the worker actually returns. No race-dependent sleeps.
+        if(!wait([&]{return h.ready(128);}))return infra("exitready PCM precondition");
+        const auto before=h.audioFramesAvailable();
+        if(before<576||!h.waitForAudio(128,false)||!h.sendMidi({0,0x90,60,100,3}))
+            return infra("exitready live positive control");
+        std::ofstream(dir/"resume").put('1');
+        if(!wait([&]{return h.finished();}))return infra("worker did not exit");
+        const bool stale=h.audioFramesAvailable()>=128;
+        const bool notReady=!h.ready(128)&&!h.ready();
+        const bool notWait=!h.waitForAudio(128,false)&&!h.waitForAudio(128,true);
+        const bool notMidi=!h.sendMidi({128,0x90,61,100,3});
+        float l[128],r[128];std::fill_n(l,128,123.f);std::fill_n(r,128,123.f);
+        const auto n=h.readAudio(l,r,128);
+        const bool silent=std::all_of(l,l+128,[](float x){return x==0.f;})&&
+                          std::all_of(r,r+128,[](float x){return x==0.f;});
+        const auto code=h.guestExitCode();
+        h.stop();
+        const bool pass=stale&&notReady&&notWait&&notMidi&&n==0&&silent&&code==97;
+        std::cout<<"AUDIT_STALE_READY_AFTER_EXIT "<<(pass?"PASS":"FAIL")
+                 <<" stale_pcm="<<stale<<" not_ready="<<notReady<<" not_wait="<<notWait
+                 <<" not_midi="<<notMidi<<" silent="<<silent<<" exit="<<code<<std::endl;
+        failures+=!pass;
+    }else if(mode=="startup"){
         if(!h.sendMidi({0,0xb0,0,0,3})||!h.sendMidi({0,0xc0,0,0,2})||
            !h.sendMidi({0,0x90,60,100,3}))return infra("early startup MIDI queue");
         if(!wait([&]{return std::filesystem::exists(dir/"startup-polled");}))

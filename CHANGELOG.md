@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 26.11.2026 — A22: veraltete Bereitschaft nach tatsächlichem Worker-Ende (Kandidat)
+
+- [Adversarial 45826817908](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45826817908) SUCCESS: Kaltstart PASS (0,304871 / 0,213013 Peak), synthetischer Offline 289959 nicht-stumme Frames / 0 Prozessfehler, Bankidentität PASS, MIDI vNNV, 3/3 Invalid-Block und Wiederanlauf PASS; leere Fehlerliste. Portabler Oracle-Job, Transport und Version SUCCESS. Der frühere sporadische Kaltstart-FAIL bleibt ursächlich ungeklärt.
+- A22: RuntimeHost durfte nach tatsächlichem Worker-Ende noch eine alte UART-Ready-Markierung bzw. gepuffertes PCM als erfolgreich melden und MIDI in die verwaiste Queue schreiben. Guard auf finished vor Bereitschaft, Audio-Warteprüfung, Demand-/MIDI-Übernahme; nach bereits beobachtetem Ende readAudio=0 und stumme Puffer. Legacy-Callback prüft zusätzlich nach Startwartepfad und am Blockende; Timed-Pfad prüft nach Audioübernahme. Keine Garantie atomarer Synchronisation mit einem zeitgleich eintretenden Worker-Ende, keine allgemeine Prozess-/SEH-/E_Exit-Isolation. Kein behaupteter Fix des sporadischen Kaltstarts.
+- Neue deterministische native ABI-Gegenprobe: Testworker setzt Ready, erzeugt 1024 nicht-stumme PCM-Frames, bleibt bis zum expliziten Signal aktiv, beendet sich dann mit Code 97 ohne Ready/PCM zu löschen. Live-Positivkontrolle, danach stale reserve vorhanden, beide Ready-Abfragen, beide Wartearten, MIDI und PCM müssen fehlschlagen bzw. stumm sein. Windows-Ausführung NOT RUN; Originalkern und GUI unverändert. Kein FULL AUDIT.
+
 ## 26.11.2026 — A09: Kaltstart-Gegenbefund und unabhängige Testausführung
 
 - Exakter Produktstand `ebbc1489`: [Original-Windows 45817583838](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45817583838) SUCCESS, 47/47 Validator, Original-Creative-Dual und 128/128 Cheezoids, p95 19,7506 / 17,6042 / 18,2708 ms, keine gemeldeten Drops/Underruns in den Original-Performancefenstern. SF2-State, Transport, Version ebenfalls SUCCESS. [Runtime 45817583796](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45817583796): drei von drei Kaltstarts mit erster Note PASS, gemessene Startfenster-Unterläufe 2560/2560/3072 Frames; kein genereller Null-Unterlauf-Claim.
