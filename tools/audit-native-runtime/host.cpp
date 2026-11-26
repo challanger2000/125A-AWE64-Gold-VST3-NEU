@@ -18,7 +18,7 @@ int main(int argc,char** argv){
     if(argc!=3)return infra("usage: host mode synthetic-fixture-dir");
     const std::string mode=argv[1];
     const auto dir=std::filesystem::absolute(argv[2]);
-    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom"&&mode!="candidate"&&mode!="startup"&&mode!="exitready")return infra("mode");
+    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom"&&mode!="candidate"&&mode!="startup"&&mode!="exitready"&&mode!="defaultbank")return infra("mode");
     // These files contain only self-generated fake bytes; use a fresh directory.
     if(!std::filesystem::create_directory(dir))return infra("fresh fixture dir");
     {std::ofstream f(dir/"awe32.raw",std::ios::binary);std::vector<char> zero(1048576,0);f.write(zero.data(),zero.size());}
@@ -32,7 +32,29 @@ int main(int argc,char** argv){
         return infra("real production RuntimeHost::begin");
     if(!wait([&]{return h.ready();}))return infra("shim readiness not observed");
     unsigned failures=0;
-    if(mode=="exitready"){
+    if(mode=="defaultbank"){
+        if(!wait([&]{return std::filesystem::exists(dir/"bank-path.txt");}))
+            return infra("default bank path not received");
+        std::ifstream info(dir/"bank-path.txt");
+        std::string path;std::getline(info,path);
+        if(path.empty())return infra("default bank stage path");
+        const auto staged=std::filesystem::path(path);
+        const auto source=dir/"SYNTHGM.SF2";
+        const bool isolated=!std::filesystem::equivalent(staged,source);
+        // Original fixture was X. Overwrite only the disposable source
+        // after begin, then allow the guest to open the staged default.
+        {std::ofstream f(source,std::ios::binary|std::ios::trunc);f<<"changed";}
+        std::ofstream(dir/"resume").put('1');
+        const bool exact=wait([&]{return std::filesystem::exists(dir/"bank-read-ok");});
+        h.stop();
+        const bool cleaned=!std::filesystem::exists(staged);
+        std::ifstream changed(source,std::ios::binary);
+        std::string text;changed>>text;
+        const bool pass=isolated&&exact&&cleaned&&text=="changed";
+        std::cout<<"AUDIT_DEFAULT_BANK_SNAPSHOT "<<(pass?"PASS":"FAIL")
+                 <<" isolated="<<isolated<<" exact="<<exact<<" cleaned="<<cleaned<<std::endl;
+        failures+=!pass;
+    }else if(mode=="exitready"){
         // Deliberately leave stale ready=true and a full audio reserve
         // after the worker actually returns. No race-dependent sleeps.
         if(!wait([&]{return h.ready(128);}))return infra("exitready PCM precondition");

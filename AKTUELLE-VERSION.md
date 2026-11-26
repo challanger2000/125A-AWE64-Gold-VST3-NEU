@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 26.11.2026 — A10: unveränderte Standard-Soundbank pro Aktivierung (Kandidat)
+
+- Exakter `af912386`: alle sieben Workflows SUCCESS. [Deterministischer A22-Test 45854291438](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45854291438): stale_pcm=1 not_ready=1 not_wait=1 not_midi=1 silent=1 exit=97. [Original 45854291377](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45854291377): 47/47 Validator, Original-Dual, 128/128 Cheezoids, p95 19,9546/18,8958/17,2708 ms, keine gemeldeten Drops/Underruns in Original-Performancefenstern. Vier erneute synthetische Kaltstarts PASS; einzelne synthetische Start-/Runtime-Unterläufe weiterhin gemessen. Frühere Kaltstartursache offen.
+- A10: Default-SF2 zuvor aus installierter C:-Quelle durch den DOS-Gast geöffnet, während der Browser diese separat las. Jetzt vor Aktivierung begrenzter Snapshot (max. 32 MiB wie externer SF2), dieselben Originalbytes für Katalog und D:-Staging, keinerlei Versionsanpassung der Defaultbank. Bei Default-Wechsel mit vorbereitetem Katalog muss sichtbares Presetinventar übereinstimmen. Quelle unverändert, Staging wird beim Stop entfernt. Kein vollständiger Default-SF2-Struktur-/Originalhash-/Recall-Nachweis; bestehender synthetischer Fallback bleibt. 
+- Native ABI-Gegenprobe: Defaultbank X, tatsächliches Gastargument /SBK:D:\\SYNTHGM.SF2, Quellfixture nach begin überschreiben, erst danach liest Worker die unveränderte Stagingdatei; Staging-Cleanup und Quelländerung prüfen. Windows-Ausführung NOT RUN. Originalkern/GUI nicht geändert; Originalklangregression erforderlich. A22 Prozessfatalpfade offen.
+
 ## 26.11.2026 — A22: veraltete Bereitschaft nach tatsächlichem Worker-Ende (Kandidat)
 
 - [Adversarial 45826817908](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45826817908) SUCCESS: Kaltstart PASS (0,304871 / 0,213013 Peak), synthetischer Offline 289959 nicht-stumme Frames / 0 Prozessfehler, Bankidentität PASS, MIDI vNNV, 3/3 Invalid-Block und Wiederanlauf PASS; leere Fehlerliste. Portabler Oracle-Job, Transport und Version SUCCESS. Der frühere sporadische Kaltstart-FAIL bleibt ursächlich ungeklärt.

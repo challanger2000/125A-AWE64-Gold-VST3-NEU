@@ -28,6 +28,29 @@ EXPORT int AWE64_CALL AWE64_StartGuest(int argc,char** argv){
     const char* p=std::getenv("AWE64_AUDIT_SHIM_DIR");
     if(!m||!p)return 91;
     const std::string mode=m;const std::filesystem::path dir=p;
+    if(mode=="defaultbank"){
+        std::string staged;
+        bool bankArgument=false;
+        for(int i=0;i<argc;++i){
+            const std::string arg=argv[i];
+            const std::string prefix="mount d \"";
+            if(arg.rfind(prefix,0)==0&&arg.back()=='"')
+                staged=arg.substr(prefix.size(),arg.size()-prefix.size()-1);
+            if(arg.find("/SBK:D:\\SYNTHGM.SF2")!=std::string::npos)bankArgument=true;
+        }
+        if(staged.empty()||!bankArgument)return 93;
+        const auto path=std::filesystem::path(staged)/"SYNTHGM.SF2";
+        std::ofstream(dir/"bank-path.txt")<<path.string();
+        ready.store(true,std::memory_order_release);
+        while(!stop.load(std::memory_order_acquire)&&!std::filesystem::exists(dir/"resume"))
+            std::this_thread::sleep_for(milliseconds(1));
+        std::ifstream f(path,std::ios::binary);
+        char ch=0;
+        const bool exact=bool(f.get(ch))&&ch=='X'&&f.peek()==std::char_traits<char>::eof();
+        if(exact)std::ofstream(dir/"bank-read-ok").put('1');
+        while(!stop.load(std::memory_order_acquire))std::this_thread::sleep_for(milliseconds(1));
+        return exact?0:94;
+    }
     if(mode=="exitready"){
         if(!pcm||!midi)return 98;
         ready.store(true,std::memory_order_release);

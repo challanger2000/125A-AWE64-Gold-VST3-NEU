@@ -269,7 +269,7 @@ public:
             stop();return false;
         }
         try {
-            std::string guestBank="SYNTHGM.SF2";
+            std::string guestBank="D:\\SYNTHGM.SF2";
             std::string guestProgram="DEMO.EXE";
             // Original files remain untouched. Only the exact proven original
             // Creative executable gets a disposable one-byte compatibility fix.
@@ -298,6 +298,18 @@ public:
                     stop();return false;
                 }
                 guestBank="D:\\BANK.SF2";
+            } else {
+                // Use the very same default-bank snapshot as the VST3
+                // catalog. Preserve bytes, do not adapt the original bank.
+                std::vector<std::uint8_t> bytes;
+                if(!validatedBank&&!awe64::guest::readDefaultBankSnapshot(sf2,bytes)){
+                    stop();return false;
+                }
+                const auto& original=validatedBank?*validatedBank:bytes;
+                if(original.empty()||original.size()>32ull*1024*1024||
+                   !awe64::guest::writeExternalSf2(stagedDirectory_/"SYNTHGM.SF2",original)){
+                    stop();return false;
+                }
             }
             const char* perf=std::getenv("AWE64_TEST_PERFORMANCE");
             performanceStats_=perf&&std::strcmp(perf,"1")==0;

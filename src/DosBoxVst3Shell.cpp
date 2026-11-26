@@ -182,7 +182,23 @@ bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle
             validatedBank=&bytes;
         }
         AWE125::PresetCatalog candidate;
-        if(preparedCatalog)candidate=std::move(*preparedCatalog);
+        if(selected.empty()){
+            // Capture installed default SF2 once for both the browser and
+            // the actual guest. Do not silently substitute external bytes.
+            if(!guest::readDefaultBankSnapshot(privateDir/"SYNTHGM.SF2",bytes))return false;
+            validatedBank=&bytes;
+            if(!loadCatalog(selected,candidate,validatedBank))return false;
+            // A prepared default catalog might refer to a different file
+            // generation. Never hand over an inconsistent candidate.
+            if(preparedCatalog){
+                const auto& prior=preparedCatalog->Entries();
+                const auto& now=candidate.Entries();
+                if(prior.size()!=now.size())return false;
+                for(std::size_t i=0;i<prior.size();++i)
+                    if(prior[i].bank!=now[i].bank||prior[i].program!=now[i].program||
+                       prior[i].name!=now[i].name)return false;
+            }
+        }else if(preparedCatalog)candidate=std::move(*preparedCatalog);
         else if(!loadCatalog(selected,candidate,validatedBank))return false;
         const bool replacing=bool(runtime_);
         const auto lead=demandRequested_?hostDemand_.lead():0u;

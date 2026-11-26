@@ -9,6 +9,22 @@
 namespace awe64::guest {
 // Host-side validation/staging only. The original Creative loader owns
 // sample upload and playback. Never modify or overwrite the source bank.
+// Preserve the installed default bank byte-for-byte, including the version
+// header. Only external banks use the existing compatibility adaptation.
+inline bool readDefaultBankSnapshot(const std::filesystem::path& path,
+                                    std::vector<std::uint8_t>& bytes) {
+    std::error_code ec;
+    const auto size=std::filesystem::file_size(path,ec);
+    if(ec||size==0||size>32ull*1024*1024)return false;
+    std::ifstream input(path,std::ios::binary);
+    if(!input)return false;
+    std::vector<std::uint8_t> candidate(static_cast<std::size_t>(size));
+    if(!input.read(reinterpret_cast<char*>(candidate.data()),
+                   static_cast<std::streamsize>(candidate.size())))return false;
+    if(input.peek()!=std::char_traits<char>::eof()||input.bad())return false;
+    bytes.swap(candidate);
+    return true;
+}
 inline bool readExternalSf2(const std::filesystem::path& path,
                             std::vector<std::uint8_t>& bytes,
                             bool& adapted) {
