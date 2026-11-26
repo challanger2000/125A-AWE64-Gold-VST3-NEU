@@ -502,6 +502,38 @@ struct AWE64RomEntryGuard {
         return GetFileType(file)==FILE_TYPE_DISK&&GetFileSizeEx(file,&size)&&size.QuadPart==1048576;
     }
 };
+// Embedded entry accepts only options actually used by the product and its
+// documented direct-DLL diagnostics. Standalone config/editor/reset options
+// can call exit() or launch external programs before guest initialization.
+static bool AWE64_ValidateEmbeddedArgs(int argc,char** argv) noexcept {
+    if(argc<1||argc>128||!argv||!argv[0])return false;
+    bool noConfig=false;
+    for(int i=1;i<argc;++i){
+        const char* arg=argv[i];
+        if(!arg)return false;
+        if(std::strcmp(arg,"-noconfig")==0){noConfig=true;continue;}
+        if(std::strcmp(arg,"-nogui")==0||std::strcmp(arg,"-nomenu")==0||
+           std::strcmp(arg,"-noconsole")==0||std::strcmp(arg,"-silent")==0||
+           std::strcmp(arg,"-test")==0)continue;
+        const bool setting=std::strcmp(arg,"-set")==0;
+        if(!setting&&std::strcmp(arg,"-c")!=0)return false;
+        if(++i>=argc||!argv[i]||!*argv[i]||argv[i][0]=='-')return false;
+        if(!setting)continue; // DOS command, not a host command-line option
+        const char* value=argv[i];
+        constexpr char romPrefix[]="sblaster awe32rom=";
+        if(std::strncmp(value,romPrefix,sizeof(romPrefix)-1)==0)continue;
+        if(std::strcmp(value,"sblaster sbtype=sbawe")==0||
+           std::strcmp(value,"sblaster sbtype=sb16")==0||
+           std::strcmp(value,"sblaster awe32ram=28672")==0||
+           std::strcmp(value,"midi mpu401=intelligent")==0||
+           std::strcmp(value,"mixer rate=44100")==0||
+           std::strcmp(value,"speaker pcspeaker=false")==0||
+           std::strcmp(value,"sblaster oplmode=none")==0||
+           std::strcmp(value,"sdl waitonerror=false")==0)continue;
+        return false;
+    }
+    return noConfig;
+}
 static bool AWE64_ValidateExplicitRom(int argc,char** argv,AWE64RomEntryGuard& guard) {
     if(argc<1||!argv||!argv[0])return false;
     const char* rom=nullptr;
@@ -522,6 +554,11 @@ static bool AWE64_ValidateExplicitRom(int argc,char** argv,AWE64RomEntryGuard& g
 // Must be invoked on a dedicated host-owned worker, inside the VST3 process.
 extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
     int argc,char** argv) {
+    if(!AWE64_ValidateEmbeddedArgs(argc,argv)){
+        std::fputs("AWE64_EMBEDDED_ARG_PREFLIGHT_REJECTED\\n",stderr);
+        std::fflush(stderr);
+        return -12565;
+    }
     AWE64RomEntryGuard rom;
     if(!AWE64_ValidateExplicitRom(argc,argv,rom)){
         std::fputs("AWE64_EMBEDDED_ROM_PREFLIGHT_REJECTED\\n",stderr);

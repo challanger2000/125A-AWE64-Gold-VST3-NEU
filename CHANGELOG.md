@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 26.11.2026 — A22: abgesicherter Standalone-Kommandozeilen-Eintritt (Kandidat)
+
+- Pinned DOSBox-X `f3a95b9`: `src/gui/sdlmain.cpp` 7119–7269/8406–8412 enthält eigenständige Konfigurations-/Editor-/Reset-Pfade mit direktem `exit()`; `src/misc/support.cpp` 489–514 enthält den allgemeinen E_Exit-Pfad mit Dialog, SDL_Quit und exit(1). `src/dosbox.cpp` 1288 und Mixer-Initialisierung sind weitere Fehlerquellen. Der bekannte ROM-Preflight bleibt unverändert.
+- Der interne DLL-Eintritt akzeptiert nur die vom Produkt und den direkten DLL-Diagnosen verwendeten Schalter und Settings; `-noconfig` verpflichtend, Options-/Argumentstruktur vor originalem main() prüfen. Unbekannte oder Standalone-Argumente return -12565, kein DOSBox-Start. ROM-Ablehnung bleibt -12564. DOS-`-c`-Nutzlast bleibt für die vorhandenen internen Gäste unverändert. Dies ist kein Gast-Sandbox- oder allgemeiner Sicherheitsboundary.
+- Lokaler isolierter C++17-Test des Argument-Prädikats mit g++ -Wall -Wextra -Werror PASS (erlaubte Produkt-/SB16-Argumente und abgewiesene Standalone-/Konfigurations-/Syntaxfälle). Vollständiger nativer MSVC/DOSBox-Build nicht lokal ausgeführt. Vorhandene echte native DLL-Prüfung um neun negative Fälle erweitert; jeder muss denselben DLL-Handle anschließend mit gültigem ROM und echten AWEUTIL-Portwrites nutzen können. Keine Lockerung des vorhandenen ROM-Gates. Native Ergebnisse ausstehend.
+- Allgemeiner E_Exit in Initialisierung, Run-Loop, anderen Threads, abort/SEH, Speicherbeschädigung und vollständiger DAW-Prozessschutz bleiben **OPEN/NO-GO**. Kein pauschales Exception-Swallowing, keine Prozessisolation behauptet; ein separater Prozess würde die explizite Nutzerarchitektur ändern. Original-EMU8000, Creative-Treiber und P165-GUI unverändert. Kein FULL AUDIT.
+ 
 ## 26.11.2026 — Auditkorrekturen, Paket 1 (noch nicht nachgetestet)
 
 - Referenz und nachgewiesene Defekte: docs/ADVERSARIAL-AUDIT-0ff0811.md. Keine neue Engine, kein Creative-/EMU8000-Quellpatch, kein GUI-Redesign. Stand bleibt 0.0.0-dev, keine Freigabe.

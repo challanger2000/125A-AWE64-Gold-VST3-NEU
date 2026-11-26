@@ -10,7 +10,19 @@ import tempfile
 from pathlib import Path
 
 REJECTED=-12564
-MODES=('positive','missing','short','oversize','empty','duplicate','absent','directory')
+ARG_REJECTED=-12565
+ARG_CASES={
+    'printconf':['-printconf'],
+    'resetconf':['-resetconf'],
+    'resetmapper':['-resetmapper'],
+    'editconf':['-editconf'],
+    'unknown-machine':['-set','dosbox machine=invalid'],
+    'unsafe-mixer':['-set','mixer blocksize=999999'],
+    'option-as-command':['-c','-printconf'],
+    'missing-command':['-c'],
+    'no-noconfig':[],
+}
+MODES=('positive','missing','short','oversize','empty','duplicate','absent','directory',*ARG_CASES)
 
 def child(dll_path,root,mode):
     rom=root/'valid.raw'
@@ -32,7 +44,13 @@ def child(dll_path,root,mode):
             encoded=[v.encode('mbcs') for v in values]
             argv=(ctypes.c_char_p*(len(encoded)+1))(*encoded,None)
             return start(len(encoded),argv)
-        if mode!='positive':
+        if mode in ARG_CASES:
+            values=args(rom)+ARG_CASES[mode]
+            if mode=='no-noconfig':values.remove('-noconfig')
+            rc=invoke(values)
+            print('AUDIT_ARG_ENTRY_REJECTION mode='+mode+' rc='+str(rc),flush=True)
+            if rc!=ARG_REJECTED or trace.exists():return 1
+        elif mode!='positive':
             # -test prevents a ROM download prompt if a regression ever
             # accidentally re-enters the upstream standalone fallback.
             invalid=root/'invalid.raw'
@@ -62,7 +80,8 @@ def parent(dll):
         for mode in MODES:
             case=Path(folder)/mode;case.mkdir()
             env=dict(os.environ)
-            env.update(TEMP=str(case),TMP=str(case),SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy')
+            env.update(TEMP=str(case),TMP=str(case),APPDATA=str(case),LOCALAPPDATA=str(case),
+                       USERPROFILE=str(case),SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy')
             try:
                 p=subprocess.run([sys.executable,str(Path(__file__).resolve()),'--child',str(dll),str(case),mode],
                     cwd=case,env=env,capture_output=True,text=True,errors='replace',timeout=30)
@@ -71,10 +90,15 @@ def parent(dll):
                 failures.append(mode);continue
             logs=p.stdout+'\n'+p.stderr
             for line in logs.splitlines():
-                if 'AUDIT_ROM_ENTRY_' in line or 'AWE64_EMBEDDED_ROM_PREFLIGHT_REJECTED' in line:
+                if ('AUDIT_ROM_ENTRY_' in line or 'AUDIT_ARG_ENTRY_' in line or
+                    'AWE64_EMBEDDED_ROM_PREFLIGHT_REJECTED' in line or
+                    'AWE64_EMBEDDED_ARG_PREFLIGHT_REJECTED' in line):
                     print(line,flush=True)
             ok=(p.returncode==0 and ('AUDIT_ROM_ENTRY_HOST_SURVIVED mode='+mode+' rc=0 writes=') in logs)
-            if mode!='positive':
+            if mode in ARG_CASES:
+                ok=ok and ('AUDIT_ARG_ENTRY_REJECTION mode='+mode+' rc='+str(ARG_REJECTED)) in logs
+                ok=ok and logs.count('AWE64_EMBEDDED_ARG_PREFLIGHT_REJECTED')==1
+            elif mode!='positive':
                 ok=ok and ('AUDIT_ROM_ENTRY_REJECTION mode='+mode+' rc='+str(REJECTED)) in logs
                 ok=ok and logs.count('AWE64_EMBEDDED_ROM_PREFLIGHT_REJECTED')==1
             if not ok:failures.append(mode)
