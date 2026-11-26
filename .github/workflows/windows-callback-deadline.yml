@@ -1,0 +1,87 @@
+name: Targeted 96 kHz callback deadline investigation
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/windows-callback-deadline.yml'
+      - 'tools/prepare_callback_diagnostic.py'
+      - 'tools/Run-Callback-Deadline-Audit.ps1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-original-dosbox-dll:
+    timeout-minutes: 18
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: microsoft/setup-msbuild@v2
+      - name: Confirm original DOSBox-X SHA
+        shell: pwsh
+        run: |
+          $sha=(git -C third_party/dosbox-x-AWE32 rev-parse HEAD).Trim()
+          if ($sha -ne 'f3a95b9f19a7f9863295e6481f271cf04733c635') { throw "Unexpected upstream SHA $sha" }
+      - name: Patch only GitHub runner working tree
+        shell: pwsh
+        run: |
+          python integration/patch_dosbox_runtime.py third_party/dosbox-x-AWE32
+          if ($LASTEXITCODE -ne 0) { throw "Source patch failed" }
+      - name: Check private Creative-only setup script PowerShell syntax without original files
+        shell: pwsh
+        run: |
+          $t = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/Run-Private-Creative-AWE-Test.ps1').Path,[ref]$t,[ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) { throw ('Private staging PowerShell syntax error: ' + ($parseErrors | Out-String)) }
+      - name: Restore compiled OPEN-SOURCE DOSBox-X SDL2 DLL cache (NO owner ROM/SF2/Creative)
+        id: original-dosbox-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll
+          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('integration/patch_dosbox_runtime.py','research/p165-control-port/VoiceOverlay.hpp') }}
+      - name: Build in-process x64 DOSBox-X-AWE32 DLL
+        if: steps.original-dosbox-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        working-directory: third_party/dosbox-x-AWE32
+        run: |
+          msbuild vs/dosbox-x.sln -t:dosbox-x:Rebuild '-p:Configuration=Release SDL2' -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m:4
+          if ($LASTEXITCODE -ne 0) { throw "DOSBox runtime DLL compilation failed" }
+          if (-not (Test-Path 'bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll')) { throw "Runtime DLL not found" }
+      - name: Save compiled OPEN-SOURCE DOSBox-X SDL2 DLL after successful build
+        if: steps.original-dosbox-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll
+          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('integration/patch_dosbox_runtime.py','research/p165-control-port/VoiceOverlay.hpp') }}
+      - name: Compile VST3 host and stage original internal DOSBox-X runtime DLL
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch v3.7.12_build_20 --recurse-submodules --shallow-submodules https://github.com/steinbergmedia/vst3sdk.git "$env:RUNNER_TEMP\vst3sdk"
+          if ($LASTEXITCODE -ne 0) { throw "VST3 SDK acquisition failed" }
+          python tools/prepare_callback_diagnostic.py
+          if ($LASTEXITCODE -ne 0) { throw 'Diagnostic host patch failed' }
+          cmake -S . -B build-vst3 -G "Visual Studio 17 2022" -A x64 -DAWE64_BUILD_VST3_DEV=ON -DAWE64_VST3SDK="$env:RUNNER_TEMP\vst3sdk" -DBUILD_TESTING=OFF
+          if ($LASTEXITCODE -ne 0) { throw "VST3 configuration failed" }
+          cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev awe64_vst3_host_pcm_smoke --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw "VST3 Windows build failed" }
+          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win'
+          $native='third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
+          if (-not (Test-Path $native)) { throw "Original DOSBox DLL not built" }
+          if (-not (Test-Path (Join-Path $bundle 'AWE64GoldDOSBoxDev.vst3'))) { throw "VST3 host binary missing" }
+          Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
+          if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
+          Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
+      - name: Three independent original Creative 96 kHz deadline trials
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $rom=Join-Path $env:RUNNER_TEMP 'awe32.raw'
+          Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/libretro/libretro-pcem/e07923e902dcedcf65a502fb3f14e75b9ded5271/awe32.raw' -OutFile $rom
+          try {
+            & powershell.exe -NoProfile -NonInteractive -File tools/Run-Callback-Deadline-Audit.ps1 -Bundle 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3' -Rom $rom -HostExe 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe' -Seconds 60
+            if ($LASTEXITCODE -ne 0) { throw 'Targeted 96 kHz deadline diagnostic failed' }
+          } finally {
+            Remove-Item -LiteralPath $rom -Force -ErrorAction SilentlyContinue
+          }
