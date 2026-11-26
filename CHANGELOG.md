@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 26.11.2026 — A22: gezielte SDL-Fehlerdiagnose (Kandidat)
+
+- `5a62cdb9`: [Original-Lauf 45873551856](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45873551856) FAIL im neuen sdl-init-Fall. DLL-Build, upstream patch und 17 weitere ROM/Argument-Fehlerfälle PASS; spätere vollständige Original-/VST3-Regression NOT RUN. Bridge, portable/native adversarial und Version SUCCESS. Fehlende Child-Details lassen die genaue Ursache des sdl-init-FAIL nicht bestimmen.
+- Upstream `sdlmain.cpp` DOSBOX_parse_argv (7536ff) setzt für -test opt_console=true und opt_nolog=true; DOSBox_ShowConsole leitet stdin/stdout/stderr um. Diese Diagnose war ungeeignet für eingebettete Fehlerprovokation. Jetzt explizites -awe64-audit-sdl-init nur im eingebetteten Entry-Wrapper verarbeitet und vor main entfernt; Scope-gebundene thread-local Injektion, kein -test und keine Prozessumgebung. Echte SDL-Initialisierung und gleicher Fehler-/Cleanup-Return. Zusätzlich Flush/Phasenmarker, Child-Exitcode (hex), Faulthandler und Fehlerlog. Keine Behauptung, dass dies die einzige Ursache war.
+- Auf Besitzerwunsch gezielter Workflow-Scope: explizites [fatal-only] im Push-Commit aktiviert nur Original-DLL-Build, bestehende frühe native Gates und Fatal-Audit; spätere vollständige VST3-/Original-/Performance-/128er-Regression bewusst NOT RUN (sichtbarer Workflow-Name und Summary). Normale Pushes und workflow_dispatch bleiben unverändert vollständige Regression. Neuer Nachtest ausstehend; keine Freigabe und kein allgemeiner Absturzschutz-Claim.
+
 ## 26.11.2026 — A22: kontrollierter SDL-Initialisierungsfehler (Kandidat)
 
 - `f0646faa`: sieben Workflows SUCCESS, [Boot-Timeout 45867304992](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45867304992) tatsächlich 30017 ms, timeout/closed/late_pcm/silent/no_midi=1, UART=1, initial PCM=0. Vier weitere Kaltstarts PASS. [Original 45867304458](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45867304458) 47/47, Original-Dual, 128/128 Cheezoids, p95 19,4558/18,9167/17,2604 ms, keine gemeldeten Drops/Underruns in Original-Performancefenstern. Frühere sporadische Ursache offen.

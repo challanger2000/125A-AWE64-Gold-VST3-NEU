@@ -3,6 +3,7 @@ before original main(); the same loaded DLL can then boot a valid fake ROM.
 No Creative files, downloads or production audio claims.
 """
 import ctypes
+import faulthandler
 import os
 import shutil
 import subprocess
@@ -27,6 +28,8 @@ ARG_CASES={
 MODES=('positive','missing','short','oversize','empty','duplicate','absent','directory','sdl-init',*ARG_CASES)
 
 def child(dll_path,root,mode):
+    faulthandler.enable()
+    print('AUDIT_CHILD_BEGIN '+mode,flush=True)
     rom=root/'valid.raw'
     rom.write_bytes(bytes(1024*1024))
     trace=root/'trace.txt'
@@ -47,9 +50,8 @@ def child(dll_path,root,mode):
             argv=(ctypes.c_char_p*(len(encoded)+1))(*encoded,None)
             return start(len(encoded),argv)
         if mode=='sdl-init':
-            # The DLL uses a static CRT. The child must inherit the
-            # variable before loading it; later Python putenv is not enough.
-            rc=invoke(args(rom)+['-test'])
+            print('AUDIT_SDL_INIT_CALL_BEGIN',flush=True)
+            rc=invoke(args(rom)+['-awe64-audit-sdl-init'])
             print('AUDIT_SDL_INIT_REJECTION rc='+str(rc),flush=True)
             if rc!=SDL_INIT_REJECTED or trace.exists():return 1
             # This was an actual original main invocation. Dispose that
@@ -57,6 +59,7 @@ def child(dll_path,root,mode):
             free=ctypes.WinDLL('kernel32',use_last_error=True).FreeLibrary
             free.argtypes=[ctypes.c_void_p];free.restype=ctypes.c_int
             if not free(dll._handle):return 1
+            print('AUDIT_SDL_INIT_DLL_RELEASED',flush=True)
             fresh=root/'fresh-runtime.dll'
             shutil.copyfile(dll_path,fresh)
             dll=ctypes.WinDLL(str(fresh))
@@ -101,8 +104,6 @@ def parent(dll):
             env=dict(os.environ)
             env.update(TEMP=str(case),TMP=str(case),APPDATA=str(case),LOCALAPPDATA=str(case),
                        USERPROFILE=str(case),SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy')
-            env.pop('AWE64_AUDIT_SDL_INIT_FAILURE',None)
-            if mode=='sdl-init':env['AWE64_AUDIT_SDL_INIT_FAILURE']='1'
             try:
                 p=subprocess.run([sys.executable,str(Path(__file__).resolve()),'--child',str(dll),str(case),mode],
                     cwd=case,env=env,capture_output=True,text=True,errors='replace',timeout=30)
@@ -114,19 +115,26 @@ def parent(dll):
                 if ('AUDIT_ROM_ENTRY_' in line or 'AUDIT_ARG_ENTRY_' in line or
                     'AWE64_EMBEDDED_ROM_PREFLIGHT_REJECTED' in line or
                     'AWE64_EMBEDDED_ARG_PREFLIGHT_REJECTED' in line or
-                    'AUDIT_SDL_INIT_REJECTION' in line or 'AWE64_EMBEDDED_SDL_INIT_FAILED' in line):
+                    'AUDIT_SDL_INIT_' in line or 'AWE64_EMBEDDED_SDL_' in line):
                     print(line,flush=True)
             ok=(p.returncode==0 and ('AUDIT_ROM_ENTRY_HOST_SURVIVED mode='+mode+' rc=0 writes=') in logs)
             if mode=='sdl-init':
                 ok=ok and 'AUDIT_SDL_INIT_REJECTION rc=-12566' in logs
                 ok=ok and logs.count('AWE64_EMBEDDED_SDL_INIT_FAILED')==1
+                ok=ok and logs.count('AWE64_EMBEDDED_SDL_CLEANUP_RETURN')==1
+                ok=ok and logs.count('AUDIT_SDL_INIT_DLL_RELEASED')==1
             elif mode in ARG_CASES:
                 ok=ok and ('AUDIT_ARG_ENTRY_REJECTION mode='+mode+' rc='+str(ARG_REJECTED)) in logs
                 ok=ok and logs.count('AWE64_EMBEDDED_ARG_PREFLIGHT_REJECTED')==1
             elif mode!='positive':
                 ok=ok and ('AUDIT_ROM_ENTRY_REJECTION mode='+mode+' rc='+str(REJECTED)) in logs
                 ok=ok and logs.count('AWE64_EMBEDDED_ROM_PREFLIGHT_REJECTED')==1
-            if not ok:failures.append(mode)
+            if not ok:
+                failures.append(mode)
+                print('AUDIT_CHILD_FAILED mode='+mode+' rc='+str(p.returncode)+
+                      ' hex='+hex(p.returncode & 0xffffffff),flush=True)
+                # Synthetic fixture only: retain actual failure context.
+                print(logs[-16000:],flush=True)
             print('AUDIT_ROM_ENTRY_CASE '+mode+' '+('PASS' if ok else 'FAIL'),flush=True)
     print('AUDIT_ROM_ENTRY_FAILURES='+str(failures),flush=True)
     return int(bool(failures))

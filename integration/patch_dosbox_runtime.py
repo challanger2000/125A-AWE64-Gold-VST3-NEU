@@ -420,6 +420,7 @@ static std::atomic<bool> awe64_guest_stop{false};
 // there skips the original main() cleanup. Only the original run-machine
 // try/catch is an established safe cancellation boundary.
 static thread_local bool awe64_guest_can_stop=false;
+static thread_local bool awe64_audit_sdl_init_failure=false;
 struct AWE64GuestRunScope {
     AWE64GuestRunScope() noexcept { awe64_guest_can_stop=true; }
     ~AWE64GuestRunScope() { awe64_guest_can_stop=false; }
@@ -479,20 +480,21 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
     s=once(s,"        /* -- SDL init */\n        if (SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE) >= 0)\n            sdl.inited = true;\n        else\n            E_Exit(\"Can't init SDL %s\",SDL_GetError());",r'''        /* -- SDL init */
 #ifdef AWE64_VST3_RUNTIME
         int awe64_sdl_init=SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE);
-        // Explicit diagnostic invocation only; VST3 never uses -test.
-        if(awe64_sdl_init>=0 && control->opt_test) {
-            const char* inject=getenv("AWE64_AUDIT_SDL_INIT_FAILURE");
-            if(inject && strcmp(inject,"1")==0)
-                awe64_sdl_init=SDL_SetError("125A diagnostic SDL init failure");
-        }
+        // Explicit embedded diagnostic, removed from argv before main.
+        // Never enable upstream -test (it hijacks the host console).
+        if(awe64_sdl_init>=0 && awe64_audit_sdl_init_failure)
+            awe64_sdl_init=SDL_SetError("125A diagnostic SDL init failure");
         if(awe64_sdl_init<0) {
             fprintf(stderr,"AWE64_EMBEDDED_SDL_INIT_FAILED: %s\n",SDL_GetError());
+            fflush(stderr);
 #if defined(C_HAVE_DUKTAPE)
             if(js_heap){duk_destroy_heap(js_heap);js_heap=NULL;}
 #endif
             LOG::Exit();
             SDL_Quit();
             sdl.inited=false;
+            fputs("AWE64_EMBEDDED_SDL_CLEANUP_RETURN\n",stderr);
+            fflush(stderr);
             return -12566;
         }
         sdl.inited=true;
@@ -555,6 +557,7 @@ static bool AWE64_ValidateEmbeddedArgs(int argc,char** argv) noexcept {
         const char* arg=argv[i];
         if(!arg)return false;
         if(std::strcmp(arg,"-noconfig")==0){noConfig=true;continue;}
+        if(std::strcmp(arg,"-awe64-audit-sdl-init")==0)continue;
         if(std::strcmp(arg,"-nogui")==0||std::strcmp(arg,"-nomenu")==0||
            std::strcmp(arg,"-noconsole")==0||std::strcmp(arg,"-silent")==0||
            std::strcmp(arg,"-test")==0)continue;
@@ -611,7 +614,23 @@ extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
     // Never reset a stop request here: the VST3 host can deactivate before
     // the worker has entered this call. A late reset would cause join() hang.
     // The DLL is loaded afresh for each activation, so the flag starts false.
-    const int result=main(argc,argv);
+    // Strip our diagnostic option, only at top-level (never inside -c/-set).
+    // No CRT getenv, no process console, no changes to upstream arguments.
+    char* forwarded[129]{};
+    int count=0;
+    bool inject=false;
+    forwarded[count++]=argv[0];
+    for(int i=1;i<argc;++i){
+        if(std::strcmp(argv[i],"-awe64-audit-sdl-init")==0){inject=true;continue;}
+        forwarded[count++]=argv[i];
+        if(std::strcmp(argv[i],"-c")==0||std::strcmp(argv[i],"-set")==0)
+            forwarded[count++]=argv[++i];
+    }
+    struct AWE64AuditScope {
+        explicit AWE64AuditScope(bool enabled){awe64_audit_sdl_init_failure=enabled;}
+        ~AWE64AuditScope(){awe64_audit_sdl_init_failure=false;}
+    } audit(inject);
+    const int result=main(count,forwarded);
     control=nullptr; // Config stack object has already been destroyed
     return result;
 }
