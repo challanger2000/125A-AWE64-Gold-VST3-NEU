@@ -380,9 +380,24 @@ int main(int argc,char** argv){
         const auto early=std::max(first,pump(220));
         const auto late= pump(70,true);
         std::cout<<"EARLY_NOTE_PEAK="<<early<<" LATE_NOTE_PEAK="<<late<<" PROCESS_ERRORS="<<unexpected<<std::endl;
-        if(early<.01f&&late<.01f)return fail("neither early nor late note reached synthetic guest");
         std::cout<<"EARLY_NOTE_FIRST_RESULT="<<firstResult<<std::endl;
-        verdict("AUDIT_A09_EARLY_NOTE",early>=.01f&&firstResult==S::kResultOk);
+        const bool timely=early>=.01f&&firstResult==S::kResultOk&&!unexpected&&!nonfinite;
+        verdict("AUDIT_A09_EARLY_NOTE",timely);
+        if(early<.01f&&late<.01f){
+            // Preserve the original deadline and FAIL. Continue only to
+            // distinguish late startup from a guest that never produces PCM.
+            // No retries-to-green; the following samples are diagnostic only.
+            const auto deadline=Clock::now()+seconds(30);
+            float delayed=0.f;
+            while(Clock::now()<deadline&&delayed<.01f){
+                delayed=std::max(delayed,pump(25));
+                if(lastResult!=S::kResultOk)break;
+            }
+            const auto finalProbe=pump(70,true);
+            std::cout<<"AUDIT_COLD_START_DIAGNOSTIC delayed_peak="<<delayed
+                     <<" final_note_peak="<<finalProbe<<" process_errors="<<unexpected
+                     <<" nonfinite="<<nonfinite<<std::endl;
+        }
     }else{
         (void)pump(180); // boot warm-up, independently measure post-boot idle
         const float idle=pump(20);

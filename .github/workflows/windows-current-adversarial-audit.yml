@@ -120,23 +120,53 @@ jobs:
           $env:AWE64_TEST_PERFORMANCE='1'
           Remove-Item Env:AWE64_TEST_HOST_DEMAND_CLOCK -ErrorAction SilentlyContinue
           $bank=Join-Path $fixtures 'valid.sf2'
-          $failed=@()
-          & $exe $plugin early $bank
-          if ($LASTEXITCODE -ne 0) { throw 'Realtime fixture positive control failed' }
-          foreach($mode in @('offline','bankreplace')){
-            & $exe $plugin $mode $bank
-            if ($LASTEXITCODE -ne 0) { $failed += "$mode=$LASTEXITCODE" }
-          }
-          # Only the disposable synthetic VST3 bundle receives test DLL.
-          Copy-Item (Resolve-Path 'build-audit-shim/Release/AWE64DOSBoxRuntime.dll') $dll -Force
-          $env:AWE64_AUDIT_SHIM_MODE='eventorder'
-          $env:AWE64_AUDIT_SHIM_DIR=Join-Path $env:RUNNER_TEMP 'current-audit-midi'
-          New-Item -ItemType Directory $env:AWE64_AUDIT_SHIM_DIR | Out-Null
-          & $exe $plugin eventorder $bank
-          if ($LASTEXITCODE -ne 0) { $failed += "eventorder=$LASTEXITCODE" }
-          $env:AWE64_AUDIT_SHIM_DIR=Join-Path $env:RUNNER_TEMP 'current-audit-invalid-block'
-          New-Item -ItemType Directory $env:AWE64_AUDIT_SHIM_DIR | Out-Null
-          & $exe $plugin invalidblock $bank
-          if ($LASTEXITCODE -ne 0) { $failed += "invalidblock=$LASTEXITCODE" }
-          Write-Host "ADVERSARIAL_NATIVE_FAILURES=$failed"
-          if ($failed.Count -ne 0) { throw 'Actual native adversarial audit found failures or infrastructure gaps; inspect individual evidence' }
+          $shim=(Resolve-Path 'build-audit-shim/Release/AWE64DOSBoxRuntime.dll').Path
+          @'
+          import os, pathlib, shutil, subprocess, sys
+          exe, plugin, bank, dll, shim = sys.argv[1:]
+          failed = []
+          def run(mode, env, timeout):
+              print("ADVERSARIAL_CASE_BEGIN", mode, flush=True)
+              try:
+                  result = subprocess.run([exe, plugin, mode, bank],
+                      env=env, capture_output=True, text=True,
+                      errors="replace", timeout=timeout)
+              except subprocess.TimeoutExpired as e:
+                  print("ADVERSARIAL_CASE_TIMEOUT", mode, e.stdout, e.stderr, flush=True)
+                  failed.append(mode + "=timeout")
+                  return
+              print(result.stdout, flush=True)
+              print(result.stderr, flush=True)
+              markers = {
+                  "early": ("AUDIT_A09_EARLY_NOTE PASS", 1),
+                  "offline": ("AUDIT_DEFAULT_OFFLINE PASS", 1),
+                  "bankreplace": ("AUDIT_ACCEPTED_BANK_IDENTITY PASS", 1),
+                  "eventorder": ("AUDIT_DEFAULT_MIDI_ORDER PASS", 1),
+                  "invalidblock": ("AUDIT_INVALID_BLOCK_ATOMIC_REJECT PASS", 3),
+              }
+              marker, count = markers[mode]
+              valid = result.stdout.count(marker) == count
+              if mode == "invalidblock":
+                  valid = valid and result.stdout.count("AUDIT_INVALID_BLOCK_RECOVERY PASS") == 1
+              if mode != "bankreplace":
+                  valid = valid and result.stdout.count(
+                      "AUDIT_NATIVE_RUNTIME_EXECUTED mode=" + mode + " failures=0 nonfinite_or_unwritten=0") == 1
+              if result.returncode or not valid:
+                  failed.append(mode + "=" + str(result.returncode))
+          # A failed startup case remains FAIL but cannot suppress unrelated
+          # bank identity or deterministic ABI cases. Each child is bounded.
+          for mode in ("early", "offline", "bankreplace"):
+              run(mode, os.environ.copy(), 75 if mode == "early" else 45)
+          shutil.copyfile(shim, dll)
+          for mode in ("eventorder", "invalidblock"):
+              env = os.environ.copy()
+              env["AWE64_AUDIT_SHIM_MODE"] = "eventorder"
+              directory = pathlib.Path(env["RUNNER_TEMP"]) / ("current-audit-" + mode)
+              directory.mkdir()
+              env["AWE64_AUDIT_SHIM_DIR"] = str(directory)
+              run(mode, env, 35)
+          print("ADVERSARIAL_NATIVE_FAILURES=" + repr(failed), flush=True)
+          sys.exit(bool(failed))
+          '@ | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\current-adversarial.py"
+          python "$env:RUNNER_TEMP\current-adversarial.py" $exe $plugin $bank $dll $shim
+          if ($LASTEXITCODE -ne 0) { throw 'At least one independent adversarial case failed or lacked evidence' }

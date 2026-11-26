@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 26.11.2026 — A09: Kaltstart-Gegenbefund und unabhängige Testausführung
+
+- Exakter Produktstand `ebbc1489`: [Original-Windows 45817583838](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45817583838) SUCCESS, 47/47 Validator, Original-Creative-Dual und 128/128 Cheezoids, p95 19,7506 / 17,6042 / 18,2708 ms, keine gemeldeten Drops/Underruns in den Original-Performancefenstern. SF2-State, Transport, Version ebenfalls SUCCESS. [Runtime 45817583796](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45817583796): drei von drei Kaltstarts mit erster Note PASS, gemessene Startfenster-Unterläufe 2560/2560/3072 Frames; kein genereller Null-Unterlauf-Claim.
+- [Adversarial 45817583829](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45817583829) FAIL: identische Revision, synthetischer Kaltstart early/late PCM-Peak 0/0 bei process_errors=0. Ursache noch unbestimmt; weder als bloßer Testfehler noch als behoben bewerten. Bisher brach die Workflow-Stufe bei diesem ersten Fehler ab; offline, bankreplace, eventorder und neuer invalidblock wurden nicht ausgeführt, daher NOT RUN auf dieser Revision.
+- Jetzt einzelne native Prozesse mit begrenzten Timeouts und separaten Resultat-/Markerprüfungen. Auch bei einem Kaltstart-FAIL werden alle unabhängigen Fälle ausgeführt; FAIL bleibt bestehen, kein Retry-to-green. Bei zwei stummen Startnoten zusätzliche begrenzte 30-s-Diagnose und späte Note, ursprünglicher Early-Deadline-FAIL bleibt unverändert. Normaler Cleanup und vorhandene Queue-Statistik auch im fehlgeschlagenen Kaltstart. Keine Änderung an Produktcode/GUI/Klang. Neuer Lauf NOT RUN, A09 und A22 offen.
+
 ## 26.11.2026 — A09: vollständige Eingabeprüfung vor Legacy-Blockübernahme (Kandidat)
 
 - A12 Windows [45812591813](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45812591813) SUCCESS: vier native echte HWND-Ablehnungsfälle (begin/perform × zwei Editor-Instanzen), unveränderter State, Wiederanlauf, 47/47 Validator, Creative-Dual und 128/128 Cheezoids; p95 17,619/18,6042/17,6354 ms, keine gemeldeten Drops/Underruns. Transport und Version SUCCESS. Keine vollständige GUI-Abnahme.
