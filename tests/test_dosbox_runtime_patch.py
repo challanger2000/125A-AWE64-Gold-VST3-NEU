@@ -94,7 +94,14 @@ class DosBoxPatchTests(unittest.TestCase):
         s+='\n'+"        std::string videodriver = static_cast<Section_prop *>(control->GetSection(\"sdl\"))->Get_string(\"videodriver\");"+'\n'+"            sdl.init_ignore = true;\n        }\n    {\n        Section_prop *section = static_cast<Section_prop *>(control->GetSection(\"dosbox\"));"+'\n'+"        if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,\"windows\")) sdl.using_windib = true;"
         s+="\n        /* -- SDL init */\n        if (SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE) >= 0)\n            sdl.inited = true;\n        else\n            E_Exit(\"Can't init SDL %s\",SDL_GetError());\n    CommandLine com_line(argc,argv);\n    Config myconf(&com_line);\n#if defined(WIN32) && !defined(HX_DOS)\n    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);\n#endif"
         s+="\nstatic void SetPriority(PRIORITY_LEVELS level) {\nvoid Windows_DPI_Awareness_Init() {\nvoid sticky_keys(bool restore){\nvoid DOSBox_ShowConsole() {\n        if (!enableime&&!tonoime) ImmDisableIME((DWORD)(-1));"
+        s+="\n    configfile = \"\";\n    exepath = GetDOSBoxXPath();\n    std::string config_path = Cross::GetPlatformConfigDir();\n    /* -- Parse configuration files */\n    {\n\n#if defined(WIN32) && !defined(C_SDL2) && !defined(HX_DOS) && !defined(_WIN32_WINDOWS)\n\t\tMSG_Add(\"PROGRAM_CONFIG_PROPERTY_ERROR\",\"No such section or property.\\n\");\n#if (ENVIRON_LINKED)\n        /* -- parse environment block (why?) */\n        control->ParseEnv(environ);\n#endif"
         r=patch.patch_main(s)
+        self.assertIn('control->opt_defaultconf=true;',r)
+        self.assertIn('control->opt_promptfolder=0;',r)
+        self.assertIn('#endif // standalone config discovery, folder prompts and chdir',r)
+        self.assertIn('#endif // standalone config load/save and migration',r)
+        self.assertIn('#if (ENVIRON_LINKED) && !defined(AWE64_VST3_RUNTIME)',r)
+        self.assertIn("\t\tMSG_Add(\"PROGRAM_CONFIG_PROPERTY_ERROR\",\"No such section or property.\\n\");",r)
         self.assertIn("static void SetPriority(PRIORITY_LEVELS level) {\n#ifdef AWE64_VST3_RUNTIME\n    (void)level;return; // process scheduling belongs to the DAW\n#endif",r)
         self.assertIn("void Windows_DPI_Awareness_Init() {\n#ifdef AWE64_VST3_RUNTIME\n    return; // the DAW owns process DPI awareness\n#endif",r)
         self.assertIn("void sticky_keys(bool restore){\n#ifdef AWE64_VST3_RUNTIME\n    (void)restore;return; // never change user accessibility settings\n#endif",r)

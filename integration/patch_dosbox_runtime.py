@@ -482,6 +482,13 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
     s=once(s,"void DOSBox_ShowConsole() {","void DOSBox_ShowConsole() {\n#ifdef AWE64_VST3_RUNTIME\n    return; // never redirect DAW standard streams or allocate its console\n#endif")
     s=once(s,'        if (!enableime&&!tonoime) ImmDisableIME((DWORD)(-1));',
            '#ifndef AWE64_VST3_RUNTIME\n        if (!enableime&&!tonoime) ImmDisableIME((DWORD)(-1));\n#endif')
+    # The pinned fork loads/creates host configuration before checking
+    # -noconfig (which concerns guest CONFIG.SYS). Skip both complete
+    # standalone discovery/load phases; retain explicit -set handling.
+    s=once(s,"    configfile = \"\";\n    exepath = GetDOSBoxXPath();\n    std::string config_path = Cross::GetPlatformConfigDir();","    configfile = \"\";\n#ifdef AWE64_VST3_RUNTIME\n    // Upstream -noconfig is not a host configuration isolation switch.\n    // Use compiled defaults plus the validated explicit -set overrides.\n    control->opt_defaultconf=true;\n    control->opt_promptfolder=0;\n    usecfgdir=false;\n#else\n    exepath = GetDOSBoxXPath();\n    std::string config_path = Cross::GetPlatformConfigDir();")
+    s=once(s,"    /* -- Parse configuration files */\n    {\n\n#if defined(WIN32) && !defined(C_SDL2) && !defined(HX_DOS) && !defined(_WIN32_WINDOWS)","#endif // standalone config discovery, folder prompts and chdir\n    /* -- Parse configuration files */\n    {\n#ifndef AWE64_VST3_RUNTIME\n\n#if defined(WIN32) && !defined(C_SDL2) && !defined(HX_DOS) && !defined(_WIN32_WINDOWS)")
+    s=once(s,"\t\tMSG_Add(\"PROGRAM_CONFIG_PROPERTY_ERROR\",\"No such section or property.\\n\");","#endif // standalone config load/save and migration\n\t\tMSG_Add(\"PROGRAM_CONFIG_PROPERTY_ERROR\",\"No such section or property.\\n\");")
+    s=once(s,"#if (ENVIRON_LINKED)\n        /* -- parse environment block (why?) */\n        control->ParseEnv(environ);\n#endif","#if (ENVIRON_LINKED) && !defined(AWE64_VST3_RUNTIME)\n        /* -- parse environment block (why?) */\n        control->ParseEnv(environ);\n#endif")
     # Exact early SDL initialization boundary, before GUI/VM/device startup.
     # Do not intercept arbitrary fatal errors on unknown stacks.
     s=once(s,"        /* -- SDL init */\n        if (SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE) >= 0)\n            sdl.inited = true;\n        else\n            E_Exit(\"Can't init SDL %s\",SDL_GetError());",r'''        /* -- SDL init */

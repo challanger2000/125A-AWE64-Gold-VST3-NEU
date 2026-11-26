@@ -9,6 +9,13 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 26.11.2026 — A09/A22: Isolation der Host-Konfigurationsdateien (Kandidat)
+
+- `7bf11818`: [Gezielter nativer Fatal-Audit 45877513159](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45877513159) SUCCESS 19/19, gemessene Host-Policy (16384,0,510) vor und nach Boot identisch, SDL-Fehlerreturn -12566 PASS. Adversarial [45877513162](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45877513162) SUCCESS, synthetischer Kaltstart peak 0,304871, process errors 0. Bridge und Version SUCCESS. Vollständige Originalregression NOT RUN.
+- Konkreter weiterer A09/A22-Quellbefund: gepinnter sdlmain.cpp 8570–8839 liest/erzeugt vorab User- und CWD-Konfiguration, wertet daraus Arbeitsordner aus, kann chdir/Dialogs ausführen; 8840–9131 lädt/speichert/migriert erneut. -noconfig setzt nur opt_noconfig, verhindert diese beiden Phasen nicht. Setup.cpp ParseConfigFile enthält keine entsprechende Sperre. ENVIRON_LINKED kann zudem DOSBOX_-Variablen nach explizitem -set anwenden. Das ist ein belegter Störeinfluss, nicht bewiesene Ursache des historischen sporadischen Fehlers.
+- Eingebetteter Pfad überspringt beide Standalone-Konfigurationsblöcke vollständig, setzt opt_defaultconf/opt_promptfolder und usecfgdir explizit, behält die originale -set-Schleife und kompilierten Defaults bei; ParseEnv deaktiviert. Standalone unverändert. Kein Eingriff in die originalen EMU8000-Algorithmen. Weitere OS-/Ressourcenpfade nicht pauschal als isoliert behauptet.
+- Native config-isolation Gegenprobe: disposable dosbox-x.conf mit erzwungenem anderem CWD, nosound und autoexec exit. Original AWEUTIL muss trotzdem mit >=16 EMU8000-Writes durchlaufen, CWD und Konfigurationsbytes unverändert, kein Config-loaded-Marker. Neue Tests NOT RUN. Gezielter Fatal-Test, danach vollständige Original-/VST3-Regression notwendig. Allgemeine In-process-Abstürze und historische Kaltstartursache weiterhin offen.
+
 ## 26.11.2026 — A22: Hostprozess- und Desktop-Policy (Kandidat)
 
 - `84940f6b`: [Gezielter nativer Fatal-Audit 45875728663](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45875728663) SUCCESS: 18/18 Fälle, SDL-Injektion rc=-12566, Cleanup-Return, DLL freigegeben und frischer Original-AWEUTIL-Start im selben Prozess PASS. Fehlerliste leer. Bridge, Adversarial und Version SUCCESS. Vollständige Original-/VST3-Regression beim [fatal-only]-Lauf bewusst NOT RUN; letzte vollständige Evidenz `f0646faa`.
