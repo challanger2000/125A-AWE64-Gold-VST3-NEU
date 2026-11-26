@@ -28,6 +28,31 @@ EXPORT int AWE64_CALL AWE64_StartGuest(int argc,char** argv){
     const char* p=std::getenv("AWE64_AUDIT_SHIM_DIR");
     if(!m||!p)return 91;
     const std::string mode=m;const std::filesystem::path dir=p;
+    if(mode=="handover"){
+        if(!pcm||!midi)return 97;
+        bool replacement=false;
+        for(int i=0;i<argc;++i)if(std::string(argv[i]).find("/SBK:D:\\BANK.SF2")!=std::string::npos)replacement=true;
+        std::ofstream log(dir/(replacement?"new-events.txt":"old-events.txt"),std::ios::trunc);
+        if(!log)return 98;
+        ready.store(true,std::memory_order_release);
+        int16_t samples[1024];
+        for(auto& v:samples)v=replacement?8192:16384;
+        const auto start=steady_clock::now();unsigned tick=0;
+        while(!stop.load(std::memory_order_acquire)){
+            pcm(pcmContext,samples,512);
+            for(unsigned i=0;i<32;++i){
+                unsigned char packet[11]{};
+                if(!midi(midiContext,packet,11))break;
+                log<<unsigned(packet[0])<<' '<<unsigned(packet[1])<<' '<<unsigned(packet[2])<<'\n'<<std::flush;
+            }
+            std::this_thread::sleep_until(start+duration_cast<steady_clock::duration>(duration<double>(++tick*512./44100.)));
+        }
+        if(!replacement){
+            std::ofstream(dir/"old-stopping").put('1');
+            std::this_thread::sleep_for(milliseconds(600));
+        }
+        return 0;
+    }
     if(mode=="eventorder"){
         if(!pcm||!midi)return 97;
         std::ofstream log(dir/"events.txt",std::ios::trunc);

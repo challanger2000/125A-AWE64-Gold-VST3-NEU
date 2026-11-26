@@ -24,6 +24,7 @@
 #include <array>
 #include <algorithm>
 #include <thread>
+#include "StateIdentityAssertions.hpp"
 #include <chrono>
 #include "pluginterfaces/vst/ivstevents.h"
 #include "pluginterfaces/vst/vstspeaker.h"
@@ -135,7 +136,7 @@ int main(int argc,char** argv){
     std::cout<<std::unitbuf;std::cerr<<std::unitbuf;
     if(argc!=4)return fail("usage: host plugin mode bank.sf2");
     const std::string mode=argv[2], bank=argv[3];
-    if(mode!="early"&&mode!="pause"&&mode!="rollback"&&mode!="switch"&&mode!="automation"&&mode!="bootfail"&&mode!="offline"&&mode!="eventorder"&&mode!="bankreplace"&&mode!="invalidblock")return fail("unknown mode");
+    if(mode!="early"&&mode!="pause"&&mode!="rollback"&&mode!="switch"&&mode!="automation"&&mode!="bootfail"&&mode!="offline"&&mode!="eventorder"&&mode!="bankreplace"&&mode!="invalidblock"&&mode!="handover")return fail("unknown mode");
         // Match the SDK's actual Windows hosting module: OLE is initialized
     // on the host UI thread before loading/initializing the plug-in.
     struct OleScope {
@@ -226,6 +227,10 @@ int main(int argc,char** argv){
         S::MemoryStream saved(b.data(),b.size());
         if(component->setState(&saved)!=S::kResultOk||controller->getParamNormalized(1000u)!=0.)
             return fail("accepted bank snapshot positive control");
+        S::MemoryStream acceptedState;
+        if(component->getState(&acceptedState)!=S::kResultOk||
+           !matchesMigratedExternalState(acceptedState.getData(),static_cast<std::size_t>(acceptedState.getSize()),b))
+            return fail("accepted bank content identity");
         // Only disposable test-owned SF2. Change a previously accepted
         // program-0 file into a separately validated program-17 file.
         std::error_code ec;
@@ -235,8 +240,8 @@ int main(int argc,char** argv){
         const auto rc=component->setActive(true);
         const auto p=controller->getParamNormalized(1000u)*127.;
         S::MemoryStream current;
-        const bool same=component->getState(&current)==S::kResultOk&&current.getSize()==static_cast<S::TSize>(b.size())&&
-            std::memcmp(current.getData(),b.data(),b.size())==0;
+        const bool same=component->getState(&current)==S::kResultOk&&current.getSize()==acceptedState.getSize()&&
+            std::memcmp(current.getData(),acceptedState.getData(),acceptedState.getSize())==0;
         // A validated bank identity may stay stable or the changed resource
         // may be explicitly rejected. A successful silent preset switch is wrong.
         const bool pass=rc!=S::kResultOk? same : same&&p==0.;
@@ -338,6 +343,46 @@ int main(int argc,char** argv){
         }
         std::cout<<"AUDIT_PROGRAM_ORDER sequence="<<programOrder<<" expected=PNQRNNZ"<<std::endl;
         verdict("AUDIT_PROGRAM_ORDER",programOrder=="PNQRNNZ"&&controller->getParamNormalized(1000u)==0.&&!unexpected&&!nonfinite);
+    }else if(mode=="handover"){
+        const auto* dir=std::getenv("AWE64_AUDIT_SHIM_DIR");
+        if(!dir)return fail("handover fixture directory");
+        const auto root=std::filesystem::path(dir);
+        (void)pump(50);
+        const auto oldPeak=pump(4);
+        if(oldPeak<.4f||unexpected||nonfinite)return fail("old guest positive PCM");
+        const auto n=static_cast<std::uint32_t>(bank.size());
+        std::vector<std::uint8_t> b{'D','B','X','D',2,0,17,0x10,0x27,0x5a,0xa5,
+            std::uint8_t(n),std::uint8_t(n>>8),std::uint8_t(n>>16),std::uint8_t(n>>24)};
+        b.insert(b.end(),bank.begin(),bank.end());
+        S::MemoryStream incoming(b.data(),b.size());
+        std::atomic<bool> done{false};S::tresult switched=S::kResultFalse;
+        std::thread transition([&]{
+            switched=component->setState(&incoming);done.store(true,std::memory_order_release);
+        });
+        unsigned inside=0,acceptedNotes=0;float newPeak=0.f;
+        const auto until=Clock::now()+seconds(5);
+        while(Clock::now()<until&&!done.load(std::memory_order_acquire)){
+            const bool stopping=std::filesystem::exists(root/"old-stopping");
+            if(stopping){
+                V::ParameterChanges changes(1);S::int32 index=0,point=0;
+                auto* q=changes.addParameterData(1001u,index);
+                if(!q||q->addPoint(0,.5,point)!=S::kResultOk){++errors;break;}
+                const auto p=block(true,&changes);
+                ++inside;
+                if(lastResult==S::kResultOk)++acceptedNotes;
+                newPeak=std::max(newPeak,p);
+            }else (void)block();
+            std::this_thread::sleep_for(milliseconds(12));
+        }
+        transition.join();
+        (void)pump(20);
+        std::ifstream log(root/"new-events.txt");unsigned st,x,y,delivered=0;
+        while(log>>st>>x>>y)if(st==0x90&&x==60&&y==100)++delivered;
+        std::cout<<"AUDIT_HANDOVER old_stop_blocks="<<inside<<" accepted="<<acceptedNotes
+                 <<" delivered="<<delivered<<" new_peak="<<newPeak<<" process_errors="<<unexpected<<std::endl;
+        verdict("AUDIT_HANDOVER_OLD_STOP_UNLOCKED",switched==S::kResultOk&&inside>=10&&acceptedNotes==inside&&
+            delivered==acceptedNotes&&newPeak>.1f&&newPeak<.2f&&std::abs(controller->getParamNormalized(1000u)*127.-17.)<1.e-6&&
+            std::abs(controller->getParamNormalized(1001u)-.5)<.0001&&!unexpected&&!nonfinite);
     }else if(mode=="invalidblock"){
         // Actual plugin with the synthetic MIDI recorder. Invalid normal
         // parameter and note offsets must reject even a valid prefix.

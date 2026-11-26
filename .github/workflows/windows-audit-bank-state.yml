@@ -41,6 +41,7 @@ jobs:
           sys.argv=['tests/MakeAuditSf2Cases.py',sys.argv[1]]
           f=runpy.run_path(sys.argv[0])
           f['write']('program17',lambda l:f['mutate'](l[b'pdta'],b'phdr',20,'<H',17))
+          f['write']('same_metadata',lambda l:f['mutate'](l[b'sdta'],b'smpl',2,'<h',12345))
           f['write']('invalid_loop',lambda l:f['mutate'](l[b'pdta'],b'shdr',32,'<I',0xffffffff))
           '@ | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\audit-fixtures.py"
           python "$env:RUNNER_TEMP\audit-fixtures.py" $fixtures

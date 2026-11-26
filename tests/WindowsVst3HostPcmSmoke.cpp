@@ -13,6 +13,7 @@
 #define NOMINMAX  // Windows.h max/min macros must not break std::max
 #include <windows.h>
 #include "WindowsScheduledCpuTrace.hpp"
+#include "StateIdentityAssertions.hpp"
 #include <ole2.h>
 #include "pluginterfaces/base/ipluginbase.h"
 #include "pluginterfaces/base/funknown.h"
@@ -511,10 +512,11 @@ int main(int argc,char** argv) {
             S::MemoryStream resetState;
             if(component->getState(&resetState)!=S::kResultOk||resetState.getSize()<11)
                 return fail("MOD RESET state save failed");
-            // Effects types are nondefault, so a fully reset state must
-            // use v3 (not v4 sends or v5 voice overlays).
-            if(reinterpret_cast<const unsigned char*>(resetState.getData())[4]!=3)
-                return fail("MOD RESET left nonneutral controls in component state");
+            const auto* raw=reinterpret_cast<const unsigned char*>(resetState.getData());
+            if(raw[4]==6){
+                if(resetState.getSize()<61||!std::all_of(raw+13,raw+25,[](auto v){return v==0;}))
+                    return fail("MOD RESET left nonneutral v6 state");
+            }else if(raw[4]!=3)return fail("MOD RESET left nonneutral controls in component state");
             std::cout<<"REAL_VST3_MOD_RESET_CLICK_PASS; PARAMS=12; GESTURES=12; PRESERVED=5; PASS="<<pass<<"\n";
             // Host refuses begin or perform: actual click must not commit any
             // parameter or serialized state. Retest same view after refusal.
@@ -588,9 +590,10 @@ int main(int argc,char** argv) {
                 return fail("External SF2 recall failed on real IComponent");
             S::MemoryStream outgoing;
             if(component->getState(&outgoing)!=S::kResultOk||
-               outgoing.getSize()!=static_cast<S::TSize>(bytes.size())||
-               std::memcmp(outgoing.getData(),bytes.data(),bytes.size())!=0)
-                return fail("External SF2 real IComponent state did not roundtrip");
+               !matchesMigratedExternalState(outgoing.getData(),static_cast<std::size_t>(outgoing.getSize()),bytes))
+                return fail("External SF2 real IComponent state did not migrate to v6");
+            const auto* canonical=reinterpret_cast<const std::uint8_t*>(outgoing.getData());
+            externalState.assign(canonical,canonical+outgoing.getSize());
             if(ramHz>0.) {
                 auto absent=bytes;absent[6]=1;
                 S::MemoryStream invalidProgram(absent.data(),absent.size());
@@ -602,12 +605,11 @@ int main(int argc,char** argv) {
                     return fail("Original bank-zero mode accepted unproven bank 1");
                 S::MemoryStream after;
                 if(component->getState(&after)!=S::kResultOk||
-                   after.getSize()!=static_cast<S::TSize>(bytes.size())||
-                   std::memcmp(after.getData(),bytes.data(),bytes.size())!=0)
+                   after.getSize()!=outgoing.getSize()||
+                   std::memcmp(after.getData(),outgoing.getData(),outgoing.getSize())!=0)
                     return fail("Rejected sparse state mutated valid project state");
                 std::cout<<"REAL_VST3_SPARSE_INVALID_STATE_REJECTED_PASS\n";
             }
-            externalState=bytes;
             // Start with ROM, then switch to the external bank while the
             // same component remains active. Both go through actual state.
             auto defaultBytes=bytes;defaultBytes.resize(11);defaultBytes[4]=1;defaultBytes[6]=0;
@@ -1347,8 +1349,8 @@ int main(int argc,char** argv) {
                effectController->setParamNormalized(1201,1.)!=S::kResultOk)
                 return fail("Original Creative effect type controller edit failed");
             S::MemoryStream fx;
-            if(component->getState(&fx)!=S::kResultOk||fx.getSize()!=17||
-               static_cast<unsigned char>(fx.getData()[4])!=3||
+            if(component->getState(&fx)!=S::kResultOk||fx.getSize()!=61||
+               static_cast<unsigned char>(fx.getData()[4])!=6||
                static_cast<unsigned char>(fx.getData()[11])!=5||
                static_cast<unsigned char>(fx.getData()[12])!=7)
                 return fail("Original effect type project state invalid");

@@ -143,9 +143,12 @@ jobs:
                   "bankreplace": ("AUDIT_ACCEPTED_BANK_IDENTITY PASS", 1),
                   "eventorder": ("AUDIT_DEFAULT_MIDI_ORDER PASS", 1),
                   "invalidblock": ("AUDIT_INVALID_BLOCK_ATOMIC_REJECT PASS", 3),
+                  "handover": ("AUDIT_HANDOVER_OLD_STOP_UNLOCKED PASS", 1),
               }
               marker, count = markers[mode]
               valid = result.stdout.count(marker) == count
+              if mode == "eventorder":
+                  valid = valid and result.stdout.count("AUDIT_PROGRAM_ORDER PASS") == 1
               if mode == "invalidblock":
                   valid = valid and result.stdout.count("AUDIT_INVALID_BLOCK_RECOVERY PASS") == 1
               if mode != "bankreplace":
@@ -158,9 +161,9 @@ jobs:
           for mode in ("early", "offline", "bankreplace"):
               run(mode, os.environ.copy(), 75 if mode == "early" else 45)
           shutil.copyfile(shim, dll)
-          for mode in ("eventorder", "invalidblock"):
+          for mode in ("eventorder", "invalidblock", "handover"):
               env = os.environ.copy()
-              env["AWE64_AUDIT_SHIM_MODE"] = "eventorder"
+              env["AWE64_AUDIT_SHIM_MODE"] = "handover" if mode == "handover" else "eventorder"
               directory = pathlib.Path(env["RUNNER_TEMP"]) / ("current-audit-" + mode)
               directory.mkdir()
               env["AWE64_AUDIT_SHIM_DIR"] = str(directory)

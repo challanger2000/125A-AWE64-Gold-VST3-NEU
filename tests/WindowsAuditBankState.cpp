@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include "StateIdentityAssertions.hpp"
 namespace S=Steinberg;
 namespace V=Steinberg::Vst;
 class MinimalHostApplication final : public V::IHostApplication {
@@ -115,8 +116,9 @@ int main(int argc,char** argv){
     };
     auto exact=[&](const std::string& path,unsigned p){
         const auto b=state(path,p);S::MemoryStream stream;
-        return component->getState(&stream)==S::kResultOk&&stream.getSize()==static_cast<S::TSize>(b.size())&&
-            std::memcmp(stream.getData(),b.data(),b.size())==0&&std::abs(controller->getParamNormalized(1000u)-p/127.)<1e-6;
+        return component->getState(&stream)==S::kResultOk&&
+            matchesMigratedExternalState(stream.getData(),static_cast<std::size_t>(stream.getSize()),b)&&
+            std::abs(controller->getParamNormalized(1000u)-p/127.)<1e-6;
     };
     const std::string a=argv[2],b=argv[3],bad=argv[4];
     // Positive control: both structurally valid banks, differing path.
@@ -132,9 +134,48 @@ int main(int argc,char** argv){
     std::cout<<"AUDIT_A03_LOOP_BOUNDS "<<(rejected?"PASS":"FAIL")<<" result="<<invalid<<std::endl;
     failures+=!rejected;
     if(recall(a,0)!=S::kResultOk||!exact(a,0))return fail("reset to first synthetic bank failed");
-    // Both paths are unique generated test fixtures in the runner's temp dir.
-    // Overwrite ONLY a with the already positively validated synthetic b.
-    std::error_code ec;std::filesystem::copy_file(b,a,std::filesystem::copy_options::overwrite_existing,ec);
+    // Fresh component must reject a SHA-bound state after a valid
+    // sample-only replacement, even with identical preset IDs/names.
+    S::MemoryStream pinned;
+    if(component->getState(&pinned)!=S::kResultOk)return fail("save pinned bank");
+    const auto backup=std::filesystem::path(a+".original");
+    const auto different=std::filesystem::path(a).parent_path()/"same_metadata.sf2";
+    std::error_code ec;std::filesystem::copy_file(a,backup,ec);
+    if(ec)return fail("backup fixture");
+    std::filesystem::copy_file(different,a,std::filesystem::copy_options::overwrite_existing,ec);
+    if(ec)return fail("sample-only fixture");
+    V::IComponent* fresh=nullptr;
+    if(factory->createInstance(info.cid,V::IComponent::iid,reinterpret_cast<void**>(&fresh))!=S::kResultOk||
+       !fresh||fresh->initialize(&host)!=S::kResultOk)return fail("fresh component");
+    auto legacy=state(a,0);S::MemoryStream legacyIncoming(legacy.data(),legacy.size());
+    if(fresh->setState(&legacyIncoming)!=S::kResultOk)return fail("sample-only bank is not valid");
+    S::MemoryStream changedBank;
+    if(fresh->getState(&changedBank)!=S::kResultOk||
+       !matchesMigratedExternalState(changedBank.getData(),static_cast<std::size_t>(changedBank.getSize()),legacy))
+        return fail("changed bank identity missing");
+    const auto extent=static_cast<std::size_t>(pinned.getSize());
+    const bool distinct=extent>=61&&changedBank.getSize()==pinned.getSize()&&
+        std::memcmp(pinned.getData(),changedBank.getData(),extent-32)==0&&
+        std::memcmp(pinned.getData()+extent-32,changedBank.getData()+extent-32,32)!=0;
+    S::MemoryStream stale(pinned.getData(),pinned.getSize());
+    const auto staleResult=fresh->setState(&stale);
+    S::MemoryStream unchanged;
+    const bool preserved=fresh->getState(&unchanged)==S::kResultOk&&
+        unchanged.getSize()==changedBank.getSize()&&
+        std::memcmp(unchanged.getData(),changedBank.getData(),changedBank.getSize())==0;
+    std::filesystem::copy_file(backup,a,std::filesystem::copy_options::overwrite_existing,ec);
+    if(ec)return fail("restore original fixture");
+    S::MemoryStream restored(pinned.getData(),pinned.getSize()),restoredState;
+    const bool recovered=fresh->setState(&restored)==S::kResultOk&&fresh->getState(&restoredState)==S::kResultOk&&
+        restoredState.getSize()==pinned.getSize()&&std::memcmp(restoredState.getData(),pinned.getData(),extent)==0;
+    const bool identity=distinct&&staleResult!=S::kResultOk&&preserved&&recovered;
+    std::cout<<"AUDIT_FRESH_RECALL_SAMPLE_IDENTITY "<<(identity?"PASS":"FAIL")<<std::endl;
+    failures+=!identity;
+    fresh->terminate();fresh->release();
+    std::filesystem::remove(backup,ec);ec.clear();
+    // Legacy v2 explicit selection remains supported. Only test fixture a
+    // is replaced by the already positively validated program-17 bank.
+    std::filesystem::copy_file(b,a,std::filesystem::copy_options::overwrite_existing,ec);
     if(ec)return fail("fixture replacement failed: "+ec.message());
     const auto changed=recall(a,17);
     const bool updated=changed==S::kResultOk&&exact(a,17);
