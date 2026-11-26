@@ -475,6 +475,13 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
     s=once(s,"        if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,\"windows\")) sdl.using_windib = true;",r'''#ifndef AWE64_VST3_RUNTIME
         if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,"windows")) sdl.using_windib = true;
 #endif''')
+    # Standalone desktop/process policies are not owned by an embedded instrument.
+    s=once(s,"static void SetPriority(PRIORITY_LEVELS level) {","static void SetPriority(PRIORITY_LEVELS level) {\n#ifdef AWE64_VST3_RUNTIME\n    (void)level;return; // process scheduling belongs to the DAW\n#endif")
+    s=once(s,"void Windows_DPI_Awareness_Init() {","void Windows_DPI_Awareness_Init() {\n#ifdef AWE64_VST3_RUNTIME\n    return; // the DAW owns process DPI awareness\n#endif")
+    s=once(s,"void sticky_keys(bool restore){","void sticky_keys(bool restore){\n#ifdef AWE64_VST3_RUNTIME\n    (void)restore;return; // never change user accessibility settings\n#endif")
+    s=once(s,"void DOSBox_ShowConsole() {","void DOSBox_ShowConsole() {\n#ifdef AWE64_VST3_RUNTIME\n    return; // never redirect DAW standard streams or allocate its console\n#endif")
+    s=once(s,'        if (!enableime&&!tonoime) ImmDisableIME((DWORD)(-1));',
+           '#ifndef AWE64_VST3_RUNTIME\n        if (!enableime&&!tonoime) ImmDisableIME((DWORD)(-1));\n#endif')
     # Exact early SDL initialization boundary, before GUI/VM/device startup.
     # Do not intercept arbitrary fatal errors on unknown stacks.
     s=once(s,"        /* -- SDL init */\n        if (SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE) >= 0)\n            sdl.inited = true;\n        else\n            E_Exit(\"Can't init SDL %s\",SDL_GetError());",r'''        /* -- SDL init */

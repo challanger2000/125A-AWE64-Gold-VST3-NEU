@@ -93,7 +93,13 @@ class DosBoxPatchTests(unittest.TestCase):
         s+='\n'+"        SetConsoleCtrlHandler((PHANDLER_ROUTINE) ConsoleEventHandler,TRUE);"+'\n'+"        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) >= 0) {"+'\n'+"            LOG(LOG_GUI,LOG_WARN)(\"Failed to init joystick support\");\n            sdl.num_joysticks = 0;\n        }"
         s+='\n'+"        std::string videodriver = static_cast<Section_prop *>(control->GetSection(\"sdl\"))->Get_string(\"videodriver\");"+'\n'+"            sdl.init_ignore = true;\n        }\n    {\n        Section_prop *section = static_cast<Section_prop *>(control->GetSection(\"dosbox\"));"+'\n'+"        if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,\"windows\")) sdl.using_windib = true;"
         s+="\n        /* -- SDL init */\n        if (SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE) >= 0)\n            sdl.inited = true;\n        else\n            E_Exit(\"Can't init SDL %s\",SDL_GetError());\n    CommandLine com_line(argc,argv);\n    Config myconf(&com_line);\n#if defined(WIN32) && !defined(HX_DOS)\n    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);\n#endif"
+        s+="\nstatic void SetPriority(PRIORITY_LEVELS level) {\nvoid Windows_DPI_Awareness_Init() {\nvoid sticky_keys(bool restore){\nvoid DOSBox_ShowConsole() {\n        if (!enableime&&!tonoime) ImmDisableIME((DWORD)(-1));"
         r=patch.patch_main(s)
+        self.assertIn("static void SetPriority(PRIORITY_LEVELS level) {\n#ifdef AWE64_VST3_RUNTIME\n    (void)level;return; // process scheduling belongs to the DAW\n#endif",r)
+        self.assertIn("void Windows_DPI_Awareness_Init() {\n#ifdef AWE64_VST3_RUNTIME\n    return; // the DAW owns process DPI awareness\n#endif",r)
+        self.assertIn("void sticky_keys(bool restore){\n#ifdef AWE64_VST3_RUNTIME\n    (void)restore;return; // never change user accessibility settings\n#endif",r)
+        self.assertIn("void DOSBox_ShowConsole() {\n#ifdef AWE64_VST3_RUNTIME\n    return; // never redirect DAW standard streams or allocate its console\n#endif",r)
+        self.assertIn('#ifndef AWE64_VST3_RUNTIME\n        if (!enableime&&!tonoime) ImmDisableIME((DWORD)(-1));\n#endif',r)
         self.assertIn('if(awe64_sdl_init<0)',r)
         self.assertIn('if(awe64_sdl_init>=0 && awe64_audit_sdl_init_failure)',r)
         self.assertIn('AWE64AuditScope',r)

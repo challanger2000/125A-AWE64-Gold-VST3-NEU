@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 26.11.2026 — A22: Hostprozess- und Desktop-Policy (Kandidat)
+
+- `84940f6b`: [Gezielter nativer Fatal-Audit 45875728663](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45875728663) SUCCESS: 18/18 Fälle, SDL-Injektion rc=-12566, Cleanup-Return, DLL freigegeben und frischer Original-AWEUTIL-Start im selben Prozess PASS. Fehlerliste leer. Bridge, Adversarial und Version SUCCESS. Vollständige Original-/VST3-Regression beim [fatal-only]-Lauf bewusst NOT RUN; letzte vollständige Evidenz `f0646faa`.
+- Gepinnter sdlmain.cpp: SetPriority (3540ff, Aufruf bei Startup 3787) setzt Prozesspriorität der DAW, Windows_DPI_Awareness_Init (7854ff) setzt DPI des gesamten Prozesses, sticky_keys (2808ff) schreibt Accessibility-Einstellungen, DOSBox_ShowConsole (7326ff) kann Standardstreams umleiten; ImmDisableIME(-1) (9309) betrifft den ganzen Prozess. Diese Standalone-Eingriffe sind im eingebetteten, unsichtbaren Runtime-Pfad nicht erforderlich und jetzt unter AWE64_VST3_RUNTIME deaktiviert. Standalone-Verhalten bleibt erhalten. Keine Umstellung der emulierten Takt-/MIDI-/DSP-Logik.
+- Native host-policy-Gegenprobe: eigener Windows-Child mit expliziter BELOW_NORMAL-Priorität, echte GetPriorityClass/GetProcessDpiAwareness/SPI_GETSTICKYKEYS vor/nach vollständigem Original-AWEUTIL-Boot, unveränderte Werte und >=16 Registerwrites erforderlich. DPI/Sticky-Vergleich erkennt nur beobachtete Endzustandsänderungen, nicht alle transienten Eingriffe; Console/IME bislang statische Gates. Neue Tests noch NOT RUN. Kein genereller E_Exit-/SEH-/Crashschutz; sporadische Kaltstartursache weiterhin ungeklärt. Gezielter Fatal-Lauf, vollständige Abschlussregression danach erforderlich.
+
 ## 26.11.2026 — A22: gezielte SDL-Fehlerdiagnose (Kandidat)
 
 - `5a62cdb9`: [Original-Lauf 45873551856](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45873551856) FAIL im neuen sdl-init-Fall. DLL-Build, upstream patch und 17 weitere ROM/Argument-Fehlerfälle PASS; spätere vollständige Original-/VST3-Regression NOT RUN. Bridge, portable/native adversarial und Version SUCCESS. Fehlende Child-Details lassen die genaue Ursache des sdl-init-FAIL nicht bestimmen.

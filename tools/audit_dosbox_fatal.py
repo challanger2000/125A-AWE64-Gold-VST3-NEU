@@ -25,7 +25,7 @@ ARG_CASES={
     'missing-command':['-c'],
     'no-noconfig':[],
 }
-MODES=('positive','missing','short','oversize','empty','duplicate','absent','directory','sdl-init',*ARG_CASES)
+MODES=('positive','missing','short','oversize','empty','duplicate','absent','directory','sdl-init','host-policy',*ARG_CASES)
 
 def child(dll_path,root,mode):
     faulthandler.enable()
@@ -40,6 +40,37 @@ def child(dll_path,root,mode):
                 '-set','sblaster awe32ram=28672','-set','sblaster awe32rom='+str(path),
                 '-set','midi mpu401=intelligent','-set','mixer rate=44100',
                 '-c','AWEUTIL /S','-c','exit']
+    # Real Windows policy, in a disposable test child only.
+    if mode=='host-policy':
+        from ctypes import wintypes
+        k=ctypes.WinDLL('kernel32',use_last_error=True)
+        k.GetCurrentProcess.restype=wintypes.HANDLE
+        k.GetPriorityClass.argtypes=[wintypes.HANDLE]
+        k.GetPriorityClass.restype=wintypes.DWORD
+        k.SetPriorityClass.argtypes=[wintypes.HANDLE,wintypes.DWORD]
+        k.SetPriorityClass.restype=wintypes.BOOL
+        proc=k.GetCurrentProcess()
+        if not k.SetPriorityClass(proc,0x4000):
+            raise ctypes.WinError(ctypes.get_last_error())
+        sh=ctypes.WinDLL('shcore')
+        sh.GetProcessDpiAwareness.argtypes=[wintypes.HANDLE,ctypes.POINTER(ctypes.c_int)]
+        sh.GetProcessDpiAwareness.restype=ctypes.c_long
+        u=ctypes.WinDLL('user32',use_last_error=True)
+        class Sticky(ctypes.Structure):
+            _fields_=[('size',wintypes.UINT),('flags',wintypes.DWORD)]
+        u.SystemParametersInfoW.argtypes=[wintypes.UINT,wintypes.UINT,ctypes.c_void_p,wintypes.UINT]
+        u.SystemParametersInfoW.restype=wintypes.BOOL
+        def policy():
+            dpi=ctypes.c_int(-1)
+            if sh.GetProcessDpiAwareness(proc,ctypes.byref(dpi))!=0:
+                raise RuntimeError('GetProcessDpiAwareness failed')
+            sticky=Sticky(ctypes.sizeof(Sticky),0)
+            if not u.SystemParametersInfoW(0x003a,ctypes.sizeof(sticky),ctypes.byref(sticky),0):
+                raise ctypes.WinError(ctypes.get_last_error())
+            return (int(k.GetPriorityClass(proc)),dpi.value,int(sticky.flags))
+        before=policy()
+        if before[0]!=0x4000:raise RuntimeError('priority precondition failed')
+        print('AUDIT_HOST_POLICY_BEFORE '+str(before),flush=True)
     with os.add_dll_directory(str(dll_path.parent)):
         dll=ctypes.WinDLL(str(dll_path))
         start=dll.AWE64_StartGuest
@@ -72,7 +103,7 @@ def child(dll_path,root,mode):
             rc=invoke(values)
             print('AUDIT_ARG_ENTRY_REJECTION mode='+mode+' rc='+str(rc),flush=True)
             if rc!=ARG_REJECTED or trace.exists():return 1
-        elif mode!='positive':
+        elif mode not in ('positive','host-policy'):
             # -test prevents a ROM download prompt if a regression ever
             # accidentally re-enters the upstream standalone fallback.
             invalid=root/'invalid.raw'
@@ -90,6 +121,11 @@ def child(dll_path,root,mode):
             print('AUDIT_ROM_ENTRY_REJECTION mode='+mode+' rc='+str(rc),flush=True)
             if rc!=REJECTED or trace.exists():return 1
         rc=invoke(args(rom))
+        if mode=='host-policy':
+            after=policy()
+            print('AUDIT_HOST_POLICY_AFTER '+str(after),flush=True)
+            print('AUDIT_HOST_POLICY_UNCHANGED='+str(int(before==after)),flush=True)
+            if before!=after:return 1
         writes=sum(1 for line in trace.read_text(errors='replace').splitlines()
                    if line and line[0].isdigit()) if trace.is_file() else 0
         print('AUDIT_ROM_ENTRY_HOST_SURVIVED mode='+mode+' rc='+str(rc)+' writes='+str(writes),flush=True)
@@ -115,7 +151,8 @@ def parent(dll):
                 if ('AUDIT_ROM_ENTRY_' in line or 'AUDIT_ARG_ENTRY_' in line or
                     'AWE64_EMBEDDED_ROM_PREFLIGHT_REJECTED' in line or
                     'AWE64_EMBEDDED_ARG_PREFLIGHT_REJECTED' in line or
-                    'AUDIT_SDL_INIT_' in line or 'AWE64_EMBEDDED_SDL_' in line):
+                    'AUDIT_SDL_INIT_' in line or 'AWE64_EMBEDDED_SDL_' in line or
+                    'AUDIT_HOST_POLICY_' in line):
                     print(line,flush=True)
             ok=(p.returncode==0 and ('AUDIT_ROM_ENTRY_HOST_SURVIVED mode='+mode+' rc=0 writes=') in logs)
             if mode=='sdl-init':
@@ -126,6 +163,8 @@ def parent(dll):
             elif mode in ARG_CASES:
                 ok=ok and ('AUDIT_ARG_ENTRY_REJECTION mode='+mode+' rc='+str(ARG_REJECTED)) in logs
                 ok=ok and logs.count('AWE64_EMBEDDED_ARG_PREFLIGHT_REJECTED')==1
+            elif mode=='host-policy':
+                ok=ok and logs.count('AUDIT_HOST_POLICY_UNCHANGED=1')==1
             elif mode!='positive':
                 ok=ok and ('AUDIT_ROM_ENTRY_REJECTION mode='+mode+' rc='+str(REJECTED)) in logs
                 ok=ok and logs.count('AWE64_EMBEDDED_ROM_PREFLIGHT_REJECTED')==1
