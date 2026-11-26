@@ -196,6 +196,95 @@ void PresetBrowserView::ChooseRom() {
   string(REPLACE "for(auto* knob:controls_)if(knob)knob->setMouseEnabled(false);" "for(auto* knob:controls_)if(knob)knob->setMouseEnabled(true);" AWE64_GUI_SRC "${AWE64_GUI_SRC}")
   string(REPLACE "if(reset_)reset_->setMouseEnabled(false);" "if(reset_)reset_->setMouseEnabled(true);" AWE64_GUI_SRC "${AWE64_GUI_SRC}")
   string(REPLACE [=[values_[size_t(i)]->setText("--"); // original Creative bridge unimplemented]=] [=[values_[size_t(i)]->setText(label);]=] AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  # A12: preserve the approved artwork and original source blob, replacing
+  # only the generated editor's host-gesture/selection behavior.
+  string(FIND "${AWE64_GUI_SRC}" "void PresetBrowserView::controlBeginEdit(" AWE64_EDIT_BEGIN)
+  string(FIND "${AWE64_GUI_SRC}" "void PresetBrowserView::RebuildActiveMenus()" AWE64_EDIT_END)
+  if(AWE64_EDIT_BEGIN LESS 0 OR AWE64_EDIT_END LESS AWE64_EDIT_BEGIN)
+    message(FATAL_ERROR "Approved host-edit anchors missing")
+  endif()
+  string(SUBSTRING "${AWE64_GUI_SRC}" 0 ${AWE64_EDIT_BEGIN} AWE64_GUI_BEFORE)
+  string(SUBSTRING "${AWE64_GUI_SRC}" ${AWE64_EDIT_END} -1 AWE64_GUI_AFTER)
+  set(AWE64_EDIT_CODE [=[
+void PresetBrowserView::controlBeginEdit(CControl* control) {
+    if(!control||!controller_)return;
+    const int index=GestureIndex(control->getTag());
+    if(index<0)return;
+    const auto i=static_cast<size_t>(index);
+    if(activeHostGestures_[i]||rejectedHostGestures_[i])return;
+    const auto tag=static_cast<Steinberg::Vst::ParamID>(control->getTag());
+    activeHostGestures_[i]=controller_->beginEdit(tag)==Steinberg::kResultOk;
+    rejectedHostGestures_[i]=!activeHostGestures_[i];
+}
+void PresetBrowserView::controlEndEdit(CControl* control) {
+    if(!control||!controller_)return;
+    const int index=GestureIndex(control->getTag());
+    if(index<0)return;
+    const auto i=static_cast<size_t>(index);
+    rejectedHostGestures_[i]=false;
+    if(activeHostGestures_[i]){
+        activeHostGestures_[i]=false;
+        (void)controller_->endEdit(static_cast<Steinberg::Vst::ParamID>(control->getTag()));
+    }
+}
+bool PresetBrowserView::ChangeParameter(Steinberg::Vst::ParamID tag,double norm) {
+    if(!controller_)return false;
+    norm=std::clamp(norm,0.,1.);
+    const int index=GestureIndex(static_cast<int>(tag));
+    const bool editing=index>=0&&activeHostGestures_[static_cast<size_t>(index)];
+    if(index>=0&&rejectedHostGestures_[static_cast<size_t>(index)])return false;
+    if(!editing&&controller_->beginEdit(tag)!=Steinberg::kResultOk)return false;
+    const auto old=controller_->getParamNormalized(tag);
+    bool accepted=false;
+    if(controller_->setParamNormalized(tag,norm)==Steinberg::kResultOk) {
+        accepted=controller_->performEdit(tag,norm)==Steinberg::kResultOk;
+        if(!accepted)(void)controller_->setParamNormalized(tag,old);
+    }
+    // A refused end cannot undo a perform already accepted by the host.
+    if(!editing)(void)controller_->endEdit(tag);
+    return accepted;
+}
+void PresetBrowserView::Select(uint16_t bank,uint8_t program) {
+    if(!controller_)return;
+    const bool sameHostBank=std::lround(controller_->getParamNormalized(kBankParam)*127.)==bank;
+    bool ok=ChangeParameter(kBankParam,double(bank)/127.);
+    if(ok&&sameHostBank)ok=browserBankReselect_&&browserBankReselect_(bank);
+    if(ok)ok=ChangeParameter(kProgram,double(program)/127.);
+    // Always paint the authoritative controller selection, even when the
+    // clicked row was highlighted before an edit was rejected.
+    lastStatus_.clear();
+    Sync();
+    SyncActiveMenuSelection();
+    SyncBrowserSelection();
+    if(!ok&&hint_){
+        hint_->setText("Host hat die Preset-Auswahl abgelehnt.");
+        hint_->setFontColor(CColor(255,143,122,255));
+    }
+}
+]=])
+  set(AWE64_GUI_SRC "${AWE64_GUI_BEFORE}${AWE64_EDIT_CODE}${AWE64_GUI_AFTER}")
+  # A rejected physical edit must also restore the visible control during
+  # the gesture, when the ordinary idle sync intentionally skips it.
+  string(REPLACE [=[        ChangeParameter(static_cast<Steinberg::Vst::ParamID>(tag),
+            double(std::clamp(int(std::lround(control->getValue())),0,7))/7.);]=]
+    [=[        if(!ChangeParameter(static_cast<Steinberg::Vst::ParamID>(tag),
+            double(std::clamp(int(std::lround(control->getValue())),0,7))/7.)){
+            control->setValue(static_cast<float>(std::lround(controller_->getParamNormalized(tag)*7.)));
+            control->invalid();
+        }]=] AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  string(REPLACE [=[        ChangeParameter(static_cast<Steinberg::Vst::ParamID>(tag),
+                        std::clamp(double(control->getValue()),0.,1.));]=]
+    [=[        if(!ChangeParameter(static_cast<Steinberg::Vst::ParamID>(tag),
+                        std::clamp(double(control->getValue()),0.,1.))){
+            control->setValue(static_cast<float>(controller_->getParamNormalized(tag)));
+            control->invalid();
+        }]=] AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  string(REPLACE "if(!control||syncing_)return;" "if(!control||!controller_||syncing_)return;" AWE64_GUI_SRC "${AWE64_GUI_SRC}")
+  string(REGEX MATCHALL [=[if\(!ChangeParameter\(static_cast<Steinberg::Vst::ParamID>\(tag\)]=] AWE64_EDIT_MATCHES "${AWE64_GUI_SRC}")
+  list(LENGTH AWE64_EDIT_MATCHES AWE64_EDIT_COUNT)
+  if(NOT AWE64_EDIT_COUNT EQUAL 3)
+    message(FATAL_ERROR "Expected three GUI control rejection paths")
+  endif()
   set(AWE64_GUI_COMPAT_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/PresetBrowserViewSdkCompat.cpp")
   file(WRITE "${AWE64_GUI_COMPAT_SOURCE}" "${AWE64_GUI_SRC}")
 

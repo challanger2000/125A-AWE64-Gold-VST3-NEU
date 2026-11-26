@@ -77,6 +77,7 @@ class ResetHostHandler final : public V::IComponentHandler {
 public:
     std::array<unsigned,12> begin{},perform{},end{};
     bool invalid=false, armed=false;
+    unsigned reject=0; // 1=begin, 2=perform
     S::tresult PLUGIN_API queryInterface(const S::TUID iid,void** obj) override {
         if(!obj)return S::kInvalidArgument;
         *obj=nullptr;
@@ -90,24 +91,24 @@ public:
     S::uint32 PLUGIN_API release() override{return --refs_;}
     S::tresult PLUGIN_API beginEdit(V::ParamID id) override {
         if(armed){if(id<1100u||id>=1112u)invalid=true;else ++begin[id-1100u];}
-        return S::kResultOk;
+        return armed&&reject==1?S::kResultFalse:S::kResultOk;
     }
     S::tresult PLUGIN_API performEdit(V::ParamID id,V::ParamValue value) override {
         if(armed){
             if(id<1100u||id>=1112u||value!=0.)invalid=true;
             else ++perform[id-1100u];
         }
-        return S::kResultOk;
+        return armed&&reject==2?S::kResultFalse:S::kResultOk;
     }
     S::tresult PLUGIN_API endEdit(V::ParamID id) override {
         if(armed){if(id<1100u||id>=1112u)invalid=true;else ++end[id-1100u];}
         return S::kResultOk;
     }
     S::tresult PLUGIN_API restartComponent(S::int32) override{return S::kResultOk;}
-    void arm(){begin.fill(0);perform.fill(0);end.fill(0);invalid=false;armed=true;}
+    void arm(unsigned refusal=0){begin.fill(0);perform.fill(0);end.fill(0);invalid=false;armed=true;reject=refusal;}
     bool passed() const {
         if(invalid)return false;
-        for(unsigned i=0;i<12;++i)if(begin[i]!=1||perform[i]!=1||end[i]!=1)return false;
+        for(unsigned i=0;i<12;++i)if(begin[i]!=1||perform[i]!=(reject==1?0u:1u)||end[i]!=(reject==1?0u:1u))return false;
         return true;
     }
 };
@@ -515,6 +516,40 @@ int main(int argc,char** argv) {
             if(reinterpret_cast<const unsigned char*>(resetState.getData())[4]!=3)
                 return fail("MOD RESET left nonneutral controls in component state");
             std::cout<<"REAL_VST3_MOD_RESET_CLICK_PASS; PARAMS=12; GESTURES=12; PRESERVED=5; PASS="<<pass<<"\n";
+            // Host refuses begin or perform: actual click must not commit any
+            // parameter or serialized state. Retest same view after refusal.
+            for(unsigned refusal=1;refusal<=2;++refusal){
+                std::array<double,12> prior{};
+                for(unsigned i=0;i<12;++i){
+                    if(controller->setParamNormalized(1100u+i,(i+1)/13.)!=S::kResultOk)
+                        return fail("Rejected RESET precondition failed");
+                    prior[i]=controller->getParamNormalized(1100u+i);
+                }
+                S::MemoryStream before,after;
+                if(component->getState(&before)!=S::kResultOk)return fail("Rejected RESET before state");
+                resetHandler.arm(refusal);
+                SendMessageW(surface,WM_MOUSEMOVE,0,xy);
+                SendMessageW(surface,WM_LBUTTONDOWN,MK_LBUTTON,xy);
+                SendMessageW(surface,WM_LBUTTONUP,0,xy);
+                while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
+                resetHandler.armed=false;
+                for(unsigned i=0;i<12;++i)
+                    if(controller->getParamNormalized(1100u+i)!=prior[i])
+                        return fail("Rejected RESET changed parameter "+std::to_string(1100u+i));
+                if(!resetHandler.passed())return fail("Rejected RESET gesture contract");
+                if(component->getState(&after)!=S::kResultOk||before.getSize()!=after.getSize()||
+                   std::memcmp(before.getData(),after.getData(),before.getSize())!=0)
+                    return fail("Rejected RESET changed serialized state");
+                std::cout<<"REAL_VST3_MOD_RESET_HOST_REJECTION_PASS mode="<<refusal<<" pass="<<pass<<"\n";
+            }
+            resetHandler.arm();
+            SendMessageW(surface,WM_LBUTTONDOWN,MK_LBUTTON,xy);
+            SendMessageW(surface,WM_LBUTTONUP,0,xy);
+            while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
+            resetHandler.armed=false;
+            if(!resetHandler.passed())return fail("RESET did not recover after host refusal");
+            for(unsigned i=0;i<12;++i)if(controller->getParamNormalized(1100u+i)!=0.)
+                return fail("RESET recovery did not restore neutral values");
             std::cout<<"EDITOR_REMOVE_ENTER "<<pass<<"\n";
             if(view->removed()!=S::kResultOk)return fail("Actual P165 editor detach failed");
             if(view->setFrame(nullptr)!=S::kResultOk)return fail("Actual editor clearFrame failed");

@@ -85,6 +85,7 @@ private:
     // A continuous pointer gesture is exactly one host automation edit;
     // not a begin/end pair for every mouse-movement value change.
     std::array<bool,kGuiCount+3> activeHostGestures_{};
+    std::array<bool,kGuiCount+3> rejectedHostGestures_{};
     static int GestureIndex(int tag) noexcept;
     std::array<VSTGUI::CControl*,kGuiCount> controls_{};
     std::array<VSTGUI::CTextLabel*,kGuiCount> values_{};
@@ -117,7 +118,7 @@ private:
     VSTGUI::CRect PageRect(const VSTGUI::CRect& r) const;
     void AddToCurrentPage(VSTGUI::CView* v);
     void Select(uint16_t bank,uint8_t program);
-    void ChangeParameter(Steinberg::Vst::ParamID,double normalized);
+    bool ChangeParameter(Steinberg::Vst::ParamID,double normalized);
     void ChooseSf2();
     void ChooseRom();
 };

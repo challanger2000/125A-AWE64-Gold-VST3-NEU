@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 26.11.2026 — A12: GUI-Host-Ablehnung und Rollback (Kandidat)
+
+- A19 [45811475200](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45811475200) Linux/Windows SUCCESS: tatsächliche neue Git-Fixture-Regression und Windows-PowerShell-Syntax bestanden; Version 45811475148 SUCCESS. Privater Besitzer-Build nicht ausgeführt.
+- A12: SDK v3.7.12 EditController beginEdit/performEdit/endEdit leiten Host-Rückgabewerte weiter; SingleComponent-Parameteränderung erfolgt lokal. Bisher wurden begin/perform-Ablehnungen ignoriert. Generierter P165-Editor prüft beginEdit, stellt abgelehnte performEdit-Werte lokal zurück, sendet kein end ohne akzeptiertes begin, synchronisiert abgelehnte sichtbare Regler und Browserauswahl. Ein abgelehntes end nach akzeptiertem perform kann ein bereits akzeptiertes Hostereignis nicht zurücknehmen. Kein neues Artwork und keine Änderung der freigegebenen ursprünglichen PresetBrowserView.cpp.
+- Echte HWND-MOD-RESET-Regression erweitert: auf jeder Editor-Instanz positive Klicks, Host-Ablehnung begin/perform mit unveränderten 12 Parametern und byteidentischem Component-State, korrekte Callbackzahlen und anschließender positiver Wiederanlauf. Native Ausführung noch NOT RUN; keine vollständige Regler-/Browser-/DPI-/Automation-Abnahme. Allgemeiner in-process Fatalpfad weiterhin offen. Kein FULL AUDIT.
+
 ## 26.11.2026 — A19: privater Build ohne alte gepatchte Arbeitskopie (Kandidat)
 
 - Vorheriger A22-Kandidat `4ed394c2`: [Original-Windows 45805621014](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45805621014) SUCCESS; alle 17 ROM-/Argument-Fälle PASS einschließlich neun neuer Ablehnungen mit anschließendem AWEUTIL-Wiederanlauf; Validator 47/47, Original-Creative-Dual, RAM-Stereo/Release, exakte Cheezoids-Revision 128/128 PASS, p95 18,9116 / 18,25 / 18,9688 ms bei 44,1/48/96 kHz, keine gemeldeten MIDI-/Audio-Drops oder Underruns. [Native Gegenproben 45805620986](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45805620986), Transport und Version SUCCESS. Allgemeiner in-process Fatalpfad bleibt offen.
