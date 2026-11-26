@@ -13,12 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 'c2f22d8ac5e27dc09dacb1e5ab666920d91222cb'
           persist-credentials: false
       - name: Confirm exact audited tree and retain public source snapshot for local review
         shell: bash
         run: |
-          test "$(git rev-parse HEAD)" = 'c2f22d8ac5e27dc09dacb1e5ab666920d91222cb'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           mkdir -p audit-evidence
           git archive --format=tar.gz -o audit-evidence/audited-source.tar.gz HEAD
           git ls-tree -r HEAD > audit-evidence/tree.txt

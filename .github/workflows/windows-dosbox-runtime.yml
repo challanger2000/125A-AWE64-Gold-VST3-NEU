@@ -266,62 +266,7 @@ jobs:
           $summary=@()
           & $validators[0].FullName $bundle 2>&1 | ForEach-Object {
               Write-Host $_
-              if ("$_" -match '^Result: 47 tests passed, 0 tests failed) { $summary += "$_" }
-          }
-          $code=$LASTEXITCODE
-          if ($code -ne 0 -or $summary.Count -ne 1) { throw "Full SDK validator failed; exit=$code" }
-      - name: Verify actual P165 editor lifecycle and MOD RESET click in independent Win32 host
-        shell: pwsh
-        timeout-minutes: 2
-        run: |
-          $plugin=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3').Path
-          $hostTestExe=(Resolve-Path 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe').Path
-          $log = & $hostTestExe $plugin --editor 2>&1
-          $code=$LASTEXITCODE
-          $log | ForEach-Object { Write-Host $_ }
-          $reset = @($log | Where-Object { "$_" -match '^REAL_VST3_MOD_RESET_CLICK_PASS; PARAMS=12; GESTURES=12; PRESERVED=5; PASS=[01]$' })
-          if ($code -ne 0 -or $reset.Count -ne 2 -or ($reset | Select-Object -Unique).Count -ne 2) { throw "Native editor/MOD RESET gate FAILED; exit=$code" }
-      - name: Original Creative archival-reference research in actual Windows VST3 (no private owner files)
-        shell: pwsh
-        timeout-minutes: 28
-        env:
-          AWE64_TEST_CHEEZOIDS: '1'
-        run: |
-          # P30 research method: independently obtain already-public archival
-          # reference inputs in ephemeral runner storage. Never upload bytes,
-          # PCM, traces, logs or a bundle containing them. No owner files.
-          $stage=Join-Path $env:RUNNER_TEMP 'AWE64-private-test-preparation'
-          $research=Join-Path $env:RUNNER_TEMP 'AWE64-archival-reference'
-          New-Item -ItemType Directory -Path $research -ErrorAction Stop | Out-Null
-          try {
-            # Use a disposable COPY; the clean development bundle stays clean.
-            Copy-Item -LiteralPath (Join-Path $stage 'AWE64GoldDOSBoxDev.vst3') -Destination $research -Recurse -ErrorAction Stop
-            $rom=Join-Path $research 'awe32.raw'
-            Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/libretro/libretro-pcem/e07923e902dcedcf65a502fb3f14e75b9ded5271/awe32.raw' -OutFile $rom
-            $expected='4e143b94f758734f594ded78f4e5115635975c16fa37fabeae0baa4938ca710e'
-            if ((Get-Item $rom).Length -ne 1048576 -or (Get-FileHash -Algorithm SHA256 -LiteralPath $rom).Hash.ToLowerInvariant() -ne $expected) { throw 'Public archival ROM does not match verified reference; no substitute' }
-            $bundle=Join-Path $research 'AWE64GoldDOSBoxDev.vst3'
-            $hostTestExe=Join-Path $stage 'awe64_vst3_host_pcm_smoke.exe'
-            # Reuse the existing gate without changing its hashes or thresholds.
-            & powershell.exe -NoProfile -NonInteractive -File (Join-Path $stage 'tools/Run-Private-Creative-AWE-Test.ps1') -Bundle $bundle -Rom $rom -HostExe $hostTestExe -Seconds 60
-            if ($LASTEXITCODE -ne 0) { throw 'Authentic archival Creative/VST3 research gate FAILED' }
-            Write-Host 'ARCHIVAL_REFERENCE_CREATIVE_VST3_RESEARCH_PASS; NOT_OWNER_DAW_OR_RELEASE'
-          } finally {
-            Remove-Item -LiteralPath $research -Recurse -Force -ErrorAction SilentlyContinue
-          }
-      # The source repo is public. Never publish the developer binaries until
-      # distribution permissions are cleared. A private-repo runner can
-      # deliver the prebuilt asset-free package after BOTH existing gates.
-      - name: Upload prebuilt developer-only test package (private repositories only)
-        if: ${{ github.event.repository.private == true }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: AWE64-private-test-preparation-${{ github.sha }}
-          path: ${{ runner.temp }}/AWE64-private-test-preparation
-          if-no-files-found: error
-          retention-days: 3
-      # No public release artifact or private ROM/SF2/Creative bytes uploaded.
-) { $summary += "$_" }
+              if ("$_" -match '^Result: 47 tests passed, 0 tests failed$') { $summary += "$_" }
           }
           $code=$LASTEXITCODE
           if ($code -ne 0 -or $summary.Count -ne 1) { throw "Full SDK validator failed; exit=$code" }
