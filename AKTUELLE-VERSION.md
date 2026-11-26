@@ -1,13 +1,20 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
 **Produkt:** 125A AWE64 Gold (Windows x64 VST3, DOSBox-X)  
-**Stand:** 25.11.2026  
+**Stand:** 26.11.2026  
 **Entwicklungskennung:** `0.0.0-dev`  
 **Release / abgenommenes Instrument:** **NEIN – Audit-Korrekturkandidat, PARTIAL / NOT VERIFIED; native Abnahme offen, NO-GO**  
 **Einziger Branch:** `main`  
 **Exakter neuester Quellstand:** [oberster Commit auf main](../../commits/main) (nicht auf eine veraltende SHA im Text verlassen)
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
+
+## 26.11.2026 — Gezielte Nachweise erfolgreich; vollständige Originalregression wieder verpflichtend
+
+- Exakter Produktquellstand `dfa777702ec79254974fa20a878a86c8ae65044a`: alle sieben Workflows SUCCESS. [Native DLL/Validator](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45893794898): sechs EMU8000-Fehlerprovokationen (Open, ROM, Read, Empty, RAM, Chip) PASS; insgesamt 26/26 ROM/Entry-Fälle einschließlich Positivkontrolle, 47/47 Steinberg-Validator, synthetische Dual-Instanz und P165-Editor/MOD RESET PASS. Keine allgemeine In-process-Absturzgarantie.
+- [SF2 State](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45893794905): frischer Recall mit veränderter Sampleidentität abgelehnt, identische Datei akzeptiert, Zustand erhalten. [Adversarial](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45893794917): akzeptierte Bankidentität, Programm-/Notenreihenfolge, invalid block recovery, Handover ohne alten Stop unter Audiosperre und portable Negativkontrollen PASS. Keine sample-exakte Gastzeit oder lückenlose Übergabe behauptet.
+- [Native Runtime](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45893794911): drei Kaltstarts, Pause, Automation, Bankwechsel und Rollback einschließlich asynchronem Bootfehler PASS, keine Prozessfehler. [96-kHz-Original-Deadline](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45893794916): 3/3 PASS, 0 Callback-Überschreitungen; p95 MIDI->PCM 17,2708 / 17,6458 / 16,2917 ms, maximale Callback-Walltime 0,2888 / 0,1602 / 0,0871 ms. ETW-Positivkontrollen nachgewiesen; keine Besitzer-PC-CPU-Messung.
+- Die gezielte Hauptprüfung hatte die vollständige Original-Archivregression explizit NOT RUN. Temporären Push-Scope `[audit-targeted]` aus dem Hauptworkflow entfernt, so dass die vollständige Originalregression wieder zwingend läuft; keine Änderung an Plugin-, GUI-, DSP- oder Emulationsquellen und keine abgesenkten Gates. Getrennte gezielte Workflows bleiben erhalten. Vollständiger Nachweis dieses Produktquellstands, Besitzer-Assets, Studio Pro und übrige Auditgrenzen weiterhin offen; NO-GO bis zur Bewertung.
 
 ## 26.11.2026 — Codex-Nachaudit: SF2-Inhaltsidentität und alter Gast außerhalb Audiosperre (Kandidat)
 
