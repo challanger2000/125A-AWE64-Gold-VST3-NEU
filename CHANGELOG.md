@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 26.11.2026 — A22: kontrollierter SDL-Initialisierungsfehler (Kandidat)
+
+- `f0646faa`: sieben Workflows SUCCESS, [Boot-Timeout 45867304992](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45867304992) tatsächlich 30017 ms, timeout/closed/late_pcm/silent/no_midi=1, UART=1, initial PCM=0. Vier weitere Kaltstarts PASS. [Original 45867304458](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45867304458) 47/47, Original-Dual, 128/128 Cheezoids, p95 19,4558/18,9167/17,2604 ms, keine gemeldeten Drops/Underruns in Original-Performancefenstern. Frühere sporadische Ursache offen.
+- A22: gepinnter Upstream sdlmain.cpp bei SDL_Init-Fehler E_Exit (support.cpp: MessageBox, SDL_Quit, exit(1)). An dieser einzelnen frühen Grenze, vor SDL_Prepare, GUI_StartUp, VM_PowerOn und Gerätelauf, kontrollierter Fehlerreturn -12566 mit Log-/optionalem Duktape-/SDL-Cleanup; Config wird durch normalen Scope-Return zerstört, control nach Return geleert, erfolgreicher COM-Init des Workerthreads per RAII ausgeglichen. Standalone-Branch unverändert. Kein globaler E_Exit-Fang oder SEH-Recovery.
+- Native Gegenprobe erweitert: explizites -test + Diagnosevariable erzwingt die exakte Fehlerbehandlung nach erfolgreicher SDL_Init, kein Hardwaretrace, Rückgabecode -12566, Host überlebt; DLL freigeben, frische isolierte DLL im gleichen Host laden und Original-AWEUTIL-Positivkontrolle. Diese künstliche Fehlerprovokation beweist nicht sämtliche natürlichen SDL-Partial-Init-Fehler. Produkt-VST3 verwendet nie -test. Neue Tests noch NOT RUN; Originalkern-Neubau und Klangregression erforderlich. Weitere E_Exit-Pfade und beliebige in-process Abstürze offen.
+
 ## 26.11.2026 — A09/A22: Startüberwachung und Ursachen-Evidenz (Kandidat)
 
 - `8c4612d7`: [A10 Snapshot 45860597792](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45860597792) PASS isolated=1 exact=1 cleaned=1; [Original 45860597790](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45860597790) SUCCESS 47/47, 128/128 Cheezoids, p95 19,161/18,9583/18 ms. Vier weitere Kaltstarts PASS. Bridge 45860597878 FAIL in Linux/Windows nur wegen statischem veraltetem Default-SF2-Pfad-Assert; auf neues D:-Staging plus tatsächlichen Schreibaufruf angepasst. Neuer Nachtest ausstehend.

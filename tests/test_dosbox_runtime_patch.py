@@ -92,7 +92,14 @@ class DosBoxPatchTests(unittest.TestCase):
         s='void GFX_Events() {}\n| SDL_WINDOW_SHOWN | (SDL2_resize_enable ? SDL_WINDOW_RESIZABLE : 0)\nint main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {}\n            DOSBOX_RunMachine();\n        } catch (int x) {'
         s+='\n'+"        SetConsoleCtrlHandler((PHANDLER_ROUTINE) ConsoleEventHandler,TRUE);"+'\n'+"        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) >= 0) {"+'\n'+"            LOG(LOG_GUI,LOG_WARN)(\"Failed to init joystick support\");\n            sdl.num_joysticks = 0;\n        }"
         s+='\n'+"        std::string videodriver = static_cast<Section_prop *>(control->GetSection(\"sdl\"))->Get_string(\"videodriver\");"+'\n'+"            sdl.init_ignore = true;\n        }\n    {\n        Section_prop *section = static_cast<Section_prop *>(control->GetSection(\"dosbox\"));"+'\n'+"        if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,\"windows\")) sdl.using_windib = true;"
+        s+="\n        /* -- SDL init */\n        if (SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE) >= 0)\n            sdl.inited = true;\n        else\n            E_Exit(\"Can't init SDL %s\",SDL_GetError());\n    CommandLine com_line(argc,argv);\n    Config myconf(&com_line);\n#if defined(WIN32) && !defined(HX_DOS)\n    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);\n#endif"
         r=patch.patch_main(s)
+        self.assertIn('if(awe64_sdl_init<0)',r)
+        self.assertIn('if(awe64_sdl_init>=0 && control->opt_test)',r)
+        self.assertIn('return -12566;',r)
+        self.assertIn('SDL_Quit();\n            sdl.inited=false;\n            return -12566;',r)
+        self.assertIn('~AWE64ComScope(){if(SUCCEEDED(hr))CoUninitialize();}',r)
+        self.assertIn('control=nullptr; // Config stack object has already been destroyed',r)
         self.assertIn('std::string videodriver="dummy";',r)
         self.assertIn('sdl.using_windib=false;',r)
         self.assertIn('#ifndef AWE64_VST3_RUNTIME\n'+"        if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,\"windows\")) sdl.using_windib = true;"+'\n#endif',r)
@@ -100,7 +107,7 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('#ifdef AWE64_VST3_RUNTIME\n        sdl.num_joysticks = 0;\n#else\n'+"        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) >= 0) {",r)
         self.assertIn("            LOG(LOG_GUI,LOG_WARN)(\"Failed to init joystick support\");\n            sdl.num_joysticks = 0;\n        }"+'\n#endif',r)
         self.assertIn('AWE64_StartGuest(',r)
-        self.assertIn('return main(argc,argv);',r)
+        self.assertIn('const int result=main(argc,argv);',r)
         self.assertIn('AWE64_ValidateExplicitRom(argc,argv,rom)',r)
         self.assertIn('return -12564;',r)
         self.assertIn('return -12565;',r)
@@ -108,7 +115,7 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertLess(r.index('if(!AWE64_ValidateEmbeddedArgs(argc,argv))'),r.index('AWE64RomEntryGuard rom;'))
         self.assertIn('return noConfig;',r)
         self.assertIn("argv[i][0]=='-'",r)
-        self.assertLess(r.index('return -12564;'),r.index('return main(argc,argv);'))
+        self.assertLess(r.index('return -12564;'),r.index('const int result=main(argc,argv);'))
         self.assertIn('FILE_SHARE_READ,nullptr,OPEN_EXISTING',r)
         self.assertIn('size.QuadPart==1048576',r)
         self.assertIn('if(rom)return false;',r)

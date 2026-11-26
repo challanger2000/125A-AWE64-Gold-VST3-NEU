@@ -474,6 +474,49 @@ extern "C" __declspec(dllexport) void __cdecl AWE64_RequestStop() noexcept {
     s=once(s,"        if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,\"windows\")) sdl.using_windib = true;",r'''#ifndef AWE64_VST3_RUNTIME
         if (sdl_videodrv != NULL && !strcmp(sdl_videodrv,"windows")) sdl.using_windib = true;
 #endif''')
+    # Exact early SDL initialization boundary, before GUI/VM/device startup.
+    # Do not intercept arbitrary fatal errors on unknown stacks.
+    s=once(s,"        /* -- SDL init */\n        if (SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE) >= 0)\n            sdl.inited = true;\n        else\n            E_Exit(\"Can't init SDL %s\",SDL_GetError());",r'''        /* -- SDL init */
+#ifdef AWE64_VST3_RUNTIME
+        int awe64_sdl_init=SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE);
+        // Explicit diagnostic invocation only; VST3 never uses -test.
+        if(awe64_sdl_init>=0 && control->opt_test) {
+            const char* inject=getenv("AWE64_AUDIT_SDL_INIT_FAILURE");
+            if(inject && strcmp(inject,"1")==0)
+                awe64_sdl_init=SDL_SetError("125A diagnostic SDL init failure");
+        }
+        if(awe64_sdl_init<0) {
+            fprintf(stderr,"AWE64_EMBEDDED_SDL_INIT_FAILED: %s\n",SDL_GetError());
+#if defined(C_HAVE_DUKTAPE)
+            if(js_heap){duk_destroy_heap(js_heap);js_heap=NULL;}
+#endif
+            LOG::Exit();
+            SDL_Quit();
+            sdl.inited=false;
+            return -12566;
+        }
+        sdl.inited=true;
+#else
+        if (SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_NOPARACHUTE) >= 0)
+            sdl.inited = true;
+        else
+            E_Exit("Can't init SDL %s",SDL_GetError());
+#endif''')
+    s=once(s,"    CommandLine com_line(argc,argv);\n    Config myconf(&com_line);",r'''#if defined(AWE64_VST3_RUNTIME) && defined(WIN32) && !defined(HX_DOS)
+    struct AWE64ComScope {
+        HRESULT hr=E_FAIL;
+        ~AWE64ComScope(){if(SUCCEEDED(hr))CoUninitialize();}
+    } awe64_com;
+#endif
+    CommandLine com_line(argc,argv);
+    Config myconf(&com_line);''')
+    s=once(s,"#if defined(WIN32) && !defined(HX_DOS)\n    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);\n#endif",r'''#if defined(WIN32) && !defined(HX_DOS)
+#ifdef AWE64_VST3_RUNTIME
+    awe64_com.hr=CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+#else
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+#endif
+#endif''')
     # Defer even a stop requested BEFORE main() until original init is
     # complete and the existing kill-switch handler can perform cleanup.
     run='            DOSBOX_RunMachine();\n        } catch (int x) {'
@@ -568,7 +611,9 @@ extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
     // Never reset a stop request here: the VST3 host can deactivate before
     // the worker has entered this call. A late reset would cause join() hang.
     // The DLL is loaded afresh for each activation, so the flag starts false.
-    return main(argc,argv);
+    const int result=main(argc,argv);
+    control=nullptr; // Config stack object has already been destroyed
+    return result;
 }
 #endif
 '''
