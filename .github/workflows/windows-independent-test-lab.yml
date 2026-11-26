@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: '0ff08116701efd831b9fca00970f8b059ae9b9af'
+          ref: 'aabcc0939b72aaeea7b90535493b1fb1196f627b'
           submodules: true
           persist-credentials: false
       - uses: microsoft/setup-msbuild@v2
@@ -74,7 +74,7 @@ jobs:
       - name: Stage synthetic guest only
         shell: pwsh
         run: |
-          if ((git rev-parse HEAD).Trim() -ne '0ff08116701efd831b9fca00970f8b059ae9b9af') { throw 'Product commit mismatch' }
+          if ((git rev-parse HEAD).Trim() -ne 'aabcc0939b72aaeea7b90535493b1fb1196f627b') { throw 'Product commit mismatch' }
           python tests/MakeSyntheticDemoExe.py --bundle 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3'
           if ($LASTEXITCODE -ne 0) { throw 'Synthetic fixture staging failed' }
       - name: Checkout immutable independent Test Lab
@@ -100,7 +100,7 @@ jobs:
           $runtime=Join-Path $bundle 'Contents/x86_64-win/AWE64DOSBoxRuntime.dll'
           $report=Join-Path $pwd 'independent-report'
           New-Item -ItemType Directory -Force $report | Out-Null
-          $identity=@{product_commit='0ff08116701efd831b9fca00970f8b059ae9b9af';lab_commit='7213fe1f81f4036f74431cb5b2d7dbd09b73ee5c';module_sha256=(Get-FileHash $module).Hash.ToLowerInvariant();runtime_sha256=(Get-FileHash $runtime).Hash.ToLowerInvariant();assets='SYNTHETIC_ONLY';original_pcm='NOT RUN';release_approved=$false}
+          $identity=@{product_commit='aabcc0939b72aaeea7b90535493b1fb1196f627b';lab_commit='7213fe1f81f4036f74431cb5b2d7dbd09b73ee5c';module_sha256=(Get-FileHash $module).Hash.ToLowerInvariant();runtime_sha256=(Get-FileHash $runtime).Hash.ToLowerInvariant();assets='SYNTHETIC_ONLY';original_pcm='NOT RUN';release_approved=$false}
           $identity | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $report 'SOURCE-IDENTITY.json')
           function Find-One([string]$name) {
             $items=@(Get-ChildItem build-lab -Recurse -File -Filter $name)
