@@ -57,18 +57,28 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::mutex selectionMutex_;
     AWE125::PresetCatalog startedCatalog_{};
     std::uint64_t displayedRevision_=0;
+    using BankDigest=std::array<std::uint8_t,32>;
+    struct RecallControls {
+        unsigned volume=10000;
+        std::array<std::uint8_t,2> effects{4,2},sends{};
+        std::array<std::uint8_t,10> voice{};
+    };
     bool startRuntimeLocked(std::unique_lock<std::mutex>&, const std::string&, const std::vector<std::uint8_t>* = nullptr,
-                            AWE125::PresetCatalog* = nullptr);
+                            AWE125::PresetCatalog* = nullptr,
+                            std::unique_ptr<integration::DosBoxRuntimeHost>* retired=nullptr);
     std::vector<std::uint8_t> requestedBankBytes_; // protected by runtimeMutex_
     std::uint64_t refreshBrowserCatalog();
     void stopRuntimeLocked() noexcept;
     std::string requestedBank_;
+    BankDigest requestedBankDigest_{};
+    bool requestedBankDigestValid_=false;
     std::string startedBank_;
     std::atomic<std::uint64_t> catalogRevision_{1};
     bool loadCatalog(const std::string&,AWE125::PresetCatalog&,
                      const std::vector<std::uint8_t>* = nullptr) const;
     void publishCatalogLocked(AWE125::PresetCatalog&&);
-    bool requestSoundFont(const std::string&,int expectedProgram=-1);
+    bool requestSoundFont(const std::string&,int expectedProgram=-1,const BankDigest* expectedDigest=nullptr,
+                          const RecallControls* recall=nullptr);
     std::string requestedSoundFont();
     std::string soundFontStatus();
 public:

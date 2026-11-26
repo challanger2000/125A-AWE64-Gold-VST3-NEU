@@ -33,6 +33,18 @@ constexpr std::array<const char*,12> kControlLabels{
 // accidentally claiming bit-identical recall with an old P007 VM version.
 constexpr std::array<std::uint8_t,4> kSignature{{'D','B','X','D'}};
 constexpr std::size_t kStateLength = 11;
+// Non-realtime: identity of the exact accepted guest bytes, not metadata.
+bool hashBank(const std::vector<std::uint8_t>& bytes,std::array<std::uint8_t,32>& digest) noexcept {
+    if(bytes.empty()||bytes.size()>32ull*1024*1024)return false;
+    BCRYPT_ALG_HANDLE alg=nullptr;BCRYPT_HASH_HANDLE hash=nullptr;
+    if(BCryptOpenAlgorithmProvider(&alg,BCRYPT_SHA256_ALGORITHM,nullptr,0)<0)return false;
+    bool ok=BCryptCreateHash(alg,&hash,nullptr,0,nullptr,0,0)>=0;
+    if(ok)ok=BCryptHashData(hash,const_cast<PUCHAR>(bytes.data()),static_cast<ULONG>(bytes.size()),0)>=0;
+    if(ok)ok=BCryptFinishHash(hash,digest.data(),static_cast<ULONG>(digest.size()),0)>=0;
+    if(hash)BCryptDestroyHash(hash);
+    BCryptCloseAlgorithmProvider(alg,0);
+    return ok;
+}
 } // namespace
 
 tresult PLUGIN_API DosBoxVst3Shell::queryInterface(const TUID iid,void** obj) {
@@ -80,8 +92,14 @@ tresult PLUGIN_API DosBoxVst3Shell::initialize(FUnknown* context) {
                 nullptr,0.,1.,spec.initial,0,ParameterInfo::kCanAutomate|ParameterInfo::kIsHidden));
         }
     }
-    if(!loadCatalog({},originalMidiCatalog_))
-        originalMidiCatalog_.SetOriginalCreativeMidiNumbers();
+    const auto binary=integration::DosBoxRuntimeHost::pluginBinaryPath();
+    const auto bankPath=integration::DosBoxRuntimeHost::privateAssetsDir(binary)/"SYNTHGM.SF2";
+    if(guest::readDefaultBankSnapshot(bankPath,requestedBankBytes_)){
+        if(!hashBank(requestedBankBytes_,requestedBankDigest_))return kResultFalse;
+        requestedBankDigestValid_=true;
+        if(!loadCatalog({},originalMidiCatalog_,&requestedBankBytes_))
+            originalMidiCatalog_.SetOriginalCreativeMidiNumbers();
+    }else originalMidiCatalog_.SetOriginalCreativeMidiNumbers();
     startedCatalog_=originalMidiCatalog_;
     return kResultOk;
 }
@@ -121,29 +139,60 @@ void DosBoxVst3Shell::publishCatalogLocked(AWE125::PresetCatalog&& candidate) {
     (void)SingleComponentEffect::setParamNormalized(kBank,0.);
     catalogRevision_.fetch_add(1,std::memory_order_release);
 }
-bool DosBoxVst3Shell::requestSoundFont(const std::string& path,int expectedProgram) {
+bool DosBoxVst3Shell::requestSoundFont(const std::string& path,int expectedProgram,
+                                      const BankDigest* expectedDigest,const RecallControls* recall) {
     try {
         if(path.size()>32768 || path.find('\0')!=std::string::npos)return false;
         std::vector<std::uint8_t> bytes;bool adapted=false;
-        if(!path.empty()&&!guest::readExternalSf2(std::filesystem::u8path(path),bytes,adapted))return false;
+        bool haveBytes=false;
+        if(path.empty()){
+            const auto binary=integration::DosBoxRuntimeHost::pluginBinaryPath();
+            haveBytes=guest::readDefaultBankSnapshot(integration::DosBoxRuntimeHost::privateAssetsDir(binary)/"SYNTHGM.SF2",bytes);
+        }else{
+            if(!guest::readExternalSf2(std::filesystem::u8path(path),bytes,adapted))return false;
+            haveBytes=true;
+        }
+        BankDigest digest{};
+        if(haveBytes&&!hashBank(bytes,digest))return false;
+        if(expectedDigest&&(!haveBytes||digest!=*expectedDigest))return false;
         AWE125::PresetCatalog candidate;
-        if(!loadCatalog(path,candidate,path.empty()?nullptr:&bytes))return false;
+        if(haveBytes){
+            if(!loadCatalog(path,candidate,&bytes))return false;
+        }else candidate.SetOriginalCreativeMidiNumbers();
         if(expectedProgram>=0 && (expectedProgram>127||!candidate.Find(0,static_cast<std::uint8_t>(expectedProgram))))return false;
+        std::string acceptedPath=path;
         std::lock_guard<std::mutex> transition(transitionMutex_);
+        // Release runtimeMutex_ before retiring old callbacks/worker.
+        std::unique_ptr<integration::DosBoxRuntimeHost> retired;
         std::unique_lock<std::mutex> lifecycle(runtimeMutex_);
+        if(!haveBytes&&(runtime_||!requestedBankBytes_.empty()))return false;
+        auto applyRecall=[&](){
+            if(!recall)return true;
+            if(setParamNormalized(kBank,0.)!=kResultOk||
+               setParamNormalized(kProgram,static_cast<double>(expectedProgram)/127.)!=kResultOk)return false;
+            (void)setParamNormalized(kMaster,static_cast<double>(recall->volume)/10000.);
+            (void)setParamNormalized(kReverbType,recall->effects[0]/7.);
+            (void)setParamNormalized(kChorusType,recall->effects[1]/7.);
+            (void)setParamNormalized(kReverbSend,recall->sends[0]/255.);
+            (void)setParamNormalized(kChorusSend,recall->sends[1]/255.);
+            for(unsigned i=0;i<10;++i)(void)setParamNormalized(1100u+i,recall->voice[i]/255.);
+            return true;
+        };
         const auto previous=requestedSoundFont();
-        if(previous==path&&bytes==requestedBankBytes_&&(!runtime_||!runtime_->finished()))return true;
+        if(previous==path&&bytes==requestedBankBytes_&&(!runtime_||!runtime_->finished()))return applyRecall();
         if(runtime_) {
-            // Keep the old guest alive until the new engine has passed all
-            // synchronous creation/staging steps; never destroy it on failure.
-            if(!startRuntimeLocked(lifecycle,path,path.empty()?nullptr:&bytes,&candidate))return false;
+            if(!startRuntimeLocked(lifecycle,path,&bytes,&candidate,&retired))return false;
         } else publishCatalogLocked(std::move(candidate));
         requestedBankBytes_.swap(bytes);
         {
             std::lock_guard<std::mutex> lock(selectionMutex_);
-            requestedBank_=path;
+            requestedBank_.swap(acceptedPath);
+            requestedBankDigest_=digest;requestedBankDigestValid_=haveBytes;
         }
-        return true;
+        const bool applied=applyRecall();
+        lifecycle.unlock();
+        retired.reset();
+        return applied;
     } catch (...) {return false;}
 }
 std::uint64_t DosBoxVst3Shell::refreshBrowserCatalog() {
@@ -169,38 +218,29 @@ void DosBoxVst3Shell::stopRuntimeLocked() noexcept {
 }
 bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle,const std::string& selected,
                                         const std::vector<std::uint8_t>* validatedBank,
-                                        AWE125::PresetCatalog* preparedCatalog) {
+                                        AWE125::PresetCatalog* preparedCatalog,
+                                        std::unique_ptr<integration::DosBoxRuntimeHost>* retired) {
     try {
         auto engine=std::make_unique<integration::DosBoxRuntimeHost>();
         const auto ownBinary=engine->pluginBinaryPath();
         const auto privateDir=integration::DosBoxRuntimeHost::privateAssetsDir(ownBinary);
         std::vector<std::uint8_t> bytes;
         bool adapted=false;
-        const bool loadFromDisk=!selected.empty()&&!validatedBank;
+        const bool loadFromDisk=!validatedBank;
         if(loadFromDisk) {
-            if(!guest::readExternalSf2(std::filesystem::u8path(selected),bytes,adapted))return false;
+            if(selected.empty()){
+                if(!guest::readDefaultBankSnapshot(privateDir/"SYNTHGM.SF2",bytes))return false;
+            }else if(!guest::readExternalSf2(std::filesystem::u8path(selected),bytes,adapted))return false;
             validatedBank=&bytes;
         }
+        BankDigest diskDigest{};
+        if(loadFromDisk&&!hashBank(*validatedBank,diskDigest))return false;
         AWE125::PresetCatalog candidate;
-        if(selected.empty()){
-            // Capture installed default SF2 once for both the browser and
-            // the actual guest. Do not silently substitute external bytes.
-            if(!guest::readDefaultBankSnapshot(privateDir/"SYNTHGM.SF2",bytes))return false;
-            validatedBank=&bytes;
-            if(!loadCatalog(selected,candidate,validatedBank))return false;
-            // A prepared default catalog might refer to a different file
-            // generation. Never hand over an inconsistent candidate.
-            if(preparedCatalog){
-                const auto& prior=preparedCatalog->Entries();
-                const auto& now=candidate.Entries();
-                if(prior.size()!=now.size())return false;
-                for(std::size_t i=0;i<prior.size();++i)
-                    if(prior[i].bank!=now[i].bank||prior[i].program!=now[i].program||
-                       prior[i].name!=now[i].name)return false;
-            }
-        }else if(preparedCatalog)candidate=std::move(*preparedCatalog);
+        if(preparedCatalog)candidate=std::move(*preparedCatalog);
         else if(!loadCatalog(selected,candidate,validatedBank))return false;
+        std::string acceptedStarted=selected;
         const bool replacing=bool(runtime_);
+        if(replacing&&!retired)return false;
         const auto lead=demandRequested_?hostDemand_.lead():0u;
         // All non-RT lifecycle transitions are serialized by transitionMutex_.
         // Let the old engine process normally while the candidate stages/boots.
@@ -218,8 +258,11 @@ bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle
         if(replacing)lifecycle.lock();
         // Only replace the previous guest after the new UART is live.
         const bool wasProcessing=timedProcessing_.load(std::memory_order_acquire);
-        if(runtime_)stopRuntimeLocked();
-        if(engine->clocked()&&!hostDemand_.activate()){engine->stop();return false;}
+        if(engine->clocked()&&!hostDemand_.activate()){
+            lifecycle.unlock();engine->stop();lifecycle.lock();return false;
+        }
+        if(!engine->clocked())hostDemand_.reset();
+        if(runtime_)*retired=std::move(runtime_);
         runtime_=std::move(engine);
         if(loadFromDisk)requestedBankBytes_.swap(bytes);
         timedProcessing_.store(wasProcessing,std::memory_order_release);
@@ -227,7 +270,8 @@ bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle
         publishCatalogLocked(std::move(candidate));
         {
             std::lock_guard<std::mutex> lock(selectionMutex_);
-            startedBank_=selected;
+            startedBank_.swap(acceptedStarted);
+            if(loadFromDisk){requestedBankDigest_=diskDigest;requestedBankDigestValid_=true;}
         }
         guestStatus_.store(1,std::memory_order_release);
         initialProgramSent_=false;
@@ -264,7 +308,7 @@ tresult PLUGIN_API DosBoxVst3Shell::setActive(TBool state) {
         if(runtime_)return kResultOk;
         const auto selected=requestedSoundFont();
         // Keep accepted validated bytes across deactivate/reactivate.
-        const auto* snapshot=!selected.empty()&&!requestedBankBytes_.empty()?&requestedBankBytes_:nullptr;
+        const auto* snapshot=!requestedBankBytes_.empty()?&requestedBankBytes_:nullptr;
         if(!startRuntimeLocked(lifecycle,selected,snapshot))return kResultFalse;
         return SingleComponentEffect::setActive(true);
     }
@@ -724,13 +768,15 @@ tresult PLUGIN_API DosBoxVst3Shell::getState(IBStream* stream) {
     if(!stream)return kInvalidArgument;
     std::array<std::uint8_t,kStateLength> image{};
     for(unsigned i=0;i<4;i++)image[i]=kSignature[i];
-    const auto selected=requestedSoundFont();
+    std::string selected;BankDigest digest{};bool identified=false;
+    {std::lock_guard<std::mutex> lock(selectionMutex_);selected=requestedBank_;digest=requestedBankDigest_;identified=requestedBankDigestValid_;}
     const std::array<std::uint8_t,2> effects{reverbType_.load(std::memory_order_acquire),chorusType_.load(std::memory_order_acquire)};
     std::array<std::uint8_t,2> sends{reverbSend_.load(std::memory_order_acquire),chorusSend_.load(std::memory_order_acquire)};
     std::array<std::uint8_t,10> controls{};
     for(unsigned i=0;i<10;++i)controls[i]=voiceControls_[i].load(std::memory_order_acquire);
     const bool edited=std::any_of(controls.begin(),controls.end(),[](auto v){return v!=0;});
-    image[4]=edited?5:((sends[0]||sends[1])?4:((effects[0]!=4||effects[1]!=2)?3:(selected.empty()?1:2)));
+    // v6 = complete v5 controls + path + SHA-256 of exact guest bytes.
+    image[4]=identified?6:(edited?5:((sends[0]||sends[1])?4:((effects[0]!=4||effects[1]!=2)?3:(selected.empty()?1:2))));
     image[5]=bank_.load(std::memory_order_acquire);
     image[6]=program_.load(std::memory_order_acquire);
     const auto level=static_cast<std::uint32_t>(std::lround(
@@ -744,14 +790,16 @@ tresult PLUGIN_API DosBoxVst3Shell::getState(IBStream* stream) {
     if(image[4]>=3){
         if(stream->write(const_cast<std::uint8_t*>(effects.data()),2,&written)!=kResultOk||written!=2)return kResultFalse;
         if(image[4]>=4&&(stream->write(sends.data(),2,&written)!=kResultOk||written!=2))return kResultFalse;
-        if(image[4]==5&&(stream->write(controls.data(),10,&written)!=kResultOk||written!=10))return kResultFalse;
+        if(image[4]>=5&&(stream->write(controls.data(),10,&written)!=kResultOk||written!=10))return kResultFalse;
     } else if(selected.empty())return kResultOk;
     const auto n=static_cast<std::uint32_t>(selected.size());
     std::array<std::uint8_t,4> length{std::uint8_t(n),std::uint8_t(n>>8),std::uint8_t(n>>16),std::uint8_t(n>>24)};
     if(stream->write(length.data(),4,&written)!=kResultOk||written!=4)return kResultFalse;
-    if(n==0)return kResultOk;
-    return stream->write(const_cast<char*>(selected.data()),static_cast<int32>(n),&written)==kResultOk &&
-           written==static_cast<int32>(n)?kResultOk:kResultFalse;
+    if(n&&(stream->write(const_cast<char*>(selected.data()),static_cast<int32>(n),&written)!=kResultOk||
+           written!=static_cast<int32>(n)))return kResultFalse;
+    if(identified&&(stream->write(digest.data(),static_cast<int32>(digest.size()),&written)!=kResultOk||
+                   written!=static_cast<int32>(digest.size())))return kResultFalse;
+    return kResultOk;
 }
 tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
     if(!stream)return kInvalidArgument;
@@ -760,7 +808,7 @@ tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
     if(stream->read(image.data(),static_cast<int32>(image.size()),&read)!=kResultOk||
        read!=static_cast<int32>(image.size())||
        !std::equal(kSignature.begin(),kSignature.end(),image.begin())||
-       (image[4]<1||image[4]>5)||image[9]!=0x5a||image[10]!=0xa5||
+       (image[4]<1||image[4]>6)||image[9]!=0x5a||image[10]!=0xa5||
        image[5]!=0||image[6]>127)return kResultFalse;
     const unsigned volume=image[7]|(static_cast<unsigned>(image[8])<<8);
     if(volume>10000)return kResultFalse;
@@ -769,7 +817,7 @@ tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
     std::array<std::uint8_t,2> sends{};
     if(image[4]>=4&&(stream->read(sends.data(),2,&read)!=kResultOk||read!=2))return kResultFalse;
     std::array<std::uint8_t,10> controls{};
-    if(image[4]==5&&(stream->read(controls.data(),10,&read)!=kResultOk||read!=10))return kResultFalse;
+    if(image[4]>=5&&(stream->read(controls.data(),10,&read)!=kResultOk||read!=10))return kResultFalse;
     std::string selected;
     if(image[4]>=2){
         std::array<std::uint8_t,4> length{};
@@ -781,16 +829,11 @@ tresult PLUGIN_API DosBoxVst3Shell::setState(IBStream* stream) {
         if(n&&(stream->read(selected.data(),static_cast<int32>(n),&read)!=kResultOk||
            read!=static_cast<int32>(n)))return kResultFalse;
     }
-    if(!requestSoundFont(selected,image[6]))return kResultFalse;
-    if(setParamNormalized(kBank,0.)!=kResultOk||
-       setParamNormalized(kProgram,static_cast<double>(image[6])/127.)!=kResultOk)return kResultFalse;
-    (void)setParamNormalized(kMaster,static_cast<double>(volume)/10000.);
-    (void)setParamNormalized(kReverbType,effects[0]/7.);
-    (void)setParamNormalized(kChorusType,effects[1]/7.);
-    (void)setParamNormalized(kReverbSend,sends[0]/255.);
-    (void)setParamNormalized(kChorusSend,sends[1]/255.);
-    for(unsigned i=0;i<10;++i)(void)setParamNormalized(1100u+i,controls[i]/255.);
-    return kResultOk;
+    BankDigest expected{};
+    if(image[4]==6&&(stream->read(expected.data(),static_cast<int32>(expected.size()),&read)!=kResultOk||
+                     read!=static_cast<int32>(expected.size())))return kResultFalse;
+    const RecallControls recall{volume,effects,sends,controls};
+    return requestSoundFont(selected,image[6],image[4]==6?&expected:nullptr,&recall)?kResultOk:kResultFalse;
 }
 tresult PLUGIN_API DosBoxVst3Shell::setComponentState(IBStream* stream) {
     return setState(stream);
