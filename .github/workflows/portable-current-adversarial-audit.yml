@@ -1,0 +1,38 @@
+name: Portable adversarial audit - exact source and oracles
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/portable-current-adversarial-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 'c2f22d8ac5e27dc09dacb1e5ab666920d91222cb'
+          persist-credentials: false
+      - name: Confirm exact audited tree and retain public source snapshot for local review
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = 'c2f22d8ac5e27dc09dacb1e5ab666920d91222cb'
+          mkdir -p audit-evidence
+          git archive --format=tar.gz -o audit-evidence/audited-source.tar.gz HEAD
+          git ls-tree -r HEAD > audit-evidence/tree.txt
+      - name: Execute original portable preflight and adversarial report consumers
+        shell: bash
+        run: |
+          cmake -S . -B build-audit -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build build-audit --target AuditSf2PreflightTest --parallel 2
+          python tests/adversarial-current/probes.py build-audit/AuditSf2PreflightTest | tee audit-evidence/probes.log
+      - name: Retain audit-only public source and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-audit-portable-evidence
+          path: audit-evidence/
+          retention-days: 7
+          if-no-files-found: error
