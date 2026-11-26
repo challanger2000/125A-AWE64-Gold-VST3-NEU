@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 27.11.2026 — SDK-Pfadkorrektur für neutrales Windows-Bundle
+
+- `6a9bb61`: sechs native Produkt-Workflows FAIL, außerdem privater Lieferbuild FAIL (45913103630). Gleiche bestätigte Ursache: SDK 3.7.12 `smtg_target_add_plugin_resource` ersetzt bei VS den Bundle-Namen durch `$(TargetFileName)` in einem nicht VERBATIM gesetzten Copy-Befehl. MSBuild expandiert Leerzeichen und meldet `Gold.vst3/Contents/Resources/p007_p165.uidesc is not a directory`. Original-Klang- und native VST3-Prüfungen nicht erreicht; keine sechs unterschiedlichen DSP-Fehler.
+- Eigene CMake-Ressourcenstaging-Funktion mit absolutem Pfad und VERBATIM, echte gepinnte SDK-moduleinfotool-Erzeugung mit VERBATIM, keine SDK-Explorer-Dekoration (PlugIn.ico/desktop.ini). Keine Änderung am GUI-Inhalt, RC, DSP, VST3-Klassen-ID, Originaldaten oder Lizenz. SDK-Quellstand unverändert.
+- Kleines lokales Linux/Ninja-Probeprojekt mit Leerzeichen in Source/Build/Bundle/Assetpfaden erfolgreich ausgeführt: identische Testdateien kopiert und korrekte einzelne Argumente beim simulierten moduleinfotool nachgewiesen. Vollständiger neuer CTest (inkl. ressourcen-only rebuild) und nativer Windows-Build noch NOT RUN. Erst neue echte Original-, Validator-, Recall- und Paketprüfung entscheidet die technische Abnahme.
+
 ## 27.11.2026 — Neutrale Produktidentität und Paketstruktur (vor CPU-Optimierung)
 
 - Klangreferenz: `609ab17525a986c2c4a55106724e87b3ec098764`. Besitzer in Studio Pro: Klang derzeit einwandfrei und besser als frühere Fassungen. Bei 512 Samples ca. 15 % Leerlauf, bis 30 % einzelne Bassnote, ca. 50 % polyphon (Studio-Pro-Anzeige, nicht Gesamt-CPU). Performance-Optimierung ist ausdrücklich ein separater nächster Auftrag.

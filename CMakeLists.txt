@@ -8,6 +8,7 @@ include(CTest)
 if(BUILD_TESTING)
   find_package(Threads REQUIRED)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  add_test(NAME AWE64_NeutralBundleSpacePaths COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_neutral_bundle_cmake.py")
   execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/MakeAuditSf2Cases.py" "${CMAKE_CURRENT_BINARY_DIR}/audit-sf2" RESULT_VARIABLE audit_fixture_result)
   if(NOT audit_fixture_result EQUAL 0)
     message(FATAL_ERROR "Synthetic audit SF2 fixture generation failed")
@@ -92,7 +93,18 @@ if(AWE64_BUILD_VST3_DEV)
   set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES ON CACHE BOOL "" FORCE)
   set(SMTG_ENABLE_VSTGUI_SUPPORT ON CACHE BOOL "" FORCE)
   set(SMTG_CREATE_PLUGIN_LINK OFF CACHE BOOL "" FORCE)
+  # The stock SDK resource/icon commands are not safe for a spaced bundle name.
+  # Keep the actual SDK moduleinfotool, invoked with explicit VERBATIM arguments.
+  set(SMTG_CREATE_MODULE_INFO OFF CACHE BOOL "" FORCE)
   add_subdirectory("${AWE64_VST3SDK}" "${CMAKE_BINARY_DIR}/vst3sdk")
+  # Windows Explorer decoration is not part of the clean plugin payload.
+  # Suppress the SDK helper for this single product target (not SDK targets).
+  function(smtg_target_add_folder_icon target icon)
+  endfunction()
+  # The custom resource target below creates the complete directory itself.
+  function(smtg_target_create_resources_folder target)
+  endfunction()
+  include(cmake/NeutralBundle.cmake)
 
   # Preserve byte-identical owner GUI in Git. Old SDK VSTGUI 4 lacks
   # getVisibleClientRect(), so build ONLY an ephemeral compatibility copy.
@@ -318,12 +330,13 @@ void PresetBrowserView::Select(uint16_t bank,uint8_t program) {
   target_compile_features(awe64_vst3_host_pcm_smoke PRIVATE cxx_std_20)
 
   smtg_target_configure_version_file(AWE64GoldDOSBoxDev)
-  smtg_target_add_plugin_resources(AWE64GoldDOSBoxDev RESOURCES
-    gui/resource/p007_p165.uidesc
-    gui/resource/125A_P165_Original_Faceplate_1000x708.png
-    gui/resource/125A_Button_Atlas_Hardware_Normal_Pressed.png
-    gui/resource/125A_Knob_Standard_33frames_58px.png
-    gui/resource/125A_Knob_Master_33frames_134px.png)
+  awe64_stage_bundle_resources(AWE64GoldDOSBoxDev
+    "${CMAKE_CURRENT_SOURCE_DIR}/gui/resource/p007_p165.uidesc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gui/resource/125A_P165_Original_Faceplate_1000x708.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gui/resource/125A_Button_Atlas_Hardware_Normal_Pressed.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gui/resource/125A_Knob_Standard_33frames_58px.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/gui/resource/125A_Knob_Master_33frames_134px.png")
+  awe64_write_module_info(AWE64GoldDOSBoxDev)
   # Preserve the original hardware sprites for the VSTGUI CBitmap loader.
   set(AWE64_RESOURCE_RC "${CMAKE_CURRENT_BINARY_DIR}/awe64_p165_assets.rc")
   file(WRITE "${AWE64_RESOURCE_RC}" "")
