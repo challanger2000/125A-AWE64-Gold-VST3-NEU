@@ -1,0 +1,87 @@
+name: Cold-start investigation - historical vs current (synthetic only)
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/windows-audit-cold-start.yml'
+      - 'tools/audit_cold_start.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: historical
+            revision: ebbc14895fbe41c57eb08ea14af67b81586334bf
+          - variant: current
+            revision: f513c0dbca5f951f895f29be5230fdc241aa1fc7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.revision }}
+          path: product
+          submodules: true
+          persist-credentials: false
+      - uses: microsoft/setup-msbuild@v2
+      - name: Confirm exact product and upstream revisions
+        shell: pwsh
+        working-directory: product
+        run: |
+          if ((git rev-parse HEAD).Trim() -ne '${{ matrix.revision }}') { throw 'Wrong product revision' }
+          if ((git -C third_party/dosbox-x-AWE32 rev-parse HEAD).Trim() -ne 'f3a95b9f19a7f9863295e6481f271cf04733c635') { throw 'Wrong upstream revision' }
+          python integration/patch_dosbox_runtime.py third_party/dosbox-x-AWE32
+          if ($LASTEXITCODE -ne 0) { throw 'Exact upstream patch failed' }
+      - name: Restore exact open-source runtime cache
+        id: core-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: product/third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll
+          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('product/integration/patch_dosbox_runtime.py','product/research/p165-control-port/VoiceOverlay.hpp') }}
+      - name: Compile exact original core if unavailable
+        if: steps.core-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        working-directory: product/third_party/dosbox-x-AWE32
+        run: |
+          msbuild vs/dosbox-x.sln -t:dosbox-x:Rebuild '-p:Configuration=Release SDL2' -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m:4
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime DLL build failed' }
+      - name: Build exact product with common diagnostic host
+        shell: pwsh
+        working-directory: product
+        run: |
+          git clone --depth 1 --branch v3.7.12_build_20 --recurse-submodules --shallow-submodules https://github.com/steinbergmedia/vst3sdk.git "$env:RUNNER_TEMP\vst3sdk"
+          if ($LASTEXITCODE -ne 0) { throw 'SDK acquisition failed' }
+          # Only replace the independent host test, not the product source.
+          Copy-Item ../tests/adversarial-current/NativeHost.cpp tests/WindowsVst3HostPcmSmoke.cpp -Force
+          cmake -S . -B build-vst3 -G "Visual Studio 17 2022" -A x64 -DAWE64_BUILD_VST3_DEV=ON -DAWE64_VST3SDK="$env:RUNNER_TEMP\vst3sdk" -DBUILD_TESTING=OFF
+          if ($LASTEXITCODE -ne 0) { throw 'Configure failed' }
+          cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev awe64_vst3_host_pcm_smoke --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+          $bundle=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3').Path
+          $dll=Join-Path $bundle 'Contents/x86_64-win/AWE64DOSBoxRuntime.dll'
+          Copy-Item 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll' $dll -Force
+          python tests/MakeSyntheticDemoExe.py --bundle $bundle
+          if ($LASTEXITCODE -ne 0) { throw 'Synthetic fixture stage failed' }
+          python tests/MakeAuditSf2Cases.py "$env:RUNNER_TEMP\cold-start-banks"
+          if ($LASTEXITCODE -ne 0) { throw 'Synthetic bank fixture failed' }
+          $plugin=Join-Path $bundle 'Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3'
+          $exe=(Get-ChildItem build-vst3 -Recurse -Filter awe64_vst3_host_pcm_smoke.exe | Select-Object -First 1).FullName
+          if (-not $exe) { throw 'No diagnostic host' }
+          Get-FileHash -Algorithm SHA256 $plugin,$dll,$exe
+          python ../tools/audit_cold_start.py --exe $exe --plugin $plugin --bank "$env:RUNNER_TEMP\cold-start-banks\valid.sf2" --variant '${{ matrix.variant }}' --report "$env:RUNNER_TEMP\cold-start-report.json"
+          if ($LASTEXITCODE -ne 0) { throw 'At least one cold start failed; inspect report, no retry-to-green' }
+      - name: Upload synthetic diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cold-start-${{ matrix.variant }}-${{ github.sha }}
+          path: ${{ runner.temp }}/cold-start-report.json
+          if-no-files-found: warn
+          retention-days: 7
