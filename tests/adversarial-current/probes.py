@@ -57,6 +57,9 @@ with tempfile.TemporaryDirectory() as d:
     positive=common+'PERF_HOST_RATE=44100 PERF_BLOCK=128 LOGICAL_CPUS=4\nREAL_VST3_SUSTAIN_PCM_PASS\nPERF_CALLBACK_MAX_MS=0.1 CALLBACK_DEADLINE_OVERRUNS=0 HOST_WAKE_MAX_LATE_MS=1\nPERF_MIDI_TO_PCM_MEDIAN_MS=17 P95_MS=18 MAX_MS=19\nPERF_PROCESS_ONE_CORE_PERCENT=10 TOTAL_MACHINE_PERCENT=2.5\nPERF_32_NOTE_ONE_CORE_PERCENT=20 TOTAL_MACHINE_PERCENT=5\n'
     assert consumer(positive)
     assert not consumer(positive.replace('AUDIO_DROPPED_FRAMES=0','AUDIO_DROPPED_FRAMES=1'))
+    near=positive.replace('P95_MS=18 MAX_MS=19','P95_MS=20.2292 MAX_MS=20.2292')
+    verdict('A15_LATENCY_TOLERANCE_POSITIVE',consumer(near),'owner-accepted minor target deviation')
+    verdict('A15_LATENCY_CEILING_NEGATIVE',not consumer(near.replace('20.2292','21.01')),'above 21 ms ceiling')
     verdict('A15_DEADLINE_OVERRUN_ORACLE',not consumer(positive.replace('OVERRUNS=0','OVERRUNS=99')),'99 overruns')
     verdict('A15_MISSING_NUMERIC_EVIDENCE',not consumer(common),'no rate, p95, CPU values, sustain, deadline evidence')
 workflow=(Path(__file__).resolve().parents[2]/'.github/workflows/windows-dosbox-runtime.yml').read_text()

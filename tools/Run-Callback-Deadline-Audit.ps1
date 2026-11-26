@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory=$true)][string]$Rom,
     [string]$HostExe = '',
     [string]$Cheezoids = '',
-    [int]$Seconds = 45
+    [ValidateSet(44100,48000,96000)][int]$HostRate = 96000,
+    [int]$Seconds = 60
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -87,9 +88,9 @@ try {
     $failed = 0
     # Fixed number of independent runs, not retry-to-green.
     foreach ($trial in 1..3) {
-        Write-Host "DEADLINE_TRIAL_BEGIN $trial"
+        Write-Host "DEADLINE_TRIAL_BEGIN $trial rate=$HostRate seconds=$Seconds"
         $env:AWE64_TEST_PERFORMANCE = '1'
-        $env:AWE64_TEST_HOST_RATE = '96000'
+        $env:AWE64_TEST_HOST_RATE = [string]$HostRate
         $env:AWE64_TEST_EXTERNAL_SF2 = $ramFixture
         $env:AWE64_TEST_RAM_TONE_HZ = '441'
         Remove-Item Env:EMU8K_TRACE -ErrorAction SilentlyContinue
@@ -97,7 +98,7 @@ try {
         $env:SDL_AUDIODRIVER = 'dummy'
         $env:AWE64_ORIGINAL_CREATIVE_ONLY = '1'
         $env:AWE64_CREATIVE_BOOT_LOG = 'B' + [guid]::NewGuid().ToString('N').Substring(0,7).ToUpperInvariant() + '.LOG'
-        & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds 60
+        & python (Join-Path $root 'tests/WindowsRunVst3HostPcmSmoke.py') --exe $hostTestExe --plugin $pluginBinary --original --seconds $Seconds
         $code = $LASTEXITCODE
         Write-Host "DEADLINE_TRIAL_END $trial exit=$code"
         if ($code -ne 0) { $failed++ }

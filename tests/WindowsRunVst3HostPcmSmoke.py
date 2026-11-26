@@ -163,7 +163,7 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
             raise RuntimeError("Unexpected performance test configuration")
         median,p95,maximum=map(float,row("PERF_MIDI_TO_PCM_MEDIAN_MS="+number+" P95_MS="+number+" MAX_MS="+number))
         callback,overruns,wake=row("PERF_CALLBACK_MAX_MS="+number+r" CALLBACK_DEADLINE_OVERRUNS=(\d+) HOST_WAKE_MAX_LATE_MS="+number)
-        if not all(math.isfinite(v) for v in (median,p95,maximum,float(callback),float(wake))) or not 0<=median<=p95<=maximum or p95>20 or int(overruns)!=0:
+        if not all(math.isfinite(v) for v in (median,p95,maximum,float(callback),float(wake))) or not 0<=median<=p95<=maximum or p95>21 or int(overruns)!=0:
             raise RuntimeError("Latency/deadline evidence failed")
         for label in ("PERF_PROCESS_ONE_CORE_PERCENT","PERF_32_NOTE_ONE_CORE_PERCENT"):
             one,total=map(float,row(label+"="+number+" TOTAL_MACHINE_PERCENT="+number))

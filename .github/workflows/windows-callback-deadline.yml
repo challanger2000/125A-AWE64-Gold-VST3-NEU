@@ -1,4 +1,4 @@
-name: Targeted 96 kHz callback deadline investigation
+name: Targeted original performance investigation
 on:
   push:
     branches: [main]
@@ -7,11 +7,17 @@ on:
       - 'tools/prepare_callback_diagnostic.py'
       - 'tools/Run-Callback-Deadline-Audit.ps1'
   workflow_dispatch:
+    inputs:
+      host_rate:
+        description: Native host sample rate
+        type: choice
+        options: ['48000', '96000', '44100']
+        default: '48000'
 permissions:
   contents: read
 jobs:
   compile-original-dosbox-dll:
-    timeout-minutes: 18
+    timeout-minutes: 22
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -73,15 +79,19 @@ jobs:
           Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
           if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
           Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
-      - name: Three independent original Creative 96 kHz deadline trials
+      - name: Three independent original Creative performance trials
         shell: pwsh
-        timeout-minutes: 5
+        timeout-minutes: 9
+        env:
+          AUDIT_HOST_RATE: ${{ inputs.host_rate || '48000' }}
         run: |
           $rom=Join-Path $env:RUNNER_TEMP 'awe32.raw'
           Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/libretro/libretro-pcem/e07923e902dcedcf65a502fb3f14e75b9ded5271/awe32.raw' -OutFile $rom
           try {
-            & powershell.exe -NoProfile -NonInteractive -File tools/Run-Callback-Deadline-Audit.ps1 -Bundle 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3' -Rom $rom -HostExe 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe' -Seconds 60
-            if ($LASTEXITCODE -ne 0) { throw 'Targeted 96 kHz deadline diagnostic failed' }
+            $rate = [int]$env:AUDIT_HOST_RATE
+            $seconds = if ($rate -eq 48000) { 120 } else { 60 }
+            & powershell.exe -NoProfile -NonInteractive -File tools/Run-Callback-Deadline-Audit.ps1 -Bundle 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3' -Rom $rom -HostExe 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe' -HostRate $rate -Seconds $seconds
+            if ($LASTEXITCODE -ne 0) { throw 'Targeted original performance diagnostic failed' }
           } finally {
             Remove-Item -LiteralPath $rom -Force -ErrorAction SilentlyContinue
           }

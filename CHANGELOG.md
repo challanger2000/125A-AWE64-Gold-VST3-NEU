@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 26.11.2026 — Originalregression: Klanggates PASS, geringfügige Latenzabweichung vom Besitzer akzeptiert
+
+- [Originalregression 45895759554](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45895759554), exakter `f1c3e32902d42be5243e7676e29c108fba7033bb`: Gesamt FAIL im Performance-Gate. 47/47 Validator, 128/128 Cheezoids-Hüllkurven (kein Hardwareidentitätsnachweis), 10/10 Voice-PCM und Neutralrestore, RAM-Stereo/Release, Original-EMU8000-PCM und Effektregister, nativer Timed-Dreiraten-Test und gezielte DLL-Fehlerfälle PASS.
+- Legacy 128 Samples: p95 MIDI->PCM 44,1/48/96 kHz = 18,7982 / 20,2292 / 18,2188 ms. Alle drei Messfenster 0 Callback-Deadline-Überschreitungen, 0 Audio/MIDI-Drops, 0 Underrun-Frames. Maximale Callback-Walltime 0,0443 / 0,0783 / 0,0619 ms. 48 kHz mit 60 s 32-Stimmen-Soak überschritt das 20-ms-Ziel um 0,2292 ms; nach frühem nativen Abbruch wurde ETW-CPU-Validierung nicht mehr ausgeführt. Historischer Gesamt-FAIL bleibt bestehen.
+- Besitzer akzeptiert ausdrücklich diese geringfügige Überschreitung. 20 ms bleiben Entwicklungsziel; konservative zusätzliche QA-Toleranz bis 21 ms (Implementierungsentscheidung, nicht neuer Klang-/DSP-Zielwert), oberhalb FAIL. Native und unabhängige Python-Gates konsistent; alle Deadline-, Queue-, CPU- und Klanggates unverändert. Warnmarker oberhalb 20 ms; portable Positivkontrolle 20,2292 und Negativkontrolle 21,01 ms.
+- Gezielter Nachlauf mit drei unabhängigen 48-kHz-/128-Sample-/60-s-Polyphonie-Messungen und vollständigem ETW-CPU-Gate statt Wiederholung des bestandenen Klang-Sweeps. Keine Änderung an Produktquellen, DSP, EMU8000 oder GUI. Neue Tests noch NOT RUN. Studio Pro, Besitzer-PC-Performance und verbleibende Auditgrenzen separat offen; keine endgültige Freigabe.
+
 ## 26.11.2026 — Gezielte Nachweise erfolgreich; vollständige Originalregression wieder verpflichtend
 
 - Exakter Produktquellstand `dfa777702ec79254974fa20a878a86c8ae65044a`: alle sieben Workflows SUCCESS. [Native DLL/Validator](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45893794898): sechs EMU8000-Fehlerprovokationen (Open, ROM, Read, Empty, RAM, Chip) PASS; insgesamt 26/26 ROM/Entry-Fälle einschließlich Positivkontrolle, 47/47 Steinberg-Validator, synthetische Dual-Instanz und P165-Editor/MOD RESET PASS. Keine allgemeine In-process-Absturzgarantie.
