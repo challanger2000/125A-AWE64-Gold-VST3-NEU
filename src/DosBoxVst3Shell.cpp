@@ -339,7 +339,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     auto& engine=*runtime_;
     if(engine.clocked())return processTimed(data,engine);
     if(engine.finished()) {
-        guestStatus_.store(-2,std::memory_order_release);
+        guestStatus_.store(engine.startupTimedOut()?-3:-2,std::memory_order_release);
         silence();
         return kResultFalse; // original DOS guest exited; no fake playback
     }
@@ -365,11 +365,11 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
             ready=engine.ready(hostBlock);
         }
         if(!ready){
-            if(engine.finished())guestStatus_.store(-2,std::memory_order_release);
+            if(engine.finished())guestStatus_.store(engine.startupTimedOut()?-3:-2,std::memory_order_release);
             silence();return kResultFalse;
         }
     }
-    if(engine.finished()){guestStatus_.store(-2,std::memory_order_release);silence();return kResultFalse;}
+    if(engine.finished()){guestStatus_.store(engine.startupTimedOut()?-3:-2,std::memory_order_release);silence();return kResultFalse;}
     if(ready){
         guestStatus_.store(2,std::memory_order_release);
         if(data.numSamples>0)engine.startLegacyMidi();
@@ -544,7 +544,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     }
     if(data.numSamples>0)
         absoluteSamplePosition_+=static_cast<std::uint64_t>(data.numSamples);
-    if(engine.finished()){guestStatus_.store(-2,std::memory_order_release);silence();return kResultFalse;}
+    if(engine.finished()){guestStatus_.store(engine.startupTimedOut()?-3:-2,std::memory_order_release);silence();return kResultFalse;}
     if(!accepted){engine.requestMidiRecovery();return kResultFalse;}
     return kResultOk;
 }
@@ -561,7 +561,7 @@ tresult DosBoxVst3Shell::processTimed(ProcessData& data,integration::DosBoxRunti
     };
     auto fault=[&]() noexcept -> tresult {
         hostDemand_.fail();engine.requestMidiRecovery();
-        guestStatus_.store(-2,std::memory_order_release);silence();return kResultFalse;
+        guestStatus_.store(engine.startupTimedOut()?-3:-2,std::memory_order_release);silence();return kResultFalse;
     };
     if(hostDemand_.faulted()||engine.finished()||data.numSamples<0)return fault();
     if(!timedProcessing_.load(std::memory_order_acquire)) {
@@ -569,6 +569,7 @@ tresult DosBoxVst3Shell::processTimed(ProcessData& data,integration::DosBoxRunti
         if(data.numSamples>0){silence();return kResultFalse;}
     }
     if(!engine.ready(static_cast<std::size_t>(data.numSamples))) {
+        if(engine.finished())return fault();
         // Native boot proof is still a gate. Do not silently discard an
         // early MIDI event or claim a parameter change was accepted.
         silence();
@@ -794,6 +795,7 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
             return s==2 ? std::string("DOSBOX-X: MIDI-GAST BEREIT") :
                    s==1 ? std::string("DOSBOX-X: ORIGINALER CREATIVE-DOS-GAST STARTET") :
                    s==-1 ? std::string("DOSBOX-X: ORIGINAL-DATEIEN ODER DLL FEHLEN") :
+                   s==-3 ? std::string("DOSBOX-X: STARTZEIT UEBERSCHRITTEN") :
                    s==-2 ? std::string("DOSBOX-X: GAST IST BEENDET") :
                            std::string("DOSBOX-X: GAST NICHT GESTARTET");
         },

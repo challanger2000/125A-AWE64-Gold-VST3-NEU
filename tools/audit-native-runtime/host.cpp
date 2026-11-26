@@ -18,7 +18,7 @@ int main(int argc,char** argv){
     if(argc!=3)return infra("usage: host mode synthetic-fixture-dir");
     const std::string mode=argv[1];
     const auto dir=std::filesystem::absolute(argv[2]);
-    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom"&&mode!="candidate"&&mode!="startup"&&mode!="exitready"&&mode!="defaultbank")return infra("mode");
+    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom"&&mode!="candidate"&&mode!="startup"&&mode!="exitready"&&mode!="defaultbank"&&mode!="bootstall")return infra("mode");
     // These files contain only self-generated fake bytes; use a fresh directory.
     if(!std::filesystem::create_directory(dir))return infra("fresh fixture dir");
     {std::ofstream f(dir/"awe32.raw",std::ios::binary);std::vector<char> zero(1048576,0);f.write(zero.data(),zero.size());}
@@ -32,7 +32,34 @@ int main(int argc,char** argv){
         return infra("real production RuntimeHost::begin");
     if(!wait([&]{return h.ready();}))return infra("shim readiness not observed");
     unsigned failures=0;
-    if(mode=="defaultbank"){
+    if(mode=="bootstall"){
+        // UART claims readiness but never provides any PCM. Exercise
+        // the production 30-second limit; do not shorten it in a test.
+        const auto start=Clock::now();
+        if(h.ready(128)||h.finished()||!h.sendMidi({0,0x90,60,100,3}))
+            return infra("pending startup positive control");
+        while(!h.finished()&&Clock::now()-start<seconds(33)){
+            (void)h.ready(128);
+            std::this_thread::sleep_for(milliseconds(10));
+        }
+        const auto elapsed=duration_cast<milliseconds>(Clock::now()-start).count();
+        const bool timedOut=h.startupTimedOut()&&h.finished()&&h.running();
+        const bool closed=!h.ready(128)&&!h.sendMidi({1,0x90,61,100,3})&&!h.waitForAudio(128,false);
+        // A late burst must not revive the abandoned startup or play notes.
+        std::ofstream(dir/"resume").put('1');
+        const bool late=wait([&]{return std::filesystem::exists(dir/"late-pcm");});
+        float l[128],r[128];std::fill_n(l,128,123.f);std::fill_n(r,128,123.f);
+        const auto n=h.readAudio(l,r,128);
+        const bool silent=n==0&&std::all_of(l,l+128,[](float x){return x==0.f;})&&
+                               std::all_of(r,r+128,[](float x){return x==0.f;});
+        const bool noNote=!std::filesystem::exists(dir/"late-midi");
+        h.stop();
+        const bool pass=elapsed>=30000&&elapsed<=33000&&timedOut&&closed&&late&&silent&&noNote;
+        std::cout<<"AUDIT_BOOT_TIMEOUT "<<(pass?"PASS":"FAIL")<<" elapsed_ms="<<elapsed
+                 <<" timed_out="<<timedOut<<" closed="<<closed<<" late_pcm="<<late
+                 <<" silent="<<silent<<" no_midi="<<noNote<<std::endl;
+        failures+=!pass;
+    }else if(mode=="defaultbank"){
         if(!wait([&]{return std::filesystem::exists(dir/"bank-path.txt");}))
             return infra("default bank path not received");
         std::ifstream info(dir/"bank-path.txt");

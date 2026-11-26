@@ -54,6 +54,12 @@ class DosBoxRuntimeCore final {
     AWE64_GuestClockFaultFn clockFault_=nullptr;
     unsigned demandLead_=0;
     bool pcmPrimed_=false;
+    // Consumer-only boot deadline. No sleep, allocation or logging in ready().
+    std::chrono::steady_clock::time_point startupDeadline_{};
+    std::atomic<bool> startupTimedOut_{false};
+    bool firstPrimeCompleted_=false;
+    bool startupSawUart_=false;
+    std::size_t startupMaxPcm_=0;
     unsigned lastSends_=0x10000u;
     bool authenticGuest_=false;
     // Opt-in measurement only; no console I/O or file writes on RT thread.
@@ -382,6 +388,8 @@ public:
             sends_(0x10000u);lastSends_=0x10000u;
             voiceControls_(0,0);lastVoiceLo_=0;lastVoiceHi_=0;
             pcmPrimed_=false;
+            startupDeadline_={};startupTimedOut_.store(false,std::memory_order_release);
+            firstPrimeCompleted_=false;startupSawUart_=false;startupMaxPcm_=0;
             guestClockPcm_(authenticGuest_?1u:0u);
             registerMidi_(adapter_.get(),&DosBoxHostAdapter::pullMidi);
             registerPCM_(adapter_.get(),&DosBoxHostAdapter::receivePCM);
@@ -432,6 +440,12 @@ public:
                 static_cast<unsigned long long>(measurementEnd_.underruns-measurementStart_.underruns));
             std::printf("PERF_QUEUE_DEPTH_MIN=%zu MAX=%zu MEAN=%.2f MIDI_DEPTH_MAX=%zu\n",
                 depthMin_,depthMax_,double(depthTotal_)/double(measuredBlocks_),midiDepthMax_);
+            std::fflush(stdout);
+        }
+        if((performanceStats_||startupTimedOut())&&adapter_){
+            std::printf("AWE64_STARTUP_DIAGNOSTIC uart=%d max_pcm=%zu primed=%d timeout=%d pulled_notes=%llu\n",
+                        int(startupSawUart_),startupMaxPcm_,int(firstPrimeCompleted_),int(startupTimedOut()),
+                        static_cast<unsigned long long>(adapter_->pulledNoteOns()));
             std::fflush(stdout);
         }
         if(performanceStats_&&adapter_){
@@ -501,25 +515,43 @@ public:
     void startReplacementCapture() noexcept {if(adapter_)adapter_->startReplacementCapture();}
     void startLegacyMidi() noexcept {if(adapter_)adapter_->startLegacyMidi();}
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
-        if(finished()||!ready_||!ready_()||finished())return false;
-        if(pcmPrimed_)return true;
-        // The ABI-only fixture may query the UART with no audio block.
-        // A real nonempty legacy host block needs PCM reserve even for a
-        // synthetic DOS guest, and a zero-sample flush never opens MIDI.
-        if(!authenticGuest_&&hostBlock==0)return true;
-        // Add 192 native frames (4.35 ms) of initial reserve after the
-        // observed 48-kHz soak underrun. Demand clock stays unchanged.
+        if(finished())return false;
+        const bool uart=ready_&&ready_();
+        if(finished())return false;
+        if(pcmPrimed_)return uart;
+        // Zero-sample queries do not start a deadline or open legacy MIDI.
+        if(!authenticGuest_&&hostBlock==0)return uart;
         const auto target=demandLead_?static_cast<std::size_t>(demandLead_-2*rt::GuestDemandClock::maxTickFrames):
             std::max<std::size_t>(576,std::min<std::size_t>(hostBlock,8192)+320);
-        if(!queues_||queues_->snapshot().audioFrames<target)return false;
-        pcmPrimed_=true;
-        return true;
+        const auto available=queues_?queues_->snapshot().audioFrames:0u;
+        if(!firstPrimeCompleted_){
+            startupSawUart_|=uart;
+            startupMaxPcm_=std::max(startupMaxPcm_,available);
+        }
+        // Check real readiness first: a long idle period alone must not
+        // fault an already initialized guest. Same 30-s bound as candidate
+        // bank preparation and offline startup; no retries-to-green.
+        if(uart&&available>=target){
+            pcmPrimed_=true;
+            firstPrimeCompleted_=true;
+            startupDeadline_={};
+            return !finished();
+        }
+        if(hostBlock&&!firstPrimeCompleted_){
+            const auto now=std::chrono::steady_clock::now();
+            if(startupDeadline_==std::chrono::steady_clock::time_point{})
+                startupDeadline_=now+std::chrono::seconds(30);
+            else if(now>=startupDeadline_)
+                startupTimedOut_.store(true,std::memory_order_release);
+        }
+        return false;
     }
     [[nodiscard]] bool running() const noexcept {
         return running_.load(std::memory_order_acquire);
     }
+    [[nodiscard]] bool startupTimedOut() const noexcept {return startupTimedOut_.load(std::memory_order_acquire);}
     [[nodiscard]] bool finished() const noexcept {
-        return finished_.load(std::memory_order_acquire)||(clockFault_&&clockFault_());
+        return startupTimedOut()||finished_.load(std::memory_order_acquire)||(clockFault_&&clockFault_());
     }
     [[nodiscard]] int guestExitCode() const noexcept {
         return guestExitCode_.load(std::memory_order_acquire);
@@ -615,7 +647,7 @@ public:
     }
     // Consumer only, while capture is still suspended. Old-generation
     // frames from an in-flight callback are rejected by the epoch check.
-    void discardLegacyAudio() noexcept {if(queues_)queues_->discardAudio();pcmPrimed_=false;}
+    void discardLegacyAudio() noexcept {if(queues_)queues_->discardAudio();pcmPrimed_=false;startupDeadline_={};}
     std::size_t readAudio(float* left,float* right,std::size_t n) noexcept {
         if(finished()){
             if(left)std::fill_n(left,n,0.f);
@@ -691,6 +723,7 @@ public:
     bool ready(std::size_t frames=0) noexcept {return core_&&core_->ready(frames);}
     bool running() const noexcept {return core_&&core_->running();}
     bool finished() const noexcept {return !core_||core_->finished();}
+    bool startupTimedOut() const noexcept {return core_&&core_->startupTimedOut();}
     int guestExitCode() const noexcept {return core_?core_->guestExitCode():-1;}
     bool setVoiceControls(std::uint64_t lo,unsigned hi) noexcept {return core_&&core_->setVoiceControls(lo,hi);}
     bool setAbsoluteSends(unsigned r,unsigned c) noexcept {return core_&&core_->setAbsoluteSends(r,c);}
