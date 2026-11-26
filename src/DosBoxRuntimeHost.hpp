@@ -219,7 +219,7 @@ public:
                const std::filesystem::path& privateDir,
                const std::string& externalBank={},unsigned demandLead=0,
                const std::vector<std::uint8_t>* validatedBank=nullptr,
-               std::shared_ptr<rt::LegacyCaptureGate> captureGate={}) {
+               std::shared_ptr<rt::LegacyCaptureGate> captureGate={},bool deferCapture=false) {
         if(module_ || worker_.joinable())return false;
         captureGate_=demandLead?nullptr:std::move(captureGate);
         if(demandLead && (demandLead<=2*rt::GuestDemandClock::maxTickFrames ||
@@ -306,7 +306,7 @@ public:
             lostControllers_.fill({});haveLostControllers_=false;
             queues_=std::make_unique<rt::RealtimeQueues>();
             if(demandLead_&&!authenticGuest_){stop();return false;}
-            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_,demandLead_!=0,voiceControls_,sends_,captureGate_);
+            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_,demandLead_!=0,voiceControls_,sends_,captureGate_,deferCapture);
             if(demandLead_ && !adapter_->publishDemand(demandLead_-2*rt::GuestDemandClock::maxTickFrames)) {
                 stop();return false;
             }
@@ -422,8 +422,11 @@ public:
                 depthMin_,depthMax_,double(depthTotal_)/double(measuredBlocks_),midiDepthMax_);
             std::fflush(stdout);
         }
-        if(performanceStats_&&adapter_)
+        if(performanceStats_&&adapter_){
             std::printf("PERF_SUSPENDED_FRAMES=%llu\n",static_cast<unsigned long long>(adapter_->suspendedFrames()));
+            std::printf("PERF_REPLACEMENT_SUPPRESSED_FRAMES=%llu\n",
+                        static_cast<unsigned long long>(adapter_->replacementSuppressedFrames()));
+        }
         performanceStats_=measurementStarted_=false;
         if(sends_)sends_(0x10000u);
         if(voiceControls_)voiceControls_(0,0);
@@ -467,14 +470,21 @@ public:
     // Non-RT candidate-bank preparation only: do not prime/dequeue PCM
     // or alter host timing while the former runtime is still processing.
     bool waitForGuestMidiReady() noexcept {
-        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+        // Same boot deadline as the independent original Creative bank
+        // sweep, which allows large banks 30 seconds to load.
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
         while(std::chrono::steady_clock::now()<deadline){
-            if(finished())return false;
+            if(finished()){
+                std::fprintf(stderr,"AWE64_CANDIDATE_BOOT_EXIT=%d\n",guestExitCode());
+                return false;
+            }
             if(ready_&&ready_()&&!finished())return true;
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
+        std::fprintf(stderr,"AWE64_CANDIDATE_BOOT_TIMEOUT_MS=30000\n");
         return false;
     }
+    void startReplacementCapture() noexcept {if(adapter_)adapter_->startReplacementCapture();}
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
         if(!ready_||!ready_()||(clockFault_&&clockFault_()))return false;
         if(!authenticGuest_||pcmPrimed_)return true;
@@ -622,11 +632,11 @@ public:
     bool begin(const std::filesystem::path& binary,const std::filesystem::path& dir,
                const std::string& bank={},unsigned demandLead=0,
                const std::vector<std::uint8_t>* validatedBank=nullptr,
-               std::shared_ptr<rt::LegacyCaptureGate> captureGate={}) {
+               std::shared_ptr<rt::LegacyCaptureGate> captureGate={},bool deferCapture=false) {
         if(core_||quarantinedRuntimeCount())return false;
         try{
             auto core=std::make_unique<DosBoxRuntimeCore>();
-            if(!core->begin(binary,dir,bank,demandLead,validatedBank,std::move(captureGate)))return false;
+            if(!core->begin(binary,dir,bank,demandLead,validatedBank,std::move(captureGate),deferCapture))return false;
             core_=std::move(core);return true;
         }catch(...){return false;}
     }
@@ -646,6 +656,7 @@ public:
         std::fprintf(stderr,"AWE64_RUNTIME_QUARANTINED reaper=%s\n",thread?"started":"unavailable");
     }
     bool waitForGuestMidiReady() noexcept {return core_&&core_->waitForGuestMidiReady();}
+    void startReplacementCapture() noexcept {if(core_)core_->startReplacementCapture();}
     bool ready(std::size_t frames=0) noexcept {return core_&&core_->ready(frames);}
     bool running() const noexcept {return core_&&core_->running();}
     bool finished() const noexcept {return !core_||core_->finished();}

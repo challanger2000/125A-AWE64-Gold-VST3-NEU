@@ -25,6 +25,10 @@ class DosBoxHostAdapter final {
     const AWE64_SetAbsoluteSendsFn sends_;
     const std::shared_ptr<rt::LegacyCaptureGate> captureGate_;
     std::atomic<std::uint64_t> suspendedFrames_{0};
+    // Independent of the host pause gate: a replacement guest may boot
+    // while the old guest is playing. It must not accumulate pre-handover PCM.
+    std::atomic<bool> captureStarted_{true};
+    std::atomic<std::uint64_t> replacementSuppressedFrames_{0};
     rt::GuestDemandClock demand_;
     std::atomic<std::uint64_t> guestFrames_{0};
     std::atomic<std::uint64_t> lateMidi_{0};
@@ -90,9 +94,15 @@ public:
                                bool clocked=false,
                                AWE64_SetVoiceControlsFn voiceControls=nullptr,
                                AWE64_SetAbsoluteSendsFn sends=nullptr,
-                               std::shared_ptr<rt::LegacyCaptureGate> captureGate={}) noexcept:
+                               std::shared_ptr<rt::LegacyCaptureGate> captureGate={},
+                               bool deferCapture=false) noexcept:
         queues_(q),mailbox_(q),ready_(ready),clocked_(clocked),
-        voiceControls_(voiceControls),sends_(sends),captureGate_(clocked?nullptr:std::move(captureGate)){}
+        voiceControls_(voiceControls),sends_(sends),captureGate_(clocked?nullptr:std::move(captureGate)),
+        captureStarted_(clocked||!deferCapture){}
+    void startReplacementCapture() noexcept {captureStarted_.store(true,std::memory_order_release);}
+    std::uint64_t replacementSuppressedFrames() const noexcept {
+        return replacementSuppressedFrames_.load(std::memory_order_relaxed);
+    }
     std::uint64_t suspendedFrames() const noexcept {return suspendedFrames_.load(std::memory_order_relaxed);}
     std::uint64_t guestFrames() const noexcept {return guestFrames_.load(std::memory_order_acquire);}
     bool publishDemand(std::uint64_t horizon) noexcept {
@@ -185,6 +195,10 @@ public:
         auto* self=static_cast<DosBoxHostAdapter*>(ctx);
         // Discard hardware startup PCM before it reaches the audio ring.
         if(self->ready_&&!self->ready_())return;
+        if(!self->captureStarted_.load(std::memory_order_acquire)){
+            self->replacementSuppressedFrames_.fetch_add(frames,std::memory_order_relaxed);
+            return;
+        }
         auto& ring=self->queues_;
         constexpr float scale=1.f/32768.f;
         if(self->captureGate_){

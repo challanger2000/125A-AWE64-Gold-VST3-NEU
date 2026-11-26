@@ -139,6 +139,10 @@ def vst3(bundle,exe,source,work):
         env.pop(key,None)
     proc=subprocess.run([str(exe),str(plugin),"--original","60"],env=env,capture_output=True,text=True,timeout=440)
     if proc.returncode or "CHEEZ_VST3_SWEEP_COMPLETE" not in proc.stdout:
+        # Preserve the failing host's actual diagnostic and last completed
+        # presets; a bare exit code cannot distinguish bank boot from PCM.
+        print("CHEEZ_NATIVE_HOST_STDOUT_TAIL:\n"+"\n".join(proc.stdout.splitlines()[-40:]),flush=True)
+        print("CHEEZ_NATIVE_HOST_STDERR_TAIL:\n"+"\n".join(proc.stderr.splitlines()[-60:]),flush=True)
         raise RuntimeError("Native Cheezoids sweep failed: "+str(proc.returncode))
     log=plugin.parent.parent/"Resources/PRIVATE"/env["AWE64_CREATIVE_BOOT_LOG"]
     if not log.exists() or b"ERROR:" in log.read_bytes().upper():raise RuntimeError("Creative bank boot failed")

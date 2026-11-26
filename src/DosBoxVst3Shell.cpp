@@ -190,7 +190,7 @@ bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle
         // UART readiness is a necessary startup proof, not a soundfont
         // semantic or original-audio proof. Initial activation stays asynchronous.
         if(replacing)lifecycle.unlock();
-        bool started=!ownBinary.empty()&&engine->begin(ownBinary,privateDir,selected,lead,validatedBank,captureGate_);
+        bool started=!ownBinary.empty()&&engine->begin(ownBinary,privateDir,selected,lead,validatedBank,captureGate_,replacing);
         if(started&&replacing)started=engine->waitForGuestMidiReady();
         if(!started){
             engine->stop();
@@ -329,6 +329,9 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         rateConverter_.reset();
         captureGate_->resume();
     }
+    // Only the first actual nonempty host block after replacement opens
+    // capture. Until then, even a ready candidate cannot build latency.
+    if(data.numSamples>0)engine.startReplacementCapture();
     const bool ready=engine.ready(data.numSamples>0?static_cast<std::size_t>(data.numSamples):0u);
     if(ready)guestStatus_.store(2,std::memory_order_release);
     if(data.numSamples>0&&(!data.outputs||data.numOutputs!=1||data.outputs[0].numChannels!=2||

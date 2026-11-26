@@ -61,4 +61,25 @@ int main(){
  pausedQueue->discardAudio();gate->resume();
  integration::DosBoxHostAdapter::receivePCM(&paused,pcm.data(),4);
  CHECK(pausedQueue->readAudio(l,r,4,gate->epoch())==4&&l[2]==.5f&&r[2]==-.5f);
+ // Independent candidate gate: same host pause gate, separate PCM rings.
+ // The previous engine keeps producing; the replacement cannot accumulate
+ // even a full ring of obsolete pre-handover audio.
+ auto candidateQueue=std::make_unique<rt::RealtimeQueues>();
+ integration::DosBoxHostAdapter candidate(*candidateQueue,nullptr,false,nullptr,nullptr,gate,true);
+ for(unsigned i=0;i<10000;++i)integration::DosBoxHostAdapter::receivePCM(&candidate,pcm.data(),4);
+ integration::DosBoxHostAdapter::receivePCM(&paused,pcm.data(),4);
+ CHECK(pausedQueue->readAudio(l,r,4,gate->epoch())==4);
+ CHECK(candidateQueue->snapshot().audioFrames==0&&candidateQueue->audioDrops()==0);
+ CHECK(candidate.replacementSuppressedFrames()==40000);
+ gate->suspend();candidate.startReplacementCapture();
+ integration::DosBoxHostAdapter::receivePCM(&candidate,pcm.data(),4);
+ CHECK(candidateQueue->snapshot().audioFrames==0&&candidate.suspendedFrames()==4);
+ gate->resume();
+ integration::DosBoxHostAdapter::receivePCM(&candidate,pcm.data(),4);
+ CHECK(candidateQueue->readAudio(l,r,4,gate->epoch())==4&&l[2]==.5f&&r[2]==-.5f);
+ // Demand-clock mode must not be gated by legacy candidate suppression.
+ auto clockQueue=std::make_unique<rt::RealtimeQueues>();
+ integration::DosBoxHostAdapter clocked(*clockQueue,nullptr,true,nullptr,nullptr,gate,true);
+ integration::DosBoxHostAdapter::receivePCM(&clocked,pcm.data(),4);
+ CHECK(clocked.guestFrames()==4&&clockQueue->readAudio(l,r,4)==4);
 }

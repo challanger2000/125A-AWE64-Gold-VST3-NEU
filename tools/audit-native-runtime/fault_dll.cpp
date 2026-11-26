@@ -13,8 +13,10 @@
 static std::atomic<bool> stop{false},ready{false};
 static AWE64_PullMidiFn midi=nullptr;
 static void* midiContext=nullptr;
+static AWE64_PcmFn pcm=nullptr;
+static void* pcmContext=nullptr;
 EXPORT void AWE64_CALL AWE64_HostRegisterMidi(void* context,AWE64_PullMidiFn fn){midi=fn;midiContext=context;}
-EXPORT void AWE64_CALL AWE64_HostRegisterPCM(void*,AWE64_PcmFn){}
+EXPORT void AWE64_CALL AWE64_HostRegisterPCM(void* context,AWE64_PcmFn fn){pcm=fn;pcmContext=context;}
 EXPORT void AWE64_CALL AWE64_RequestStop(){stop.store(true,std::memory_order_release);}
 EXPORT int AWE64_CALL AWE64_IsGuestMidiReady(){return ready.load(std::memory_order_acquire)?1:0;}
 EXPORT void AWE64_CALL AWE64_SetAbsoluteSends(unsigned){}
@@ -26,6 +28,19 @@ EXPORT int AWE64_CALL AWE64_StartGuest(int argc,char** argv){
     const char* p=std::getenv("AWE64_AUDIT_SHIM_DIR");
     if(!m||!p)return 91;
     const std::string mode=m;const std::filesystem::path dir=p;
+    if(mode=="candidate"){
+        if(!pcm)return 97;
+        ready.store(true,std::memory_order_release);
+        const int16_t old[8]={24576,24576,24576,24576,24576,24576,24576,24576};
+        for(unsigned n=0;n<10000;++n)pcm(pcmContext,old,4);
+        std::ofstream(dir/"candidate-burst-done").put('1');
+        while(!stop.load(std::memory_order_acquire)&&!std::filesystem::exists(dir/"resume"))
+            std::this_thread::sleep_for(milliseconds(1));
+        const int16_t fresh[8]={8192,-8192,8192,-8192,8192,-8192,8192,-8192};
+        if(!stop.load(std::memory_order_acquire))pcm(pcmContext,fresh,4);
+        while(!stop.load(std::memory_order_acquire))std::this_thread::sleep_for(milliseconds(1));
+        return 0;
+    }
     if(mode=="bootfail"){
         // begin() has already loaded this ABI and launched the worker.
         // Return an actual error without ever opening the UART.

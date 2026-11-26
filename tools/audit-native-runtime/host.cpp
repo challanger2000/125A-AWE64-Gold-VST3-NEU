@@ -18,7 +18,7 @@ int main(int argc,char** argv){
     if(argc!=3)return infra("usage: host mode synthetic-fixture-dir");
     const std::string mode=argv[1];
     const auto dir=std::filesystem::absolute(argv[2]);
-    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom")return infra("mode");
+    if(mode!="normal"&&mode!="stall"&&mode!="recovery"&&mode!="rom"&&mode!="candidate")return infra("mode");
     // These files contain only self-generated fake bytes; use a fresh directory.
     if(!std::filesystem::create_directory(dir))return infra("fresh fixture dir");
     {std::ofstream f(dir/"awe32.raw",std::ios::binary);std::vector<char> zero(1048576,0);f.write(zero.data(),zero.size());}
@@ -28,10 +28,27 @@ int main(int argc,char** argv){
     integration::DosBoxRuntimeHost h;
     // DLL is the explicit controlled fixture beside this executable.
     auto exe=std::filesystem::absolute(argv[0]);
-    if(!h.begin(exe,dir))return infra("real production RuntimeHost::begin");
+    if(!h.begin(exe,dir,{},0,nullptr,std::make_shared<rt::LegacyCaptureGate>(),mode=="candidate"))
+        return infra("real production RuntimeHost::begin");
     if(!wait([&]{return h.ready();}))return infra("shim readiness not observed");
     unsigned failures=0;
-    if(mode=="rom"){
+    if(mode=="candidate"){
+        if(!wait([&]{return std::filesystem::exists(dir/"candidate-burst-done");}))
+            return infra("candidate PCM burst not produced");
+        const auto before=h.audioFramesAvailable();
+        h.startReplacementCapture();
+        std::ofstream(dir/"resume").put('1');
+        const bool received=wait([&]{return h.audioFramesAvailable()>=4;});
+        const auto after=h.audioFramesAvailable();
+        float l[4]{},r[4]{};
+        const auto n=h.readAudio(l,r,4);
+        const bool pass=before==0&&received&&after==4&&n==4&&l[0]==.25f&&r[0]==-.25f;
+        h.stop();
+        std::cout<<"AUDIT_CANDIDATE_PCM_GATE "<<(pass?"PASS":"FAIL")
+                 <<" pre_handover_frames="<<before<<" post_handover_frames="<<after
+                 <<" read="<<n<<std::endl;
+        failures+=!pass;
+    }else if(mode=="rom"){
         std::ifstream info(dir/"rom-path.txt");
         std::string path;std::getline(info,path);
         if(path.empty())return infra("guest ROM argument missing");
