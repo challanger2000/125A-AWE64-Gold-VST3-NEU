@@ -1,5 +1,16 @@
 # Änderungsverlauf
 
+## 26.11.2026 — Auditkorrekturen, Paket 1 (noch nicht nachgetestet)
+
+- Referenz und nachgewiesene Defekte: docs/ADVERSARIAL-AUDIT-0ff0811.md. Keine neue Engine, kein Creative-/EMU8000-Quellpatch, kein GUI-Redesign. Stand bleibt 0.0.0-dev, keine Freigabe.
+- A06-I: akzeptierte SF2-Bytes bei Reaktivierung wiederverwenden; kein unbemerktes erneutes Lesen und Programmwechsel. Explizites Neuladen/setState darf neue Daten akzeptieren. Serialisiertes Format weiterhin pfadbasiert; neue Hostinstanz nach Dateiaustausch noch separat zu prüfen.
+- A01-O: feste MidiBlockBatch auch im Legacy-Pfad, chronologische Reihenfolge nach Host-Offset, bei Gleichstand Controller vor Note. Kein Claim samplegenauer Legacy-Gastzeit; blockweise übrige Parameter und PDC bleiben offen.
+- A07-O: nur kOffline darf begrenzt auf echte Gastbereitschaft und PCM warten; bei fehlenden Frames expliziter Fehler statt erfolgreicher Stille. Legacy-Offline bleibt an die Gast-Wallclock gebunden, nicht schneller/deterministisch samplegenau; Demand-Clock-Forschungsweg unverändert. Realtime ohne neue Warteoperationen.
+- A13: vollständiges 10-Byte-Overlay und absolute Sends als vorhandene GuestCommand-Pakete auf dem Gast-CPU-Thread zwischen MIDI-Paketen übernehmen; kein separater Host-Thread-Write der beiden Hälften während Wiedergabe. Native Register-/PCM-Regression noch erforderlich.
+- A26: Stereo-/Linked-Sample-Referenz muss reziprok, typkompatibel und nicht selbstreferenziell sein. A15/16/20/23: tatsächliche Zahlen/Rate/Deadline/CPU-Sustain-Evidenz erforderlich, kompletter 128er Vergleich mit nichtstummem Referenz- und Ist-Signal, exakte MIDI-Zeitziele und stereo 441-Hz-AC-Oracle, exakt 47 Validator-PASS. Gitlink-Trigger ergänzt. Ursprüngliche sieben Negativkontrollen bleiben aktiv, native drei Gegenproben erneut ausgelöst. Neue Ergebnisse NOT RUN.
+- A24/A25: Original-RAM-Spektraltest fordert dominante Sollfrequenz in beiden Kanälen und abgeklungene letzte Release-Hälfte (RAM-Fixture -2400 Timecents); Original-Dual-Host prüft beide Richtungen mit je frischem Prozess, gleicher Initialisierungsreihenfolge, vertauschter erster Note und Teardown. Keine bloße Pegel- oder doppelte PASS-Ausgabe; native Ausführung noch offen. 
+- Weiter offen: allgemeiner in-process E_Exit/abort/SEH-Schutz A22, GUI-Host-Rejections A12, native Nachweise zu den neuen A24/A25-Orakeln, Private-Build-Provenienz A19, restliche vollständige MIDI-/Host-/Besitzer-Matrix und unabhängiger Nachaudit. Keine FULL-AUDIT-Freigabe.
+
 ## 26.11.2026 — Stabilisierung 7: frühe MIDI-Pakete erst bei primed PCM zustellen
 
 - `51545219`: [Original-Gesamtlauf 45727299084](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45727299084) PASS, Validator 47/47, Cheezoids alle 128 Vergleich PASS, p95 19,161 / 18,9375 / 17,3021 ms (44,1/48/96 kHz), 0 Drops/Underruns; 2822 / 3440 / 3175 Kandidatenframes bewusst vor Handover unterdrückt. [Native ABI 45727299133](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45727299133) Kandidaten-Queue 0/4 PASS. Unit-, SF2- und Versionstests PASS.

@@ -1,9 +1,15 @@
-name: Current adversarial audit - frozen 0ff0811
+name: Adversarial regression - native and oracle controls
 on:
   push:
     branches: [main]
     paths:
       - '.github/workflows/windows-current-adversarial-audit.yml'
+      - 'src/**'
+      - 'integration/**'
+      - 'tests/adversarial-current/**'
+      - 'tests/WindowsCheezoidsSweep.py'
+      - 'tests/WindowsGuestDemandClockSmoke.py'
+      - 'tests/WindowsRunVst3HostPcmSmoke.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,7 +22,7 @@ jobs:
       - name: Build exact portable parser and run independent negative controls
         shell: bash
         run: |
-          test "$(git rev-parse HEAD^)" = 'b311d720de3c80709eb0db33e4b1575bbef34f2b'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           cmake -S . -B build-audit -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
           cmake --build build-audit --target AuditSf2PreflightTest --parallel 2
           python tests/adversarial-current/probes.py build-audit/AuditSf2PreflightTest

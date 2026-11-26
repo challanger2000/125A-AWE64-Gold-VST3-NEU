@@ -5,6 +5,7 @@ Only synthetic (non-Creative) DOS fixtures. No proprietary AWE ROM or private
 owner assets are ever uploaded to the public GitHub Actions worker.
 """
 import argparse
+import math
 import os
 from pathlib import Path
 import re
@@ -100,16 +101,17 @@ def validate_voice_overlay_report(stdout: str):
 def run_dual_creative_command(command: list[str]):
     # Capture native stderr independently: ordinary DOSBox logs are not
     # PowerShell errors. Only native exit and one exact PASS line count.
-    proc = subprocess.run(command, timeout=90, capture_output=True,
-                          text=True, encoding="utf-8", errors="replace",
-                          check=False)
     marker = "REAL_VST3_DUAL_CREATIVE_PCM_LIFECYCLE_PASS"
-    # Print only test-owned result lines; do not publish native guest logs.
-    for line in proc.stdout.splitlines():
-        if line.startswith(("DUAL_VST3_", "REAL_VST3_TWO_ACTIVE_COMPONENTS_")):
-            print(line, flush=True)
-    if proc.returncode or proc.stdout.splitlines().count(marker) != 1:
-        raise RuntimeError(f"Dual original VST3 gate FAILED; exit=0x{proc.returncode & 0xffffffff:08x}")
+    for reverse,direction in (("0","FIRST_TO_SECOND"),("1","SECOND_TO_FIRST")):
+        proc = subprocess.run(command, timeout=90, capture_output=True,
+                              text=True, encoding="utf-8", errors="replace",
+                              check=False,env=dict(os.environ,AWE64_TEST_DUAL_REVERSE=reverse))
+        # Print only test-owned result lines; do not publish native guest logs.
+        for line in proc.stdout.splitlines():
+            if line.startswith(("DUAL_VST3_", "REAL_VST3_TWO_ACTIVE_COMPONENTS_")):
+                print(line, flush=True)
+        if proc.returncode or proc.stdout.splitlines().count(marker)!=1 or proc.stdout.splitlines().count("DUAL_VST3_DIRECTION="+direction)!=1:
+            raise RuntimeError(f"Dual original VST3 {direction} gate FAILED; exit=0x{proc.returncode & 0xffffffff:08x}")
     print(marker, flush=True)
     return True
 
@@ -150,7 +152,24 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
     if original and os.environ.get("AWE64_TEST_VOICE_OVERLAYS") == "1":
         validate_voice_overlay_report(proc.stdout)
     if original and os.environ.get("AWE64_TEST_PERFORMANCE") == "1":
-        if "PERF_HOST_RATE=44100 " in proc.stdout and "REAL_VST3_SUSTAIN_PCM_PASS" not in proc.stdout:
+        def row(pattern):
+            matches=[re.fullmatch(pattern,line) for line in proc.stdout.splitlines()]
+            found=[m.groups() for m in matches if m]
+            if len(found)!=1:raise RuntimeError("Missing or ambiguous numeric performance evidence: "+pattern)
+            return found[0]
+        number=r"([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)"
+        rate,block,cores=map(int,row(r"PERF_HOST_RATE=(\d+) PERF_BLOCK=(\d+) LOGICAL_CPUS=(\d+)"))
+        if rate not in (44100,48000,96000) or str(rate)!=os.environ.get("AWE64_TEST_HOST_RATE",str(rate)) or block!=128 or cores<1:
+            raise RuntimeError("Unexpected performance test configuration")
+        median,p95,maximum=map(float,row("PERF_MIDI_TO_PCM_MEDIAN_MS="+number+" P95_MS="+number+" MAX_MS="+number))
+        callback,overruns,wake=row("PERF_CALLBACK_MAX_MS="+number+r" CALLBACK_DEADLINE_OVERRUNS=(\d+) HOST_WAKE_MAX_LATE_MS="+number)
+        if not all(math.isfinite(v) for v in (median,p95,maximum,float(callback),float(wake))) or not 0<=median<=p95<=maximum or p95>20 or int(overruns)!=0:
+            raise RuntimeError("Latency/deadline evidence failed")
+        for label in ("PERF_PROCESS_ONE_CORE_PERCENT","PERF_32_NOTE_ONE_CORE_PERCENT"):
+            one,total=map(float,row(label+"="+number+" TOTAL_MACHINE_PERCENT="+number))
+            if not 0<one<=100*cores or not 0<total<=100 or not math.isclose(one/cores,total,rel_tol=.001,abs_tol=.001):
+                raise RuntimeError("Invalid CPU evidence")
+        if rate==44100 and proc.stdout.splitlines().count("REAL_VST3_SUSTAIN_PCM_PASS")!=1:
             raise RuntimeError("Original Creative CC64 sustain PCM gate missing")
         rows = [re.fullmatch(r"PERF_QUEUE_BLOCKS=(\d+) AUDIO_DROPPED_FRAMES=(\d+) MIDI_DROPPED_EVENTS=(\d+) UNDERRUN_FRAMES=(\d+)", line) for line in proc.stdout.splitlines()]
         rows = [match.groups() for match in rows if match is not None]

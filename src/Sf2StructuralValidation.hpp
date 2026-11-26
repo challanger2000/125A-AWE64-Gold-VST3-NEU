@@ -172,7 +172,15 @@ inline bool validateSf2Structure(const std::vector<std::uint8_t>& bytes) noexcep
             // Otherwise bounds are absolute sample indices, end exclusive.
             if((loopStart||loopEnd)&&(loopStart<start||loopEnd>end||loopStart>=loopEnd))return false;
         }
-        if(kind!=1 && le16(s+42)>=count-1)return false;
+        if(kind!=1){
+            const auto link=le16(s+42);
+            if(link>=count-1||link==i)return false;
+            const auto* peer=shdr.p+46u*link;
+            const auto peerType=le16(peer+44);
+            const auto expectedKind=kind==2?4u:kind==4?2u:8u;
+            if((peerType&0x7fffu)!=expectedKind||(peerType&0x8000u)!=(type&0x8000u)||
+               le16(peer+42)!=i)return false;
+        }
     }
     return true;
 }

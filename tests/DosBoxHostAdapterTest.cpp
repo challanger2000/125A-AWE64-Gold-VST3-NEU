@@ -1,4 +1,5 @@
 #include "DosBoxHostAdapter.hpp"
+#include "MidiTimeline.hpp"
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -98,4 +99,17 @@ int main(){
  CHECK(integration::DosBoxHostAdapter::pullMidi(&startup,packet,3)==2&&packet[0]==0xc0);
  CHECK(integration::DosBoxHostAdapter::pullMidi(&startup,packet,3)==3&&packet[0]==0x90&&packet[1]==60&&packet[2]==100);
  CHECK(integration::DosBoxHostAdapter::pullMidi(&startup,packet,3)==0&&startup.pulledNoteOns()==1);
+ // Guest-only consumer delivers both halves in a single command before
+ // the following NoteOn, and the next generation after that note.
+ static std::uint64_t observedLo=0;static unsigned observedHi=0;
+ auto commands=std::make_unique<rt::RealtimeQueues>();
+ integration::DosBoxHostAdapter consumer(*commands,nullptr,false,
+     +[](std::uint64_t lo,unsigned hi){observedLo=lo;observedHi=hi;});
+ CHECK(commands->pushMidi(rt::makeVoiceControlCommand(0,0xffffffffffffffffull,0xffff)));
+ CHECK(commands->pushMidi({0,0x90,60,100,3}));
+ CHECK(commands->pushMidi(rt::makeVoiceControlCommand(0,0,0)));
+ CHECK(observedLo==0&&observedHi==0);
+ CHECK(consumer.pullMidi(&consumer,packet,3)==0&&observedLo==0xffffffffffffffffull&&observedHi==0xffff);
+ CHECK(consumer.pullMidi(&consumer,packet,3)==3&&packet[0]==0x90);
+ CHECK(consumer.pullMidi(&consumer,packet,3)==0&&observedLo==0&&observedHi==0);
 }

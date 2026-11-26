@@ -42,6 +42,7 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     rt::HostRateConverter rateConverter_{};
     rt::HostDemandSession hostDemand_{};
     rt::MasterGainPlan legacyMaster_{};
+    rt::MidiBlockBatch legacyMidi_{};
     // Experimental clock path only; native acceptance required before default.
     bool demandRequested_=false;
     std::atomic<unsigned> latencySamples_{0};

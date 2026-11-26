@@ -176,7 +176,8 @@ bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle
         const auto privateDir=integration::DosBoxRuntimeHost::privateAssetsDir(ownBinary);
         std::vector<std::uint8_t> bytes;
         bool adapted=false;
-        if(!selected.empty()&&!validatedBank) {
+        const bool loadFromDisk=!selected.empty()&&!validatedBank;
+        if(loadFromDisk) {
             if(!guest::readExternalSf2(std::filesystem::u8path(selected),bytes,adapted))return false;
             validatedBank=&bytes;
         }
@@ -204,7 +205,7 @@ bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle
         if(runtime_)stopRuntimeLocked();
         if(engine->clocked()&&!hostDemand_.activate()){engine->stop();return false;}
         runtime_=std::move(engine);
-        if(!preparedCatalog)requestedBankBytes_.swap(bytes);
+        if(loadFromDisk)requestedBankBytes_.swap(bytes);
         timedProcessing_.store(wasProcessing,std::memory_order_release);
         demandActive_.store(runtime_->clocked(),std::memory_order_release);
         publishCatalogLocked(std::move(candidate));
@@ -245,7 +246,10 @@ tresult PLUGIN_API DosBoxVst3Shell::setActive(TBool state) {
     std::unique_lock<std::mutex> lifecycle(runtimeMutex_);
     if(state) {
         if(runtime_)return kResultOk;
-        if(!startRuntimeLocked(lifecycle,requestedSoundFont()))return kResultFalse;
+        const auto selected=requestedSoundFont();
+        // Keep accepted validated bytes across deactivate/reactivate.
+        const auto* snapshot=!selected.empty()&&!requestedBankBytes_.empty()?&requestedBankBytes_:nullptr;
+        if(!startRuntimeLocked(lifecycle,selected,snapshot))return kResultFalse;
         return SingleComponentEffect::setActive(true);
     }
     stopRuntimeLocked();
@@ -312,7 +316,9 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     if(!lifecycle.owns_lock()||!runtime_) {
         silence();
         // Do not acknowledge lost musical events during a lifecycle transition.
-        return data.inputEvents&&data.inputEvents->getEventCount()>0?kResultFalse:kResultOk;
+        return data.processMode==kOffline||
+            (data.inputEvents&&data.inputEvents->getEventCount()>0)||
+            (data.inputParameterChanges&&data.inputParameterChanges->getParameterCount()>0)?kResultFalse:kResultOk;
     }
     auto& engine=*runtime_;
     if(engine.clocked())return processTimed(data,engine);
@@ -332,7 +338,18 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     // Only the first actual nonempty host block after replacement opens
     // capture. Until then, even a ready candidate cannot build latency.
     if(data.numSamples>0)engine.startReplacementCapture();
-    const bool ready=engine.ready(data.numSamples>0?static_cast<std::size_t>(data.numSamples):0u);
+    const auto hostBlock=static_cast<std::size_t>(data.numSamples);
+    const bool offline=data.processMode==kOffline;
+    bool ready=engine.ready(hostBlock);
+    // Offline may wait for the native guest; realtime must never wait.
+    if(offline&&hostBlock&&!ready){
+        const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+        while(!ready&&!engine.finished()&&std::chrono::steady_clock::now()<until){
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ready=engine.ready(hostBlock);
+        }
+        if(!ready){silence();return kResultFalse;}
+    }
     if(ready){
         guestStatus_.store(2,std::memory_order_release);
         if(data.numSamples>0)engine.startLegacyMidi();
@@ -402,7 +419,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         std::uint64_t lo=0;
         for(unsigned i=0;i<8;++i)lo|=std::uint64_t(voiceControls_[i].load(std::memory_order_acquire))<<(i*8);
         const unsigned hi=voiceControls_[8].load(std::memory_order_acquire)|(unsigned(voiceControls_[9].load(std::memory_order_acquire))<<8);
-        engine.setVoiceControls(lo,hi);
+        accepted=engine.setVoiceControls(lo,hi)&&accepted;
     }
     const auto bank=bank_.load(std::memory_order_acquire);
     const auto program=program_.load(std::memory_order_acquire);
@@ -419,7 +436,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         if(setupAccepted){initialProgramSent_=true;lastBank_=bank;lastProgram_=program;}
         accepted=setupAccepted&&accepted;
     }
-    engine.setAbsoluteSends(reverbSend_.load(std::memory_order_acquire),chorusSend_.load(std::memory_order_acquire));
+    accepted=engine.setAbsoluteSends(reverbSend_.load(std::memory_order_acquire),chorusSend_.load(std::memory_order_acquire))&&accepted;
     const auto reverb=reverbType_.load(std::memory_order_acquire);
     const auto chorus=chorusType_.load(std::memory_order_acquire);
     if(reverb!=lastReverbType_){
@@ -430,6 +447,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
         if(engine.sendMidi(rt::makeCreativeEffectType(absoluteSamplePosition_,true,chorus)))lastChorusType_=chorus;
         else accepted=false;
     }
+    legacyMidi_.reset();
     if(data.inputParameterChanges)for(int32 i=0;i<data.inputParameterChanges->getParameterCount();++i){
         auto* q=data.inputParameterChanges->getParameterData(i);
         if(q->getParameterId()<rt::midiControllerBase)continue;
@@ -440,7 +458,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
                !rt::makeMappedController(q->getParameterId(),v,absoluteSamplePosition_+static_cast<std::uint64_t>(offset),midi)){
                 accepted=false;continue;
             }
-            if(!engine.sendMidi(midi))accepted=false;
+            if(!legacyMidi_.add(midi,rt::MidiPhase::Controller))accepted=false;
         }
     }
     if(data.inputEvents){
@@ -472,22 +490,34 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
             note=static_cast<std::uint8_t>(pitch);
             const auto when=absoluteSamplePosition_+
                 static_cast<std::uint64_t>(std::clamp(offset,0,data.numSamples));
-            if(!engine.sendMidi({when,static_cast<std::uint8_t>(status|channel),note,velocity,3}))accepted=false;
+            if(!legacyMidi_.add({when,static_cast<std::uint8_t>(status|channel),note,velocity,3},rt::MidiPhase::Note))accepted=false;
         }
     }
+    if(!legacyMidi_.submitLegacy([&engine](const rt::MidiEvent& e) noexcept {return engine.sendMidi(e);}))
+        accepted=false;
     if(data.outputs&&data.numOutputs>0&&data.outputs[0].channelBuffers32&&
        data.outputs[0].numChannels>=2&&data.numSamples>0){
         auto* left=data.outputs[0].channelBuffers32[0];
         auto* right=data.outputs[0].channelBuffers32[1];
         if(left&&right){
+            const auto need=rateConverter_.requiredInputFrames(hostBlock);
+            if(offline&&(!ready||!engine.waitForAudio(need,true))){
+                engine.requestMidiRecovery();silence();return kResultFalse;
+            }
             engine.measureQueueBeforeBlock();
             // Preserve native mixer samples at 44.1 kHz. For higher host
             // rates convert the original final PCM, not the chip clock.
             if(!ready){std::fill_n(left,data.numSamples,0.f);std::fill_n(right,data.numSamples,0.f);}
-            else if(rateConverter_.bypass())engine.readAudio(left,right,static_cast<std::size_t>(data.numSamples));
-            else rateConverter_.render(left,right,static_cast<std::size_t>(data.numSamples),[&engine]() noexcept {
-                rt::StereoFrame f{};engine.readAudio(&f.left,&f.right,1);return f;
-            });
+            else if(rateConverter_.bypass()){
+                const auto read=engine.readAudio(left,right,hostBlock);
+                if(offline&&read!=hostBlock){engine.requestMidiRecovery();silence();return kResultFalse;}
+            }else{
+                bool full=true;
+                rateConverter_.render(left,right,hostBlock,[&engine,&full]() noexcept {
+                    rt::StereoFrame f{};if(engine.readAudio(&f.left,&f.right,1)!=1)full=false;return f;
+                });
+                if(offline&&!full){engine.requestMidiRecovery();silence();return kResultFalse;}
+            }
             engine.measureQueueAfterBlock();
             legacyMaster_.apply(left,right);
             auto& out=data.outputs[0];

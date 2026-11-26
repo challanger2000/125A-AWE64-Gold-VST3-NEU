@@ -168,13 +168,12 @@ public:
         // returned. The native MPU pump contract is part of integration QA.
         if(ev.command!=rt::GuestCommand::Midi) {
             if(!queue.popMidi(ev))return 0u;
-            if(self->clocked_) {
-                recordLate();
-                if(ev.command==rt::GuestCommand::VoiceControls&&self->voiceControls_)
-                    self->voiceControls_(ev.controlLo,ev.controlHi&65535u);
-                else if(ev.command==rt::GuestCommand::AbsoluteSends&&self->sends_)
-                    self->sends_(static_cast<unsigned>(ev.controlLo)&65535u);
-            }
+            recordLate();
+            // Legacy and clocked controls run on the guest CPU thread.
+            if(ev.command==rt::GuestCommand::VoiceControls&&self->voiceControls_)
+                self->voiceControls_(ev.controlLo,ev.controlHi&65535u);
+            else if(ev.command==rt::GuestCommand::AbsoluteSends&&self->sends_)
+                self->sends_(static_cast<unsigned>(ev.controlLo)&65535u);
             return 0; // no synthetic byte sent to the original guest
         }
         if(ev.status==0xf0u) {

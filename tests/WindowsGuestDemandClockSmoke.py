@@ -4,6 +4,7 @@ The parent is bounded; no trace, audio, guest bytes or native guest logs are pub
 Requires the baseline test helpers in tests/ and the augmented runtime DLL.
 """
 import argparse
+import math
 from array import array
 import ctypes as C
 import os
@@ -24,10 +25,24 @@ def analyze(samples, deliveries):
         part=samples[2*start:2*end]
         if len(part)!=2*(end-start):raise RuntimeError('Incomplete PCM window')
         return (sum(v*v for v in part)/len(part))**.5
-    if len(deliveries)!=6:raise RuntimeError('Missing or duplicate MIDI packets')
+    if [target for target,_ in deliveries]!=[0,0,4410,17640,48510,61740]:
+        raise RuntimeError('Missing, duplicate or wrong MIDI targets')
     for target,actual in deliveries:
         if not target<=actual<=target+2*TICK_MAX:
             raise RuntimeError('Guest MIDI deadline violated')
+    # Independently generated 441 Hz RAM sine: verify genuine AC in both
+    # channels rather than accepting DC or arbitrary noise as a tone.
+    for start in (8000,52100):
+        for ch in (0,1):
+            part=samples[2*start+ch:2*(start+6000):2]
+            if len(part)!=6000:raise RuntimeError('Incomplete tone window')
+            mean=sum(part)/len(part)
+            ac=[x-mean for x in part]
+            power=sum(x*x for x in ac)
+            re=sum(x*math.cos(2*math.pi*441*i/RATE) for i,x in enumerate(ac))
+            im=sum(x*math.sin(2*math.pi*441*i/RATE) for i,x in enumerate(ac))
+            if power<10000*len(part) or 2*(re*re+im*im)<.5*len(part)*power:
+                raise RuntimeError('Expected stereo RAM tone absent')
     a=rms(8000,14000);b=rms(52100,58100);idle=rms(37000,40000)
     if min(a,b)<100 or idle>min(a,b)*.05 or not .85<=a/b<=1.15:
         raise RuntimeError('Held-note PCM / release oracle failed')

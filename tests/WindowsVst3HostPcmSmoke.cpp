@@ -373,11 +373,17 @@ int main(int argc,char** argv) {
                 p->release();c->release();return true;
             }
         };
-        Slot a(component,processor),b(second,secondProc);
-        if(!a.setup(dualOriginal,1.)||!b.setup(dualOriginal,.6)||
-           !a.activate()||!b.activate())return fail("Dual VST3 activation failed");
-        if(std::abs(a.control->getParamNormalized(1001)-1.)>1.e-6||
-           std::abs(b.control->getParamNormalized(1001)-.6)>1.e-6)
+        Slot first(component,processor),secondSlot(second,secondProc);
+        if(!first.setup(dualOriginal,1.)||!secondSlot.setup(dualOriginal,.6)||
+           !first.activate()||!secondSlot.activate())return fail("Dual VST3 activation failed");
+        const char* reverseEnv=std::getenv("AWE64_TEST_DUAL_REVERSE");
+        const bool reverse=reverseEnv&&std::strcmp(reverseEnv,"1")==0;
+        // Initialization and activation order stay fixed. Reverse which
+        // physical component receives the first note and is removed.
+        auto& a=reverse?secondSlot:first;auto& b=reverse?first:secondSlot;
+        std::cout<<"DUAL_VST3_DIRECTION="<<(reverse?"SECOND_TO_FIRST":"FIRST_TO_SECOND")<<"\n";
+        if(std::abs(first.control->getParamNormalized(1001)-1.)>1.e-6||
+           std::abs(secondSlot.control->getParamNormalized(1001)-.6)>1.e-6)
             return fail("Dual VST3 controller values leaked");
         std::cout<<"REAL_VST3_TWO_ACTIVE_COMPONENTS_PASS\n";
         auto window=[&](unsigned blocks,bool noteA=false,bool noteB=false){
@@ -685,6 +691,8 @@ int main(int argc,char** argv) {
     float peak=0.;
     double idleEnergy=0., noteEnergy=0., releaseEnergy=0.;
     double expectedTonePower=0., otherTonePower=0.;
+    double expectedStereo[2]{},totalStereo[2]{},settledReleaseEnergy=0.;
+    std::uint64_t settledReleaseFrames=0;
     std::uint64_t toneBlocks=0;
     std::uint64_t idleFrames=0,noteFrames=0,releaseFrames=0,activeNoteBlocks=0,nearFullScale=0;
     const auto scaleBlocks=[hostRate](unsigned n){return static_cast<unsigned>(std::ceil(n*hostRate/44100.));};
@@ -1328,6 +1336,7 @@ int main(int argc,char** argv) {
         called=true;
         double blockEnergy=0.;
         double er=0.,ei=0.,orr=0.,oi=0.;
+        double re[2]{},im[2]{},energy[2]{};
         const bool measureTone=ramHz>0.&&block>=startNoteBlock+20&&block<stopNoteBlock-10;
         for(std::size_t i=0;i<l.size();++i) {
             const float v=std::max(std::abs(l[i]),std::abs(r[i]));
@@ -1336,8 +1345,14 @@ int main(int argc,char** argv) {
                 const double x=0.5*(l[i]+r[i]);
                 const double a=2.*pi*ramHz*i/hostRate;
                 const double b=2.*pi*(ramHz==735.?441.:735.)*i/hostRate;
-                er+=x*std::cos(a);ei+=x*std::sin(a);
+                const double ca=std::cos(a),sa=std::sin(a);
+                er+=x*ca;ei+=x*sa;
                 orr+=x*std::cos(b);oi+=x*std::sin(b);
+                const double channels[]{l[i],r[i]};
+                for(unsigned ch=0;ch<2;++ch){
+                    const auto v=channels[ch];
+                    re[ch]+=v*ca;im[ch]+=v*sa;energy[ch]+=v*v;
+                }
             }
             if(!std::isfinite(l[i])||!std::isfinite(r[i])||v>1.01f) {
                 std::cerr<<"PCM_LIMIT_FAILURE_BLOCK="<<block<<" SAMPLE="<<i<<" PEAK="<<v<<" HOST_RATE="<<hostRate<<"\n";
@@ -1350,13 +1365,22 @@ int main(int argc,char** argv) {
                 blockEnergy+=e;
                 if(block>=warmupBlocks && block<startNoteBlock){idleEnergy+=e;++idleFrames;}
                 else if(block>=startNoteBlock && block<stopNoteBlock){noteEnergy+=e;++noteFrames; if(v>=0.9999f)++nearFullScale;}
-                else if(block>=stopNoteBlock){releaseEnergy+=e;++releaseFrames;}
+                else if(block>=stopNoteBlock){
+                    releaseEnergy+=e;++releaseFrames;
+                    if(block>=stopNoteBlock+tailBlocks/2){settledReleaseEnergy+=e;++settledReleaseFrames;}
+                }
             }
             if(!originalMode || block>=startNoteBlock){peak=std::max(peak,v);if(v>0.0001f)++nonzero;}
         }
         if(originalMode && block>=startNoteBlock && block<stopNoteBlock &&
            blockEnergy/l.size()>0.000001)++activeNoteBlocks;
-        if(measureTone){expectedTonePower+=er*er+ei*ei;otherTonePower+=orr*orr+oi*oi;++toneBlocks;}
+        if(measureTone){
+            expectedTonePower+=er*er+ei*ei;otherTonePower+=orr*orr+oi*oi;++toneBlocks;
+            for(unsigned ch=0;ch<2;++ch){
+                expectedStereo[ch]+=re[ch]*re[ch]+im[ch]*im[ch];
+                totalStereo[ch]+=energy[ch];
+            }
+        }
         frames+=l.size();
         if(!originalMode && !exclusionMode && peak>minimumPeak&&nonzero>=512)break;
         if(originalMode) {
@@ -1398,6 +1422,24 @@ int main(int argc,char** argv) {
                  <<" RAM_OTHER_POWER="<<otherTonePower<<" RAM_TONE_BLOCKS="<<toneBlocks<<"\n";
         if(toneBlocks<20||expectedTonePower<0.01||expectedTonePower<otherTonePower*8.)
             return fail("RAM fixture spectral signature missing or incorrect program played");
+        // The fixed RAM fixture contains a bipolar 441/735 Hz sine in
+        // mono routed to stereo and a -2400 timecent release (~0.25 s).
+        // Require genuine tone energy in BOTH channels, not merely a
+        // small projection stronger than the one alternative frequency.
+        // Wet endpoint tests intentionally permit a long reverb tail and
+        // modulation sidebands; their independent register tests stay active.
+        if(!sendTest||sendPair==0){
+            for(unsigned ch=0;ch<2;++ch){
+                if(totalStereo[ch]<1.e-6||
+                   2.*expectedStereo[ch]<.5*l.size()*totalStereo[ch])
+                    return fail("RAM expected frequency not dominant in both channels");
+            }
+            const auto late=settledReleaseFrames?std::sqrt(settledReleaseEnergy/settledReleaseFrames):1.;
+            const auto held=noteFrames?std::sqrt(noteEnergy/noteFrames):0.;
+            if(!settledReleaseFrames||held<.001||late>held*.1)
+                return fail("RAM settled NoteOff/release failed");
+            std::cout<<"RAM_STEREO_TONE_AND_SETTLED_RELEASE_PASS late="<<late<<" held="<<held<<"\n";
+        }
         std::cout<<"REAL_VST3_RAM_SAMPLE_SPECTRAL_PASS\n";
     }
     if(!called||peak<=minimumPeak||nonzero<512)

@@ -154,6 +154,15 @@ def vst3(bundle,exe,source,work):
 def compare(ref,actual):
     # Do not require arbitrary one-shot presets to sustain. Compare each
     # held note against the same original driver. Flag >20 dB discrepancies.
+    if set(ref)!=set(range(128)) or set(actual)!=set(ref):
+        raise RuntimeError("Incomplete Cheezoids preset coverage")
+    if any(len(v)!=2 or any(not math.isfinite(x) or x<0 for x in v)
+           for bank in (ref,actual) for v in bank.values()):
+        raise RuntimeError("Invalid Cheezoids RMS evidence")
+    silent_pairs=[p for p in ref if max(*ref[p],*actual[p])<.0005]
+    if not any(max(v)>=.0005 for v in ref.values()) or not any(max(v)>=.0005 for v in actual.values()):
+        raise RuntimeError("Silent reference or actual bank; no envelope proof")
+    print("CHEEZ_SILENT_PAIRS_NOT_VERIFIED="+str(silent_pairs))
     ref_bleep=[]; vst_bleep=[]; lost=[]; mismatch=[]
     for p,(a,b) in ref.items():
         x,y=actual[p]

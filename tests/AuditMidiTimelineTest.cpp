@@ -62,6 +62,14 @@ int main(){
     CHECK(pull()==3&&out[0]==0xb0&&out[2]==0);CHECK(pull()==0);
     CHECK(adapter.lateMidi()==1&&adapter.maxLateFrames()==3);
     std::puts("UART gate: no early delivery; sorted offsets; stable equal-offset phases; late-frame telemetry PASS");
+    CHECK(batch.add({511,0xb0,7,127,3},rt::MidiPhase::Controller));
+    CHECK(batch.add({0,0x90,60,100,3},rt::MidiPhase::Note));
+    unsigned ordered=0;
+    CHECK(batch.submitLegacy([&](const rt::MidiEvent& e){
+        const bool correct=ordered==0?e.status==0x90:e.status==0xb0;
+        ++ordered;return correct;
+    }));
+    CHECK(ordered==2);
     // Future backlog must not prevent overload recovery. One active note is
     // already delivered. Reject the future queue, explicitly release it.
     for(unsigned i=0;i<4096;++i){rt::MidiEvent event{0,0x90,61,100,3};event.guestFrame=999999999;CHECK(q->pushMidi(event));}

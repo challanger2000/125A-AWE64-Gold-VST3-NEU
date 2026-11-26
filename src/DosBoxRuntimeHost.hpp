@@ -512,16 +512,21 @@ public:
     [[nodiscard]] int guestExitCode() const noexcept {
         return guestExitCode_.load(std::memory_order_acquire);
     }
-    void setVoiceControls(std::uint64_t lo,unsigned hi) noexcept {
+    bool setVoiceControls(std::uint64_t lo,unsigned hi) noexcept {
         if(authenticGuest_&&voiceControls_&&(lo!=lastVoiceLo_||hi!=lastVoiceHi_)){
-            voiceControls_(lo,hi);lastVoiceLo_=lo;lastVoiceHi_=hi;
+            // Guest thread consumes the complete 10-byte control packet.
+            if(!sendMidi(rt::makeVoiceControlCommand(0,lo,hi)))return false;
+            lastVoiceLo_=lo;lastVoiceHi_=hi;
         }
+        return true;
     }
-    void setAbsoluteSends(unsigned reverb,unsigned chorus) noexcept {
+    bool setAbsoluteSends(unsigned reverb,unsigned chorus) noexcept {
         const unsigned packed=(reverb&255u)|((chorus&255u)<<8);
         if(authenticGuest_&&sends_&&packed!=lastSends_) {
-            sends_(packed);lastSends_=packed;
+            if(!sendMidi(rt::makeAbsoluteSendCommand(0,packed)))return false;
+            lastSends_=packed;
         }
+        return true;
     }
     [[nodiscard]] bool clocked() const noexcept {return demandLead_!=0;}
     [[nodiscard]] unsigned demandLead() const noexcept {return demandLead_;}
@@ -669,8 +674,8 @@ public:
     bool running() const noexcept {return core_&&core_->running();}
     bool finished() const noexcept {return !core_||core_->finished();}
     int guestExitCode() const noexcept {return core_?core_->guestExitCode():-1;}
-    void setVoiceControls(std::uint64_t lo,unsigned hi) noexcept {if(core_)core_->setVoiceControls(lo,hi);}
-    void setAbsoluteSends(unsigned r,unsigned c) noexcept {if(core_)core_->setAbsoluteSends(r,c);}
+    bool setVoiceControls(std::uint64_t lo,unsigned hi) noexcept {return core_&&core_->setVoiceControls(lo,hi);}
+    bool setAbsoluteSends(unsigned r,unsigned c) noexcept {return core_&&core_->setAbsoluteSends(r,c);}
     bool clocked() const noexcept {return core_&&core_->clocked();}
     unsigned demandLead() const noexcept {return core_?core_->demandLead():0;}
     std::uint64_t guestFrames() const noexcept {return core_?core_->guestFrames():0;}

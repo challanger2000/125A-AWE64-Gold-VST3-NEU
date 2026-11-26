@@ -66,9 +66,7 @@ public:
             if(e.command==GuestCommand::Midi&&(e.status&0xf0u)==0x90u&&e.data2)return true;}
         return false;
     }
-    bool submit(const MidiTimeline& timeline,RealtimeQueues& queue) noexcept {
-        if(!invalid_)for(unsigned i=0;i<size_;++i)if(!timeline.stamp(entries_[i].event)){invalid_=true;break;}
-        if(invalid_){queue.requestMidiRecovery();reset();return false;}
+    void order() noexcept {
         const auto compare=[](const Entry& a,const Entry& b) noexcept {
             if(a.event.absoluteHostSample!=b.event.absoluteHostSample)return a.event.absoluteHostSample<b.event.absoluteHostSample;
             if(a.phase!=b.phase)return a.phase<b.phase;
@@ -77,6 +75,19 @@ public:
         // In-place heapsort: bounded O(n log n), no recursion/auxiliary buffer.
         std::make_heap(entries_.begin(),entries_.begin()+size_,compare);
         std::sort_heap(entries_.begin(),entries_.begin()+size_,compare);
+    }
+    template<class Send> bool submitLegacy(Send&& send) noexcept {
+        if(invalid_){reset();return false;}
+        order();
+        bool ok=true;
+        // Journal all rejected persistent controls, not only the first.
+        for(unsigned i=0;i<size_;++i)if(!send(entries_[i].event))ok=false;
+        reset();return ok;
+    }
+    bool submit(const MidiTimeline& timeline,RealtimeQueues& queue) noexcept {
+        if(!invalid_)for(unsigned i=0;i<size_;++i)if(!timeline.stamp(entries_[i].event)){invalid_=true;break;}
+        if(invalid_){queue.requestMidiRecovery();reset();return false;}
+        order();
         bool ok=true;
         for(unsigned i=0;i<size_;++i)if(!queue.pushMidi(entries_[i].event)){ok=false;break;}
         reset();return ok;
