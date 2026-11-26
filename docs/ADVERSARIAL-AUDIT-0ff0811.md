@@ -1,0 +1,18 @@
+# Adversarial Nachaudit — 26.11.2026 — Arbeitsnachweis
+
+Frozen product `0ff08116701efd831b9fca00970f8b059ae9b9af`, tree `d4bab55d67be76643230d48d41a1abea2e2bd947`, audit-only parent `b311d720de3c80709eb0db33e4b1575bbef34f2b`. Engineering `53b10bd4a81fe6c5d62e110b932aef7155172ad6`. Previous complete reading receipts at identical mandatory blobs used for same-agent self-challenge, not second independent reviewer. Current START-HERE and AUDIT-COMPLETENESS-CONTRACT reread. Prior audit A01–A25 remains part of the scope. Product version 0.0.0-dev; no release baseline exists. New audit-only workflow, frozen product sources unchanged. Test-only native host and synthetic DLL replace test targets only in disposable runner. No owner files; no proprietary assets. This is not a full-audit certificate.
+
+## Existing exact evidence
+- [45731174304](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45731174304) all original archival tests PASS, 47/47 validator, 128/128 Cheezoids envelope, p95 18.9569/18.6042/18.625ms zero drops/underruns.
+- [45731174350](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45731174350) all eight native runtime cases including three cold startup PASS; [45731174401](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45731174401) deterministic ABI PASS; [45731174280](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45731174280) SF2 state PASS; [45731174284](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45731174284) portable unit PASS; [45731174298](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45731174298) version PASS.
+- [45734851189](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45734851189) independent P74 technical baseline PASS on pinned product synthetic assets, not feature completeness, non-silent reference PCM, hardware or DAW.
+
+## New targeted tests (results NOT RUN at commit)
+- A01: two MIDI events within a host block, earlier CC vs earlier note; exact actual ABI byte order with independently expected offset ordering. Controlled recorder DLL, not real Creative PCM.
+- A07: default offline-mode fast render vs real synthetic DOSBox realtime positive control; no test-only demand-clock opt-in.
+- A06: valid accepted external bank program0, file subsequently replaced by valid program17 before activation. Reject or preserve accepted identity, not silently switch.
+- A15/16/20/23: real existing Python/regex oracles challenged with positive and invalid reports, silent reference, DC, duplicate events, missing numeric evidence, reduced validator coverage. These test oracles, not real sound failures.
+- A26: SF2 actual portable preflight target, valid and invalid-loop controls, malformed self-linked stereo sample.
+- A22: in-process unhandled native fatal paths remain statically open beyond preflight; no general crash isolation proof. A12 GUI host rejection, A13 coherent overlays, A14 linked upstream/license, A19 local build provenance, A24 release/stereo/spectral and A25 reciprocal isolation need remaining evidence. Physical ASIO, owner assets, Studio Pro and Plugin Tester not executed here. Completion contract blocks FULL AUDIT/RELEASE.
+
+Scope inventory is not complete: prior audit reviewed product files at old baseline, changed integration/runtime/SF2 state reviewed again, but entire pinned upstream compile/link closure and all GUI-generated compatibility paths and tests have not been independently inspected on this revision. No source review complete claimed. No additional build of expensive original reference sweep triggered by this commit. 

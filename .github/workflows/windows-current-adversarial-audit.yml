@@ -1,0 +1,132 @@
+name: Current adversarial audit - frozen 0ff0811
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/windows-current-adversarial-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  portable-oracles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build exact portable parser and run independent negative controls
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD^)" = 'b311d720de3c80709eb0db33e4b1575bbef34f2b'
+          cmake -S . -B build-audit -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build build-audit --target AuditSf2PreflightTest --parallel 2
+          python tests/adversarial-current/probes.py build-audit/AuditSf2PreflightTest
+  windows-real-vst3:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: microsoft/setup-msbuild@v2
+      - name: Confirm original DOSBox-X SHA
+        shell: pwsh
+        run: |
+          $sha=(git -C third_party/dosbox-x-AWE32 rev-parse HEAD).Trim()
+          if ($sha -ne 'f3a95b9f19a7f9863295e6481f271cf04733c635') { throw "Unexpected upstream SHA $sha" }
+      - name: Patch only GitHub runner working tree
+        shell: pwsh
+        run: |
+          python integration/patch_dosbox_runtime.py third_party/dosbox-x-AWE32
+          if ($LASTEXITCODE -ne 0) { throw "Source patch failed" }
+      - name: Check private Creative-only setup script PowerShell syntax without original files
+        shell: pwsh
+        run: |
+          $t = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/Run-Private-Creative-AWE-Test.ps1').Path,[ref]$t,[ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count -gt 0) { throw ('Private staging PowerShell syntax error: ' + ($parseErrors | Out-String)) }
+      - name: Restore compiled OPEN-SOURCE DOSBox-X SDL2 DLL cache (NO owner ROM/SF2/Creative)
+        id: original-dosbox-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll
+          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('integration/patch_dosbox_runtime.py','research/p165-control-port/VoiceOverlay.hpp') }}
+      - name: Build in-process x64 DOSBox-X-AWE32 DLL
+        if: steps.original-dosbox-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        working-directory: third_party/dosbox-x-AWE32
+        run: |
+          msbuild vs/dosbox-x.sln -t:dosbox-x:Rebuild '-p:Configuration=Release SDL2' -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m:4
+          if ($LASTEXITCODE -ne 0) { throw "DOSBox runtime DLL compilation failed" }
+          if (-not (Test-Path 'bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll')) { throw "Runtime DLL not found" }
+      - name: Save compiled OPEN-SOURCE DOSBox-X SDL2 DLL after successful build
+        if: steps.original-dosbox-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll
+          key: awe64-original-sdl2-msvc-2022-f3a95b9-${{ hashFiles('integration/patch_dosbox_runtime.py','research/p165-control-port/VoiceOverlay.hpp') }}
+      - name: Compile VST3 host and stage original internal DOSBox-X runtime DLL
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch v3.7.12_build_20 --recurse-submodules --shallow-submodules https://github.com/steinbergmedia/vst3sdk.git "$env:RUNNER_TEMP\vst3sdk"
+          if ($LASTEXITCODE -ne 0) { throw "VST3 SDK acquisition failed" }
+          Copy-Item tests/adversarial-current/NativeHost.cpp tests/WindowsVst3HostPcmSmoke.cpp -Force
+          cmake -S . -B build-vst3 -G "Visual Studio 17 2022" -A x64 -DAWE64_BUILD_VST3_DEV=ON -DAWE64_VST3SDK="$env:RUNNER_TEMP\vst3sdk" -DBUILD_TESTING=OFF
+          if ($LASTEXITCODE -ne 0) { throw "VST3 configuration failed" }
+          cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev awe64_vst3_host_pcm_smoke --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw "VST3 Windows build failed" }
+          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win'
+          $native='third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
+          if (-not (Test-Path $native)) { throw "Original DOSBox DLL not built" }
+          if (-not (Test-Path (Join-Path $bundle 'AWE64GoldDOSBoxDev.vst3'))) { throw "VST3 host binary missing" }
+          Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
+          if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
+          Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
+      - name: Build synthetic ABI recorder in disposable tree
+        shell: pwsh
+        run: |
+          Copy-Item tests/adversarial-current/FaultDLL.cpp tools/audit-native-runtime/fault_dll.cpp -Force
+          cmake -S tools/audit-native-runtime -B build-audit-shim -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'Shim configure failed' }
+          cmake --build build-audit-shim --config Release --target AWE64DOSBoxRuntime --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'Shim build failed' }
+      - name: Actual VST3 default offline render, accepted bank identity and MIDI ordering
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $bundle=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3').Path
+          python tests/MakeSyntheticDemoExe.py --bundle $bundle
+          if ($LASTEXITCODE -ne 0) { throw 'Synthetic fixture staging failed' }
+          $fixtures=Join-Path $env:RUNNER_TEMP 'current-audit-banks'
+          @'
+          import runpy,sys
+          sys.argv=['tests/MakeAuditSf2Cases.py',sys.argv[1]]
+          f=runpy.run_path(sys.argv[0])
+          f['write']('program17',lambda l:f['mutate'](l[b'pdta'],b'phdr',20,'<H',17))
+          '@ | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\current-fixtures.py"
+          python "$env:RUNNER_TEMP\current-fixtures.py" $fixtures
+          if ($LASTEXITCODE -ne 0) { throw 'SF2 fixtures failed' }
+          $plugin=Join-Path $bundle 'Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3'
+          $dll=Join-Path $bundle 'Contents/x86_64-win/AWE64DOSBoxRuntime.dll'
+          $exe=(Get-ChildItem build-vst3 -Recurse -Filter awe64_vst3_host_pcm_smoke.exe | Select-Object -First 1).FullName
+          $env:SDL_AUDIODRIVER='dummy'
+          $env:AWE64_TEST_PERFORMANCE='1'
+          Remove-Item Env:AWE64_TEST_HOST_DEMAND_CLOCK -ErrorAction SilentlyContinue
+          $bank=Join-Path $fixtures 'valid.sf2'
+          $failed=@()
+          & $exe $plugin early $bank
+          if ($LASTEXITCODE -ne 0) { throw 'Realtime fixture positive control failed' }
+          foreach($mode in @('offline','bankreplace')){
+            & $exe $plugin $mode $bank
+            if ($LASTEXITCODE -ne 0) { $failed += "$mode=$LASTEXITCODE" }
+          }
+          # Only the disposable synthetic VST3 bundle receives test DLL.
+          Copy-Item (Resolve-Path 'build-audit-shim/Release/AWE64DOSBoxRuntime.dll') $dll -Force
+          $env:AWE64_AUDIT_SHIM_MODE='eventorder'
+          $env:AWE64_AUDIT_SHIM_DIR=Join-Path $env:RUNNER_TEMP 'current-audit-midi'
+          New-Item -ItemType Directory $env:AWE64_AUDIT_SHIM_DIR | Out-Null
+          & $exe $plugin eventorder $bank
+          if ($LASTEXITCODE -ne 0) { $failed += "eventorder=$LASTEXITCODE" }
+          Write-Host "ADVERSARIAL_NATIVE_FAILURES=$failed"
+          if ($failed.Count -ne 0) { throw 'Actual native adversarial audit found failures or infrastructure gaps; inspect individual evidence' }
