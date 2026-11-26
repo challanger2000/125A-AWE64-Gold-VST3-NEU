@@ -1,13 +1,21 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
 **Produkt:** 125A AWE64 Gold (Windows x64 VST3, DOSBox-X)  
-**Stand:** 26.11.2026  
+**Stand:** 27.11.2026  
 **Entwicklungskennung:** `0.0.0-dev`  
-**Release / abgenommenes Instrument:** **NEIN – Audit-Korrekturkandidat, PARTIAL / NOT VERIFIED; native Abnahme offen, NO-GO**  
+**Release / abgenommenes Instrument:** **NEIN – neutrale Paketrevision noch nicht abgenommen; Klangreferenz 609ab17, CPU-Optimierung offen**  
 **Einziger Branch:** `main`  
 **Exakter neuester Quellstand:** [oberster Commit auf main](../../commits/main) (nicht auf eine veraltende SHA im Text verlassen)
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
+
+## 27.11.2026 — Neutrale Produktidentität und Paketstruktur (vor CPU-Optimierung)
+
+- Klangreferenz: `609ab17525a986c2c4a55106724e87b3ec098764`. Besitzer in Studio Pro: Klang derzeit einwandfrei und besser als frühere Fassungen. Bei 512 Samples ca. 15 % Leerlauf, bis 30 % einzelne Bassnote, ca. 50 % polyphon (Studio-Pro-Anzeige, nicht Gesamt-CPU). Performance-Optimierung ist ausdrücklich ein separater nächster Auftrag.
+- Codex-Nachaudit GO zum Praxistest; unabhängiger Test Lab [45903818521](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45903818521) TECHNICAL_BASELINE_PASS auf aabcc09; privater 609ab17-Build [45908493969](https://github.com/challanger2000/125A-Engineering/actions/runs/45908493969) SUCCESS, 47/47 Validator. Vorherige Nachweise gelten nicht automatisch für die neue Paketrevision.
+- Produktname und VST3-Bundle: `125A AWE64 Gold`; Hersteller `125A Systems`. Gleiche VST3-Klassen-ID 125A8600F0074AEEB64A000000000D01, keine State-/Parameter-/DSP-/GUI-/Emulationsänderung. Interne CMake-Targetnamen und Original-Upstream-Dateinamen bleiben reine Build-Details. Unveränderte gepinnte DOSBox-X-Quellen und Lizenznachweise.
+- Installiertes Bundle: `Contents/x86_64-win/125A AWE64 Gold.vst3`, `Engine.dll`, `Contents/Resources/ROM/awe32.raw`, `Driver.exe`, `SYNTHGM.SF2`. Driver.exe ist die byteidentische Creative-Archivdatei DOS/DEMO/DEMO.EXE; bestehende Hashprüfungen unverändert, DOS-Aufruf /SBK: unverändert. Workspace-PRIVATE bleibt weiterhin gitignorierter Arbeitsbereich, nicht Lieferordner. Die alte installierte Struktur wird nicht als neue akzeptiert. Temporäre FXDEMO-Datei ist weiterhin ein technisches Detail der bisherigen SysEx-Reparatur, kein Lieferbestandteil.
+- Aktuelle Tests/Workflows prüfen neue Pfade, echte VST3-Factory-Metadaten und sauberes Paket vor synthetischen/Original-Fixtures. Historische Cold-start-Vergleichsworkflow-Pins bleiben bewusst unverändert. Originaldaten nur lokal; kein Upload befüllter Bundles oder proprietärer Bytes, kein öffentliches Release. Neues Windows-Build-/Originaltestresultat und neuer Studio-Pro-Recall noch NOT RUN. Kein FINAL, interne Entwicklungsversion 0.0.0-dev bleibt.
 
 ## 26.11.2026 — Vollständige Originalregression erfolgreich; unabhängige Abschlussprüfung
 

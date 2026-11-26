@@ -2,6 +2,8 @@
 
 **Gültig ab 23.11.2026.**
 
+**27.11.2026 – neue installierte Struktur:** `125A AWE64 Gold.vst3/Contents/Resources/ROM/` mit `awe32.raw`, `Driver.exe` (byteidentisches archiviertes `DEMO.EXE`) und `SYNTHGM.SF2`. `PRIVATE/` bleibt der nicht versionierte Arbeitsbereich; frühere Pfade/Dateinamen in historischen Beispielen beziehen sich auf alte Revisionen. Keine Originalbytes in GitHub; neue Paketprüfung noch ausstehend.
+
 **Aktuelle Prüfentscheidung 23.11.2026 (hat Vorrang vor früheren rein synthetischen CI-Regeln):** Der Nutzer verlangt Fortsetzung des P30-Forschungswegs. Ausschließlich die unabhängig öffentlich auffindbaren, hashverifizierten Archiv-Referenzdateien dürfen temporär im isolierten Windows-Archivtest verwendet werden. Keine privaten Nutzerdateien in CI, kein Upload von Creative-/ROM-/SF2-Bytes, Audio, Traces, Logs oder befüllten Bundles; kein Release. Der alte synthetische Positiv-/Negativtest bleibt getrennt. Ein Original-Archivtest-PASS ist kein Besitzer-/DAW-/Hardwaretreue-PASS. Der neue Lauf ist noch nicht abgeschlossen.
 
 

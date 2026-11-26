@@ -22,7 +22,7 @@ int main(int argc,char** argv){
     // These files contain only self-generated fake bytes; use a fresh directory.
     if(!std::filesystem::create_directory(dir))return infra("fresh fixture dir");
     {std::ofstream f(dir/"awe32.raw",std::ios::binary);std::vector<char> zero(1048576,0);f.write(zero.data(),zero.size());}
-    std::ofstream(dir/"DEMO.EXE",std::ios::binary).put('X');
+    std::ofstream(dir/"Driver.exe",std::ios::binary).put('X');
     std::ofstream(dir/"SYNTHGM.SF2",std::ios::binary).put('X');
     _putenv_s("AWE64_AUDIT_SHIM_MODE",mode.c_str());_putenv_s("AWE64_AUDIT_SHIM_DIR",dir.string().c_str());
     integration::DosBoxRuntimeHost h;

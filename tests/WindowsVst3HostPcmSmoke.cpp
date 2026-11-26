@@ -1,7 +1,7 @@
 #include "../src/PerfCpuMeasurement.hpp"
 // REAL VST3-host audio-callback gate with an explicitly NON-CREATIVE DOS fixture.
 //
-// Loads the exact compiled AWE64GoldDOSBoxDev.vst3 Windows binary, creates
+// Loads the exact compiled 125A AWE64 Gold.vst3 Windows binary, creates
 // an IComponent/IAudioProcessor through the actual Steinberg factory, starts
 // the actual embedded DOSBox runtime and checks non-silent PCM from process().
 //
@@ -297,6 +297,12 @@ int main(int argc,char** argv) {
         }
     }
     if(!found)return fail("No real VST3 audio component registered");
+    S::PFactoryInfo identity{};
+    if(factory->getFactoryInfo(&identity)!=S::kResultOk||
+       std::strcmp(identity.vendor,"125A Systems")!=0||
+       std::strcmp(info.name,"125A AWE64 Gold")!=0)
+        return fail("Non-neutral or unexpected actual VST3 factory identity");
+    std::cout<<"NEUTRAL_PRODUCT_FACTORY_PASS\n";
     V::IComponent* component=nullptr;
     if(factory->createInstance(info.cid,V::IComponent::iid,
                                reinterpret_cast<void**>(&component))!=S::kResultOk||

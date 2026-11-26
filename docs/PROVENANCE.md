@@ -23,3 +23,7 @@ Der DOSBox-X-Fork enthält GPL-lizenzierte Komponenten. Rechtslage des gesamten 
 - P007/86Box-VM mit Windows-95-Gastbetriebssystem.
 - P008/P009 mit nachgebauter Creative-Treiberlogik.
 - Alte, nicht getestete Rendering-Engines, private ROMs, SF2-Samples, Windows-Images.
+
+## Neutrale installierte Dateinamen (27.11.2026)
+
+`Engine.dll` ist die intern gebaute DOSBox-X-Laufzeit mit unveränderter Herkunft; `ROM/Driver.exe` ist der byteidentische originale Creative `DOS/DEMO/DEMO.EXE` (Git-Blob e10b8705c6a46444a998c4f6aa74a1cda2081506). Die tatsächliche ROM-Bank ist `ROM/SYNTHGM.SF2` (SHA-256 78f8739a25d49e519b3fdc92a7f03d4ddd68588fd0260578a880296e304b7b5f), nicht SBK. Historische Namen in Dokumenten/Upstream sind Herkunftsnachweise, keine Produktnamen. Keine Rechteklärung durch Umbenennung; keine Veröffentlichung proprietärer Bytes.

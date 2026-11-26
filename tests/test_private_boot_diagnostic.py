@@ -21,11 +21,11 @@ spec.loader.exec_module(runner)
 class PrivateCreativeBootDiagnosticTests(unittest.TestCase):
     @staticmethod
     def make_bundle(tmp):
-        plugin = (Path(tmp) / "AWE64GoldDOSBoxDev.vst3" / "Contents" /
-                  "x86_64-win" / "AWE64GoldDOSBoxDev.vst3")
+        plugin = (Path(tmp) / "125A AWE64 Gold.vst3" / "Contents" /
+                  "x86_64-win" / "125A AWE64 Gold.vst3")
         plugin.parent.mkdir(parents=True)
         plugin.write_bytes(b"generated stand-in, not a VST3")
-        log = (plugin.parent.parent / "Resources" / "PRIVATE" /
+        log = (plugin.parent.parent / "Resources" / "ROM" /
                "B12AB34C.LOG")
         log.parent.mkdir(parents=True)
         return plugin, log

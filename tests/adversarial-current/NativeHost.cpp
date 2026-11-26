@@ -508,7 +508,7 @@ int main(int argc,char** argv){
             };
             auto bytes=state(bank);
             S::MemoryStream prior;if(component->getState(&prior)!=S::kResultOk)return fail("save before rollback");
-            auto dll=std::filesystem::path(argv[1]).parent_path()/"AWE64DOSBoxRuntime.dll";
+            auto dll=std::filesystem::path(argv[1]).parent_path()/"Engine.dll";
             auto moved=dll;moved+=".audit-hidden";
             std::error_code ec;
             const bool failing=mode=="rollback"||mode=="bootfail";

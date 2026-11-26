@@ -32,7 +32,7 @@ jobs:
           $runtime=Get-Content src/DosBoxRuntimeHost.hpp -Raw
           if (-not $source.Contains('engine->begin(')) { throw "Host never starts actual DOSBox guest" }
           if (-not $source.Contains('engine.readAudio(')) { throw "Actual DOSBox PCM is not read" }
-          if (-not $runtime.Contains('DEMO.EXE')) { throw "Original Creative guest requirement missing" }
+          if (-not $runtime.Contains('Driver.exe')) { throw "Original Creative guest requirement missing" }
           if (-not (Get-Content AKTUELLE-VERSION.md -Raw).Contains('Noch nicht gebaut')) { throw "Must not claim completed VST3" }
       - name: Assert no engine falsely promoted to a product
         shell: pwsh

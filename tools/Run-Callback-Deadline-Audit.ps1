@@ -15,11 +15,11 @@ if ($Seconds -lt 5 -or $Seconds -gt 120) { throw 'Seconds must be 5..120.' }
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $bundlePath = (Resolve-Path $Bundle).Path
 $romPath = (Resolve-Path $Rom).Path
-if ((Split-Path $bundlePath -Leaf) -ne 'AWE64GoldDOSBoxDev.vst3') {
+if ((Split-Path $bundlePath -Leaf) -ne '125A AWE64 Gold.vst3') {
     throw 'Refusing anything except the exact DOSBox-X development VST3.'
 }
 $native = Join-Path $bundlePath 'Contents/x86_64-win'
-foreach ($filename in @('AWE64GoldDOSBoxDev.vst3','AWE64DOSBoxRuntime.dll')) {
+foreach ($filename in @('125A AWE64 Gold.vst3','Engine.dll')) {
     if (-not (Test-Path -PathType Leaf (Join-Path $native $filename))) {
         throw "Missing real compiled Windows plugin binary: $filename"
     }
@@ -52,11 +52,11 @@ try {
         (Get-FileHash -Algorithm SHA256 $sf2).Hash.ToLowerInvariant() -ne $expectedSf2) {
         throw 'Original SF2 failed pinned size/SHA-256 verification.'
     }
-    $privateDir = Join-Path $bundlePath 'Contents/Resources/PRIVATE'
+    $privateDir = Join-Path $bundlePath 'Contents/Resources/ROM'
     New-Item -Path $privateDir -ItemType Directory -Force | Out-Null
     $staged = @(
         @{ Source = $romPath; Dest = (Join-Path $privateDir 'awe32.raw') },
-        @{ Source = $demo; Dest = (Join-Path $privateDir 'DEMO.EXE') },
+        @{ Source = $demo; Dest = (Join-Path $privateDir 'Driver.exe') },
         @{ Source = $sf2; Dest = (Join-Path $privateDir 'SYNTHGM.SF2') }
     )
     foreach ($file in $staged) {
@@ -80,7 +80,7 @@ try {
     if (-not (Test-Path -PathType Leaf $hostTestExe)) {
         throw 'VST3 test binary absent. Build awe64_vst3_host_pcm_smoke locally or use -HostExe.'
     }
-    $pluginBinary = Join-Path $native 'AWE64GoldDOSBoxDev.vst3'
+    $pluginBinary = Join-Path $native '125A AWE64 Gold.vst3'
     $ramFixture = Join-Path $temporary '125A RAM probe.sf2'
     & python (Join-Path $root 'tests/MakeRamSampleSf2.py') --output $ramFixture
     if ($LASTEXITCODE -ne 0) { throw 'RAM fixture creation failed.' }

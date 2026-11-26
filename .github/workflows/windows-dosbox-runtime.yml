@@ -195,20 +195,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "VST3 configuration failed" }
           cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev awe64_vst3_host_pcm_smoke --parallel 2
           if ($LASTEXITCODE -ne 0) { throw "VST3 Windows build failed" }
-          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win'
+          $bundle='build-vst3/VST3/Release/125A AWE64 Gold.vst3/Contents/x86_64-win'
           $native='third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           if (-not (Test-Path $native)) { throw "Original DOSBox DLL not built" }
-          if (-not (Test-Path (Join-Path $bundle 'AWE64GoldDOSBoxDev.vst3'))) { throw "VST3 host binary missing" }
-          Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
-          if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
+          if (-not (Test-Path (Join-Path $bundle '125A AWE64 Gold.vst3'))) { throw "VST3 host binary missing" }
+          Copy-Item $native (Join-Path $bundle 'Engine.dll')
+          if (-not (Test-Path (Join-Path $bundle 'Engine.dll'))) { throw "In-bundle runtime DLL missing" }
           Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
       - name: Prepare asset-free developer test bundle BEFORE synthetic DOS staging
         shell: pwsh
         run: |
-          $source='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3'
+          $source='build-vst3/VST3/Release/125A AWE64 Gold.vst3'
           $stage=Join-Path $env:RUNNER_TEMP 'AWE64-private-test-preparation'
           New-Item -ItemType Directory -Path $stage -ErrorAction Stop | Out-Null
-          if (Test-Path (Join-Path $source 'Contents/Resources/PRIVATE')) { throw 'Unexpected private or synthetic assets in clean bundle' }
+          if (Test-Path (Join-Path $source 'Contents/Resources/ROM')) { throw 'Unexpected private or synthetic assets in clean bundle' }
+          $nativeDir=Join-Path $source 'Contents/x86_64-win'
+          if (-not (Test-Path -LiteralPath (Join-Path $nativeDir '125A AWE64 Gold.vst3')) -or -not (Test-Path -LiteralPath (Join-Path $nativeDir 'Engine.dll'))) { throw 'Neutral bundle filenames missing' }
+          $info=Get-Content -LiteralPath (Join-Path $source 'Contents/Resources/moduleinfo.json') -Raw | ConvertFrom-Json
+          $classes=@($info.Classes | Where-Object { $_.Category -eq 'Audio Module Class' })
+          if ($info.Name -ne '125A AWE64 Gold' -or $info.'Factory Info'.Vendor -ne '125A Systems' -or $classes.Count -ne 1 -or $classes[0].Name -ne '125A AWE64 Gold' -or $classes[0].Vendor -ne '125A Systems' -or $classes[0].CID -ne '125A8600F0074AEEB64A000000000D01') { throw 'Neutral moduleinfo or stable class ID contract failed' }
+          Write-Host 'NEUTRAL_PRODUCT_BUNDLE_IDENTITY_PASS'
           Copy-Item -LiteralPath $source -Destination $stage -Recurse -ErrorAction Stop
           New-Item -ItemType Directory -Path (Join-Path $stage 'tools'),(Join-Path $stage 'tests') -ErrorAction Stop | Out-Null
           Copy-Item -LiteralPath 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe' -Destination $stage -ErrorAction Stop
@@ -217,7 +223,7 @@ jobs:
           Copy-Item -LiteralPath 'third_party/dosbox-x-AWE32/COPYING' -Destination (Join-Path $stage 'DOSBox-X-COPYING.txt') -ErrorAction Stop
           Copy-Item -LiteralPath 'docs/PROVENANCE.md' -Destination $stage -ErrorAction Stop
           Copy-Item -LiteralPath 'tools/Run-Prebuilt-Private-Test.cmd' -Destination $stage -ErrorAction Stop
-          $forbidden=Get-ChildItem $stage -Recurse -Force | Where-Object { $_.Name -eq 'PRIVATE' -or $_.Name -eq 'DEMO.EXE' -or $_.Extension -in @('.raw','.sf2','.sbk') }
+          $forbidden=Get-ChildItem $stage -Recurse -Force | Where-Object { $_.Name -in @('PRIVATE','ROM','DEMO.EXE','Driver.exe','AWE64GoldDOSBoxDev.vst3','AWE64DOSBoxRuntime.dll') -or $_.Extension -in @('.raw','.sf2','.sbk') }
           if ($forbidden) { throw 'Asset-free package check failed' }
           Set-Content -LiteralPath (Join-Path $stage 'BUILD-COMMIT.txt') -Value $env:GITHUB_SHA
           Write-Host 'Prepared original-free development test bundle; no original Creative bytes and no release.'
@@ -225,8 +231,8 @@ jobs:
         shell: pwsh
         timeout-minutes: 2
         run: |
-          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3'
-          $plugin=Join-Path $bundle 'Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3'
+          $bundle='build-vst3/VST3/Release/125A AWE64 Gold.vst3'
+          $plugin=Join-Path $bundle 'Contents/x86_64-win/125A AWE64 Gold.vst3'
           $hostTestExe='build-vst3/Release/awe64_vst3_host_pcm_smoke.exe'
           python tests/MakeSyntheticDemoExe.py --bundle $bundle
           if ($LASTEXITCODE -ne 0) { throw 'Safe synthetic test DOS EXE staging failed' }
@@ -236,7 +242,7 @@ jobs:
         shell: pwsh
         timeout-minutes: 2
         run: |
-          $plugin=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3').Path
+          $plugin=(Resolve-Path 'build-vst3/VST3/Release/125A AWE64 Gold.vst3/Contents/x86_64-win/125A AWE64 Gold.vst3').Path
           $hostTestExe=(Resolve-Path 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe').Path
           $log = & $hostTestExe $plugin --dual 2>&1
           $code=$LASTEXITCODE
@@ -246,8 +252,8 @@ jobs:
         shell: pwsh
         timeout-minutes: 2
         run: |
-          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3'
-          $plugin=Join-Path $bundle 'Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3'
+          $bundle='build-vst3/VST3/Release/125A AWE64 Gold.vst3'
+          $plugin=Join-Path $bundle 'Contents/x86_64-win/125A AWE64 Gold.vst3'
           $hostTestExe='build-vst3/Release/awe64_vst3_host_pcm_smoke.exe'
           # This must run on exactly the SYNTHETIC ROM and DOS MZ fixture
           # from the previous POSITIVE control, NOT authentic Creative files.
@@ -262,7 +268,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Official Steinberg validator build failed' }
           $validators=@(Get-ChildItem -LiteralPath 'build-vst3' -Filter 'validator.exe' -Recurse -File)
           if ($validators.Count -ne 1) { throw 'Missing or ambiguous official SDK validator binary' }
-          $bundle=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3').Path
+          $bundle=(Resolve-Path 'build-vst3/VST3/Release/125A AWE64 Gold.vst3').Path
           $env:SDL_AUDIODRIVER='dummy'
           $summary=@()
           & $validators[0].FullName $bundle 2>&1 | ForEach-Object {
@@ -275,7 +281,7 @@ jobs:
         shell: pwsh
         timeout-minutes: 2
         run: |
-          $plugin=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3').Path
+          $plugin=(Resolve-Path 'build-vst3/VST3/Release/125A AWE64 Gold.vst3/Contents/x86_64-win/125A AWE64 Gold.vst3').Path
           $hostTestExe=(Resolve-Path 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe').Path
           $log = & $hostTestExe $plugin --editor 2>&1
           $code=$LASTEXITCODE
@@ -296,12 +302,12 @@ jobs:
           New-Item -ItemType Directory -Path $research -ErrorAction Stop | Out-Null
           try {
             # Use a disposable COPY; the clean development bundle stays clean.
-            Copy-Item -LiteralPath (Join-Path $stage 'AWE64GoldDOSBoxDev.vst3') -Destination $research -Recurse -ErrorAction Stop
+            Copy-Item -LiteralPath (Join-Path $stage '125A AWE64 Gold.vst3') -Destination $research -Recurse -ErrorAction Stop
             $rom=Join-Path $research 'awe32.raw'
             Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/libretro/libretro-pcem/e07923e902dcedcf65a502fb3f14e75b9ded5271/awe32.raw' -OutFile $rom
             $expected='4e143b94f758734f594ded78f4e5115635975c16fa37fabeae0baa4938ca710e'
             if ((Get-Item $rom).Length -ne 1048576 -or (Get-FileHash -Algorithm SHA256 -LiteralPath $rom).Hash.ToLowerInvariant() -ne $expected) { throw 'Public archival ROM does not match verified reference; no substitute' }
-            $bundle=Join-Path $research 'AWE64GoldDOSBoxDev.vst3'
+            $bundle=Join-Path $research '125A AWE64 Gold.vst3'
             $hostTestExe=Join-Path $stage 'awe64_vst3_host_pcm_smoke.exe'
             # Reuse the existing gate without changing its hashes or thresholds.
             & powershell.exe -NoProfile -NonInteractive -File (Join-Path $stage 'tools/Run-Private-Creative-AWE-Test.ps1') -Bundle $bundle -Rom $rom -HostExe $hostTestExe -Seconds 60

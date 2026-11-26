@@ -26,3 +26,9 @@ awe32.raw
 PRIVATE/
 DEMO.EXE
 SYNTHGM.SF2
+
+# Neutral installed ROM resource directory; retain legacy private exclusions.
+**/Contents/Resources/ROM/
+Driver.exe
+DRIVER.EXE
+driver.exe

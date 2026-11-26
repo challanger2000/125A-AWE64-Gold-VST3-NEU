@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 'aabcc0939b72aaeea7b90535493b1fb1196f627b'
+          ref: ${{ github.sha }}
           submodules: true
           persist-credentials: false
       - uses: microsoft/setup-msbuild@v2
@@ -64,18 +64,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "VST3 configuration failed" }
           cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev --parallel 2
           if ($LASTEXITCODE -ne 0) { throw "VST3 Windows build failed" }
-          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win'
+          $bundle='build-vst3/VST3/Release/125A AWE64 Gold.vst3/Contents/x86_64-win'
           $native='third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           if (-not (Test-Path $native)) { throw "Original DOSBox DLL not built" }
-          if (-not (Test-Path (Join-Path $bundle 'AWE64GoldDOSBoxDev.vst3'))) { throw "VST3 host binary missing" }
-          Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
-          if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
+          if (-not (Test-Path (Join-Path $bundle '125A AWE64 Gold.vst3'))) { throw "VST3 host binary missing" }
+          Copy-Item $native (Join-Path $bundle 'Engine.dll')
+          if (-not (Test-Path (Join-Path $bundle 'Engine.dll'))) { throw "In-bundle runtime DLL missing" }
           Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
       - name: Stage synthetic guest only
         shell: pwsh
         run: |
-          if ((git rev-parse HEAD).Trim() -ne 'aabcc0939b72aaeea7b90535493b1fb1196f627b') { throw 'Product commit mismatch' }
-          python tests/MakeSyntheticDemoExe.py --bundle 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3'
+          if ((git rev-parse HEAD).Trim() -ne $env:GITHUB_SHA) { throw 'Product commit mismatch' }
+          python tests/MakeSyntheticDemoExe.py --bundle 'build-vst3/VST3/Release/125A AWE64 Gold.vst3'
           if ($LASTEXITCODE -ne 0) { throw 'Synthetic fixture staging failed' }
       - name: Checkout immutable independent Test Lab
         uses: actions/checkout@v4
@@ -95,12 +95,12 @@ jobs:
       - name: Run independent P74 ABI GUI and technical baseline
         shell: pwsh
         run: |
-          $bundle=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3').Path
-          $module=Join-Path $bundle 'Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3'
-          $runtime=Join-Path $bundle 'Contents/x86_64-win/AWE64DOSBoxRuntime.dll'
+          $bundle=(Resolve-Path 'build-vst3/VST3/Release/125A AWE64 Gold.vst3').Path
+          $module=Join-Path $bundle 'Contents/x86_64-win/125A AWE64 Gold.vst3'
+          $runtime=Join-Path $bundle 'Contents/x86_64-win/Engine.dll'
           $report=Join-Path $pwd 'independent-report'
           New-Item -ItemType Directory -Force $report | Out-Null
-          $identity=@{product_commit='aabcc0939b72aaeea7b90535493b1fb1196f627b';lab_commit='7213fe1f81f4036f74431cb5b2d7dbd09b73ee5c';module_sha256=(Get-FileHash $module).Hash.ToLowerInvariant();runtime_sha256=(Get-FileHash $runtime).Hash.ToLowerInvariant();assets='SYNTHETIC_ONLY';original_pcm='NOT RUN';release_approved=$false}
+          $identity=@{product_commit=$env:GITHUB_SHA;lab_commit='7213fe1f81f4036f74431cb5b2d7dbd09b73ee5c';module_sha256=(Get-FileHash $module).Hash.ToLowerInvariant();runtime_sha256=(Get-FileHash $runtime).Hash.ToLowerInvariant();assets='SYNTHETIC_ONLY';original_pcm='NOT RUN';release_approved=$false}
           $identity | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $report 'SOURCE-IDENTITY.json')
           function Find-One([string]$name) {
             $items=@(Get-ChildItem build-lab -Recurse -File -Filter $name)

@@ -78,18 +78,18 @@ $build = Join-Path $runRoot 'build-vst3'
 if ($LASTEXITCODE -ne 0) { throw 'Original P165 VST3 CMake configure failed.' }
 & cmake --build $build --config Release --target AWE64GoldDOSBoxDev awe64_vst3_host_pcm_smoke --parallel 2
 if ($LASTEXITCODE -ne 0) { throw 'Actual Windows VST3 and native test host build failed.' }
-$bundle = Join-Path $build 'VST3/Release/AWE64GoldDOSBoxDev.vst3'
+$bundle = Join-Path $build 'VST3/Release/125A AWE64 Gold.vst3'
 $native = Join-Path $bundle 'Contents/x86_64-win'
-if (-not (Test-Path -PathType Leaf (Join-Path $native 'AWE64GoldDOSBoxDev.vst3'))) {
+if (-not (Test-Path -PathType Leaf (Join-Path $native '125A AWE64 Gold.vst3'))) {
     throw 'Actual Windows VST3 binary is missing.'
 }
-$stagedRuntime = Join-Path $native 'AWE64DOSBoxRuntime.dll'
+$stagedRuntime = Join-Path $native 'Engine.dll'
 Copy-Item -LiteralPath $runtime -Destination $stagedRuntime
 $runtimeHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $runtime).Hash
 if ((Get-FileHash -Algorithm SHA256 -LiteralPath $stagedRuntime).Hash -ne $runtimeHash) {
     throw 'Staged runtime SHA-256 differs from freshly built DLL.'
 }
-$plugin = Join-Path $native 'AWE64GoldDOSBoxDev.vst3'
+$plugin = Join-Path $native '125A AWE64 Gold.vst3'
 $binaryHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $plugin).Hash
 $productHead = (& git -C $root rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify product source HEAD.' }

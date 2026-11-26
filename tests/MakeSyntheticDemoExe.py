@@ -21,20 +21,20 @@ def build_test_mz_exe():
 
 def stage_fixture(bundle: Path):
     bundle = bundle.resolve(strict=True)
-    if bundle.name.lower() != "awe64golddosboxdev.vst3":
+    if bundle.name.lower() != "125a awe64 gold.vst3":
         raise ValueError("Refuse fixture outside exact development VST3")
     binary_dir = bundle / "Contents" / "x86_64-win"
-    if not (binary_dir / "AWE64GoldDOSBoxDev.vst3").is_file():
+    if not (binary_dir / "125A AWE64 Gold.vst3").is_file():
         raise FileNotFoundError("Original VST3 binary missing")
-    if not (binary_dir / "AWE64DOSBoxRuntime.dll").is_file():
+    if not (binary_dir / "Engine.dll").is_file():
         raise FileNotFoundError("Original DOSBox-X DLL missing")
-    folder = bundle / "Contents" / "Resources" / "PRIVATE"
+    folder = bundle / "Contents" / "Resources" / "ROM"
     folder.mkdir(parents=True, exist_ok=True)
-    for n in ("awe32.raw", "DEMO.EXE", "SYNTHGM.SF2"):
+    for n in ("awe32.raw", "Driver.exe", "SYNTHGM.SF2"):
         if (folder / n).exists():
             raise FileExistsError("Refuse overwrite of ANY private owner file: " + n)
     (folder / "awe32.raw").write_bytes(bytes(1024 * 1024))
-    (folder / "DEMO.EXE").write_bytes(build_test_mz_exe())
+    (folder / "Driver.exe").write_bytes(build_test_mz_exe())
     (folder / "SYNTHGM.SF2").write_bytes(b"CI FIXTURE; NOT A CREATIVE SOUNDFONT")
     print("SYNTHETIC_DOS_MZ_FIXTURE_ONLY_NO_CREATIVE_DATA")
 

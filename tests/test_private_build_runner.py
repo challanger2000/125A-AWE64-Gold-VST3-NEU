@@ -19,6 +19,8 @@ class PrivateBuildRunnerContract(unittest.TestCase):
             "AWE64GoldDOSBoxDev",
             "awe64_vst3_host_pcm_smoke",
             "AWE64DOSBoxRuntime.dll",
+            "125A AWE64 Gold.vst3",
+            "Engine.dll",
             "Run-Private-Creative-AWE-Test.ps1",
             "Release SDL2",
             "Windows x64",

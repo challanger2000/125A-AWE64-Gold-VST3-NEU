@@ -11,7 +11,7 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--bundle',type=Path,required=True);p.add_argument('--host-exe',type=Path,required=True);a=p.parse_args()
     if os.name!='nt':raise RuntimeError('Windows x64 required')
     _,assets=find_private_bundle(a.bundle)
-    plugin=a.bundle.resolve()/'Contents'/'x86_64-win'/'AWE64GoldDOSBoxDev.vst3'
+    plugin=a.bundle.resolve()/'Contents'/'x86_64-win'/'125A AWE64 Gold.vst3'
     with tempfile.TemporaryDirectory(prefix='awe64_timed_native_') as d:
         fixture=Path(d)/'RAMTEST.SF2';fixture.write_bytes(build())
         env=os.environ.copy()

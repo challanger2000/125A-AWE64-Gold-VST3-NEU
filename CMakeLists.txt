@@ -288,7 +288,7 @@ void PresetBrowserView::Select(uint16_t bank,uint8_t program) {
   set(AWE64_GUI_COMPAT_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/PresetBrowserViewSdkCompat.cpp")
   file(WRITE "${AWE64_GUI_COMPAT_SOURCE}" "${AWE64_GUI_SRC}")
 
-  smtg_add_vst3plugin(AWE64GoldDOSBoxDev
+  smtg_add_vst3plugin(AWE64GoldDOSBoxDev PACKAGE_NAME "125A AWE64 Gold" SOURCES_LIST
     src/DosBoxVst3Shell.hpp
     src/DosBoxVst3Shell.cpp
     src/DosBoxVst3Factory.cpp

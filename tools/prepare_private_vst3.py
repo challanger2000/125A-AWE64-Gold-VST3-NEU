@@ -2,7 +2,7 @@
 """Prepare a PRIVATE Windows VST3 integration-test bundle.
 
 Copies an already built original DOSBox-X/VST3 DEV bundle and the owner's
-existing licensed assets into the bundle's PRIVATE resources. This script
+existing licensed assets into the bundle's ROM resources. This script
 does NOT download or publish Creative files and MUST NOT run in public CI.
 It does not promote this DEV build to a release or prove original AWE sound.
 """
@@ -16,7 +16,7 @@ REQUIRED = {
     "awe32.raw": ("sha256",
         "4e143b94f758734f594ded78f4e5115635975c16fa37fabeae0baa4938ca710e",
         1_048_576),
-    "DEMO.EXE": ("git-blob",
+    "Driver.exe": ("git-blob",
         "e10b8705c6a46444a998c4f6aa74a1cda2081506", None),
     "SYNTHGM.SF2": ("sha256",
         "78f8739a25d49e519b3fdc92a7f03d4ddd68588fd0260578a880296e304b7b5f",
@@ -53,10 +53,10 @@ def assemble(source: Path, assets: Path, destination: Path) -> Path:
         raise ValueError("Source bundle and private asset folder must be directories")
     if destination.exists():
         raise FileExistsError("Refuse to overwrite an existing private candidate")
-    if source.name.lower()!="awe64golddosboxdev.vst3":
+    if source.name.lower()!="125a awe64 gold.vst3":
         raise ValueError("Unexpected VST3 DEV bundle name")
-    host=source/"Contents"/"x86_64-win"/"AWE64GoldDOSBoxDev.vst3"
-    core=source/"Contents"/"x86_64-win"/"AWE64DOSBoxRuntime.dll"
+    host=source/"Contents"/"x86_64-win"/"125A AWE64 Gold.vst3"
+    core=source/"Contents"/"x86_64-win"/"Engine.dll"
     artwork=source/"Contents"/"Resources"/"125A_P165_Original_Faceplate_1000x708.png"
     for component in (host,core):
         if not component.is_file() or component.is_symlink() or component.stat().st_size<1024:
@@ -86,7 +86,7 @@ def assemble(source: Path, assets: Path, destination: Path) -> Path:
     try:
         candidate=work/source.name
         shutil.copytree(source,candidate)
-        private_inside=candidate/"Contents"/"Resources"/"PRIVATE"
+        private_inside=candidate/"Contents"/"Resources"/"ROM"
         private_inside.mkdir(parents=True,exist_ok=True)
         for name,spec in REQUIRED.items():
             shutil.copy2(assets/name,private_inside/name)
@@ -105,7 +105,7 @@ if __name__=="__main__":
     parser.add_argument("--source-bundle",type=Path,required=True)
     parser.add_argument("--private-assets",type=Path,required=True)
     parser.add_argument("--output",type=Path,
-        default=Path(__file__).resolve().parents[1]/"PRIVATE"/"AWE64GoldDOSBoxDev.vst3")
+        default=Path(__file__).resolve().parents[1]/"PRIVATE"/"125A AWE64 Gold.vst3")
     options=parser.parse_args()
     result=assemble(options.source_bundle,options.private_assets,options.output)
     print("PRIVATE DEVELOPMENT BUNDLE (NO RELEASE, NO CREATIVE SOUND VALIDATION):")

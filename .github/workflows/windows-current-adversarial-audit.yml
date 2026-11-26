@@ -82,12 +82,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "VST3 configuration failed" }
           cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev awe64_vst3_host_pcm_smoke --parallel 2
           if ($LASTEXITCODE -ne 0) { throw "VST3 Windows build failed" }
-          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win'
+          $bundle='build-vst3/VST3/Release/125A AWE64 Gold.vst3/Contents/x86_64-win'
           $native='third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           if (-not (Test-Path $native)) { throw "Original DOSBox DLL not built" }
-          if (-not (Test-Path (Join-Path $bundle 'AWE64GoldDOSBoxDev.vst3'))) { throw "VST3 host binary missing" }
-          Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
-          if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
+          if (-not (Test-Path (Join-Path $bundle '125A AWE64 Gold.vst3'))) { throw "VST3 host binary missing" }
+          Copy-Item $native (Join-Path $bundle 'Engine.dll')
+          if (-not (Test-Path (Join-Path $bundle 'Engine.dll'))) { throw "In-bundle runtime DLL missing" }
           Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
       - name: Build synthetic ABI recorder in disposable tree
         shell: pwsh
@@ -101,7 +101,7 @@ jobs:
         shell: pwsh
         timeout-minutes: 5
         run: |
-          $bundle=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3').Path
+          $bundle=(Resolve-Path 'build-vst3/VST3/Release/125A AWE64 Gold.vst3').Path
           python tests/MakeSyntheticDemoExe.py --bundle $bundle
           if ($LASTEXITCODE -ne 0) { throw 'Synthetic fixture staging failed' }
           $fixtures=Join-Path $env:RUNNER_TEMP 'current-audit-banks'
@@ -113,14 +113,14 @@ jobs:
           '@ | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\current-fixtures.py"
           python "$env:RUNNER_TEMP\current-fixtures.py" $fixtures
           if ($LASTEXITCODE -ne 0) { throw 'SF2 fixtures failed' }
-          $plugin=Join-Path $bundle 'Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3'
-          $dll=Join-Path $bundle 'Contents/x86_64-win/AWE64DOSBoxRuntime.dll'
+          $plugin=Join-Path $bundle 'Contents/x86_64-win/125A AWE64 Gold.vst3'
+          $dll=Join-Path $bundle 'Contents/x86_64-win/Engine.dll'
           $exe=(Get-ChildItem build-vst3 -Recurse -Filter awe64_vst3_host_pcm_smoke.exe | Select-Object -First 1).FullName
           $env:SDL_AUDIODRIVER='dummy'
           $env:AWE64_TEST_PERFORMANCE='1'
           Remove-Item Env:AWE64_TEST_HOST_DEMAND_CLOCK -ErrorAction SilentlyContinue
           $bank=Join-Path $fixtures 'valid.sf2'
-          $shim=(Resolve-Path 'build-audit-shim/Release/AWE64DOSBoxRuntime.dll').Path
+          $shim=(Resolve-Path 'build-audit-shim/Release/Engine.dll').Path
           @'
           import os, pathlib, shutil, subprocess, sys
           exe, plugin, bank, dll, shim = sys.argv[1:]

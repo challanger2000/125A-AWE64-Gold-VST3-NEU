@@ -42,15 +42,15 @@ def digest(path: Path, git_blob: bool = False) -> str:
 
 def find_private_bundle(bundle: Path):
     bundle = bundle.resolve(strict=True)
-    if bundle.name.lower() != "awe64golddosboxdev.vst3":
-        raise ValueError("Expected the single AWE64GoldDOSBoxDev.vst3 development bundle")
+    if bundle.name.lower() != "125a awe64 gold.vst3":
+        raise ValueError("Expected the single 125A AWE64 Gold.vst3 development bundle")
     binaries = bundle / "Contents" / "x86_64-win"
-    runtime = binaries / "AWE64DOSBoxRuntime.dll"
-    plugin = binaries / "AWE64GoldDOSBoxDev.vst3"
-    assets = bundle / "Contents" / "Resources" / "PRIVATE"
+    runtime = binaries / "Engine.dll"
+    plugin = binaries / "125A AWE64 Gold.vst3"
+    assets = bundle / "Contents" / "Resources" / "ROM"
     required = (
         (assets / "awe32.raw", ROM_SHA256, False, 1_048_576),
-        (assets / "DEMO.EXE", CREATIVE_DEMO_GIT_BLOB, True, None),
+        (assets / "Driver.exe", CREATIVE_DEMO_GIT_BLOB, True, None),
         (assets / "SYNTHGM.SF2", GM_SF2_SHA256, False, 42_726),
     )
     for path in (plugin, runtime):
@@ -83,11 +83,11 @@ def guest_arguments(assets: Path, ram_dir: Path | None = None):
         "-set", "mixer rate=44100",
         "-c", 'mount c "' + str(assets) + '"',
         "-c", "c:",
-        "-c", "DEMO.EXE /SBK:SYNTHGM.SF2",
+        "-c", "Driver.exe /SBK:SYNTHGM.SF2",
     ]
     if ram_dir is not None:
         args[-2:] = ["-c", 'mount d "' + str(ram_dir) + '"',
-                     "-c", r"DEMO.EXE /SBK:D:\RAMTEST.SF2 > D:\RAMBOOT.LOG"]
+                     "-c", r"Driver.exe /SBK:D:\RAMTEST.SF2 > D:\RAMBOOT.LOG"]
     return args
 
 
@@ -449,11 +449,11 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
             register_pcm(None, read_pcm)
             launch = guest_arguments(assets, ram_dir)
             if corrected_sysex:
-                original = (assets / "DEMO.EXE").read_bytes()
+                original = (assets / "Driver.exe").read_bytes()
                 fixed = corrected_sysex_copy(original)
                 (Path(work) / "FXDEMO.EXE").write_bytes(fixed)
                 launch[-2:] = ["-c", 'mount d "' + str(work) + '"',
-                               "-c", r"D:\FXDEMO.EXE /SBK:C:\SYNTHGM.SF2"]
+                               "-c", r"D:\FXDriver.exe /SBK:C:\SYNTHGM.SF2"]
                 print("PRIVATE_SYSEX_COMPARE_FIX_STAGED_ONE_BYTE")
             args = [s.encode("mbcs") for s in launch]
             argv = (ctypes.c_char_p * (len(args) + 1))(*args, None)

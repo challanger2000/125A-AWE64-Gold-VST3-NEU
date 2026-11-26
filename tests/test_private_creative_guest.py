@@ -39,20 +39,20 @@ class CreativePrivateHarnessTest(unittest.TestCase):
         self.assertNotIn("-silent", cmd)
         self.assertIn("-nogui", cmd)
         self.assertIn("-nomenu", cmd)
-        self.assertIn("DEMO.EXE /SBK:SYNTHGM.SF2", cmd)
+        self.assertIn("Driver.exe /SBK:SYNTHGM.SF2", cmd)
         self.assertNotIn("midi mpu401=uart", cmd)
         self.assertFalse(any("86box" in x.lower() for x in cmd))
 
     def test_rejects_fake_originals_before_dll_load(self):
         with tempfile.TemporaryDirectory() as t:
-            root = Path(t) / "AWE64GoldDOSBoxDev.vst3"
+            root = Path(t) / "125A AWE64 Gold.vst3"
             b = root / "Contents" / "x86_64-win"
             b.mkdir(parents=True)
-            (b / "AWE64DOSBoxRuntime.dll").write_bytes(b"X" * 2048)
-            (b / "AWE64GoldDOSBoxDev.vst3").write_bytes(b"Y" * 2048)
-            a = root / "Contents" / "Resources" / "PRIVATE"
+            (b / "Engine.dll").write_bytes(b"X" * 2048)
+            (b / "125A AWE64 Gold.vst3").write_bytes(b"Y" * 2048)
+            a = root / "Contents" / "Resources" / "ROM"
             a.mkdir(parents=True)
-            for n in ("awe32.raw", "DEMO.EXE", "SYNTHGM.SF2"):
+            for n in ("awe32.raw", "Driver.exe", "SYNTHGM.SF2"):
                 (a / n).write_bytes(b"not authentic")
             with self.assertRaises(ValueError):
                 module.find_private_bundle(root)

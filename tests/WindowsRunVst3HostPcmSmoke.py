@@ -27,7 +27,7 @@ def run_private_creative_host(command: list[str], plugin: Path, seconds: int):
     name = os.environ.get("AWE64_CREATIVE_BOOT_LOG", "")
     if not re.fullmatch(r"B[0-9A-F]{7}\.LOG", name):
         raise RuntimeError("Private Creative test requires a fresh 8.3 DOS boot logfile")
-    log = plugin.resolve(strict=True).parent.parent / "Resources" / "PRIVATE" / name
+    log = plugin.resolve(strict=True).parent.parent / "Resources" / "ROM" / name
     if log.exists():
         raise RuntimeError("Private Creative boot diagnostic already exists; refusing stale log")
     # Only the filter isolation suite may need to wait for natural tails.

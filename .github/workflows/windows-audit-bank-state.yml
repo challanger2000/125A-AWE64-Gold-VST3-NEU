@@ -46,7 +46,7 @@ jobs:
           '@ | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\audit-fixtures.py"
           python "$env:RUNNER_TEMP\audit-fixtures.py" $fixtures
           if ($LASTEXITCODE -ne 0) { throw 'Fixture generation failed' }
-          $plugin=(Resolve-Path 'build-audit/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3').Path
+          $plugin=(Resolve-Path 'build-audit/VST3/Release/125A AWE64 Gold.vst3/Contents/x86_64-win/125A AWE64 Gold.vst3').Path
           $testExe=(Get-ChildItem build-audit -Recurse -Filter awe64_vst3_host_pcm_smoke.exe | Select-Object -First 1).FullName
           if (-not $testExe) { throw 'Native audit test executable missing' }
           & $testExe $plugin (Join-Path $fixtures 'valid.sf2') (Join-Path $fixtures 'program17.sf2') (Join-Path $fixtures 'invalid_loop.sf2')

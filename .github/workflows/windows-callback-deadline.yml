@@ -72,12 +72,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "VST3 configuration failed" }
           cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev awe64_vst3_host_pcm_smoke --parallel 2
           if ($LASTEXITCODE -ne 0) { throw "VST3 Windows build failed" }
-          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win'
+          $bundle='build-vst3/VST3/Release/125A AWE64 Gold.vst3/Contents/x86_64-win'
           $native='third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           if (-not (Test-Path $native)) { throw "Original DOSBox DLL not built" }
-          if (-not (Test-Path (Join-Path $bundle 'AWE64GoldDOSBoxDev.vst3'))) { throw "VST3 host binary missing" }
-          Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
-          if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
+          if (-not (Test-Path (Join-Path $bundle '125A AWE64 Gold.vst3'))) { throw "VST3 host binary missing" }
+          Copy-Item $native (Join-Path $bundle 'Engine.dll')
+          if (-not (Test-Path (Join-Path $bundle 'Engine.dll'))) { throw "In-bundle runtime DLL missing" }
           Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
       - name: Three independent original Creative performance trials
         shell: pwsh
@@ -90,7 +90,7 @@ jobs:
           try {
             $rate = [int]$env:AUDIT_HOST_RATE
             $seconds = if ($rate -eq 48000) { 120 } else { 60 }
-            & powershell.exe -NoProfile -NonInteractive -File tools/Run-Callback-Deadline-Audit.ps1 -Bundle 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3' -Rom $rom -HostExe 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe' -HostRate $rate -Seconds $seconds
+            & powershell.exe -NoProfile -NonInteractive -File tools/Run-Callback-Deadline-Audit.ps1 -Bundle 'build-vst3/VST3/Release/125A AWE64 Gold.vst3' -Rom $rom -HostExe 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe' -HostRate $rate -Seconds $seconds
             if ($LASTEXITCODE -ne 0) { throw 'Targeted original performance diagnostic failed' }
           } finally {
             Remove-Item -LiteralPath $rom -Force -ErrorAction SilentlyContinue

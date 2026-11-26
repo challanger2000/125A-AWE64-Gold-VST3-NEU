@@ -60,17 +60,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "VST3 configuration failed" }
           cmake --build build-vst3 --config Release --target AWE64GoldDOSBoxDev awe64_vst3_host_pcm_smoke --parallel 2
           if ($LASTEXITCODE -ne 0) { throw "VST3 Windows build failed" }
-          $bundle='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/x86_64-win'
+          $bundle='build-vst3/VST3/Release/125A AWE64 Gold.vst3/Contents/x86_64-win'
           $native='third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           if (-not (Test-Path $native)) { throw "Original DOSBox DLL not built" }
-          if (-not (Test-Path (Join-Path $bundle 'AWE64GoldDOSBoxDev.vst3'))) { throw "VST3 host binary missing" }
-          Copy-Item $native (Join-Path $bundle 'AWE64DOSBoxRuntime.dll')
-          if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
+          if (-not (Test-Path (Join-Path $bundle '125A AWE64 Gold.vst3'))) { throw "VST3 host binary missing" }
+          Copy-Item $native (Join-Path $bundle 'Engine.dll')
+          if (-not (Test-Path (Join-Path $bundle 'Engine.dll'))) { throw "In-bundle runtime DLL missing" }
           Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
       - name: Stage synthetic fixture and build official validator
         shell: pwsh
         run: |
-          python tests/MakeSyntheticDemoExe.py --bundle 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3'
+          python tests/MakeSyntheticDemoExe.py --bundle 'build-vst3/VST3/Release/125A AWE64 Gold.vst3'
           if ($LASTEXITCODE -ne 0) { throw 'Synthetic guest staging failed' }
           cmake --build build-vst3 --config Release --target validator --parallel 2
           if ($LASTEXITCODE -ne 0) { throw 'Official SDK validator build failed' }
@@ -81,7 +81,7 @@ jobs:
           Write-Host "VALIDATOR_DIAGNOSTIC_COMMIT=$env:GITHUB_SHA"
           # Keep live output visible even if an upstream lifecycle call blocks.
           $validator=(Resolve-Path 'build-vst3/bin/Release/validator.exe').Path
-          $bundle=(Resolve-Path 'build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3').Path
+          $bundle=(Resolve-Path 'build-vst3/VST3/Release/125A AWE64 Gold.vst3').Path
           $env:SDL_AUDIODRIVER='dummy'
           $summary=@()
           & $validator $bundle 2>&1 | ForEach-Object {

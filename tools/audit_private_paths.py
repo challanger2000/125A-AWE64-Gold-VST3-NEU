@@ -10,10 +10,10 @@ private.mkdir(exist_ok=True)
 failures=[]
 with tempfile.TemporaryDirectory(dir=root,prefix='audit_fake_') as folder:
     tmp=Path(folder)
-    source=tmp/'AWE64GoldDOSBoxDev.vst3'
+    source=tmp/'125A AWE64 Gold.vst3'
     bin_dir=source/'Contents'/'x86_64-win';bin_dir.mkdir(parents=True)
-    (bin_dir/'AWE64GoldDOSBoxDev.vst3').write_bytes(b'A'*2048)
-    (bin_dir/'AWE64DOSBoxRuntime.dll').write_bytes(b'B'*2048)
+    (bin_dir/'125A AWE64 Gold.vst3').write_bytes(b'A'*2048)
+    (bin_dir/'Engine.dll').write_bytes(b'B'*2048)
     art=source/'Contents'/'Resources'/'125A_P165_Original_Faceplate_1000x708.png'
     art.parent.mkdir(parents=True);art.write_bytes(b'SYNTHETIC_GUI')
     assets=tmp/'fake-assets';assets.mkdir()
@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(dir=root,prefix='audit_fake_') as folder:
     link=private/(tmp.name+'_junction')
     def verify_payload(dest):
         for name in specs:
-            if (dest/'Contents'/'Resources'/'PRIVATE'/name).read_bytes()!=(assets/name).read_bytes():
+            if (dest/'Contents'/'Resources'/'ROM'/name).read_bytes()!=(assets/name).read_bytes():
                 raise RuntimeError('Payload mismatch: '+name)
     def probe(label,destination):
         try:stage.assemble(source,assets,destination)
@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory(dir=root,prefix='audit_fake_') as folder:
     gitroot=tmp/'git-fixture';gitroot.mkdir()
     shutil.copyfile(root/'.gitignore',gitroot/'.gitignore')
     subprocess.run(['git','init','-q',str(gitroot)],check=True)
-    for prefix in ('PRIVATE','build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3/Contents/Resources/PRIVATE'):
+    for prefix in ('PRIVATE','example.vst3/Contents/Resources/ROM','build-vst3/VST3/Release/125A AWE64 Gold.vst3/Contents/Resources/ROM'):
         for name in specs:
             path=gitroot/prefix/name;path.parent.mkdir(parents=True,exist_ok=True)
             path.write_bytes(b'FAKE_AUDIT_ONLY')

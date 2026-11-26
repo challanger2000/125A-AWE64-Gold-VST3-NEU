@@ -36,22 +36,22 @@ class PrivateStagingTests(unittest.TestCase):
         private.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=private) as work:
             tmp=Path(work)
-            bundle=tmp/"AWE64GoldDOSBoxDev.vst3"
+            bundle=tmp/"125A AWE64 Gold.vst3"
             artifact=bundle/"Contents"/"Resources"/"125A_P165_Original_Faceplate_1000x708.png"
             fake(artifact,b"original-GUI-placeholder-test")
-            fake(bundle/"Contents"/"x86_64-win"/"AWE64GoldDOSBoxDev.vst3",b"A"*2048)
-            fake(bundle/"Contents"/"x86_64-win"/"AWE64DOSBoxRuntime.dll",b"B"*2048)
+            fake(bundle/"Contents"/"x86_64-win"/"125A AWE64 Gold.vst3",b"A"*2048)
+            fake(bundle/"Contents"/"x86_64-win"/"Engine.dll",b"B"*2048)
             inputs=tmp/"source-license-fixtures"
-            names={"awe32.raw":b"ROMTEST","DEMO.EXE":b"DEMOTEST","SYNTHGM.SF2":b"SF2TEST"}
+            names={"awe32.raw":b"ROMTEST","Driver.exe":b"DEMOTEST","SYNTHGM.SF2":b"SF2TEST"}
             for name,data in names.items():fake(inputs/name,data)
             fake_specs={name:("git-blob",blob(data),len(data)) for name,data in names.items()}
-            dest=tmp/"private-build"/"AWE64GoldDOSBoxDev.vst3"
+            dest=tmp/"private-build"/"125A AWE64 Gold.vst3"
             with patch.object(stage,"REQUIRED",fake_specs),patch.object(stage,"FACEPLATE",
                 ("git-blob",blob(artifact.read_bytes()),None)):
                 result=stage.assemble(bundle,inputs,dest)
                 self.assertEqual(result,dest)
                 for name,data in names.items():
-                    self.assertEqual((dest/"Contents"/"Resources"/"PRIVATE"/name).read_bytes(),data)
+                    self.assertEqual((dest/"Contents"/"Resources"/"ROM"/name).read_bytes(),data)
                 with self.assertRaises(FileExistsError):
                     stage.assemble(bundle,inputs,dest)
                 with self.assertRaises(ValueError):

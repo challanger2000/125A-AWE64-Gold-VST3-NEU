@@ -131,7 +131,7 @@ def reference(bundle,work):
         return results
 
 def vst3(bundle,exe,source,work):
-    plugin=bundle/"Contents/x86_64-win/AWE64GoldDOSBoxDev.vst3"
+    plugin=bundle/"Contents/x86_64-win/125A AWE64 Gold.vst3"
     env=dict(os.environ,AWE64_TEST_CHEEZOIDS_SWEEP="1",AWE64_TEST_EXTERNAL_SF2=str(source),
              AWE64_ORIGINAL_CREATIVE_ONLY="1",SDL_AUDIODRIVER="dummy",
              AWE64_CREATIVE_BOOT_LOG="B"+uuid.uuid4().hex[:7].upper()+".LOG")
@@ -144,7 +144,7 @@ def vst3(bundle,exe,source,work):
         print("CHEEZ_NATIVE_HOST_STDOUT_TAIL:\n"+"\n".join(proc.stdout.splitlines()[-40:]),flush=True)
         print("CHEEZ_NATIVE_HOST_STDERR_TAIL:\n"+"\n".join(proc.stderr.splitlines()[-60:]),flush=True)
         raise RuntimeError("Native Cheezoids sweep failed: "+str(proc.returncode))
-    log=plugin.parent.parent/"Resources/PRIVATE"/env["AWE64_CREATIVE_BOOT_LOG"]
+    log=plugin.parent.parent/"Resources/ROM"/env["AWE64_CREATIVE_BOOT_LOG"]
     if not log.exists() or b"ERROR:" in log.read_bytes().upper():raise RuntimeError("Creative bank boot failed")
     rows=re.findall(r"^CHEEZ_VST3 (\d+) ([\d.eE+-]+) ([\d.eE+-]+)$",proc.stdout,re.M)
     if len(rows)!=128 or {int(p) for p,_,_ in rows}!=set(range(128)):

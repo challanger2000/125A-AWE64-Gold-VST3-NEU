@@ -217,8 +217,8 @@ public:
     }
     static std::filesystem::path privateAssetsDir(
         const std::filesystem::path& binary) {
-        // .vst3/Contents/x86_64-win/Plugin.vst3 -> Contents/Resources/PRIVATE
-        return binary.parent_path().parent_path()/"Resources"/"PRIVATE";
+        // .vst3/Contents/x86_64-win/Plugin.vst3 -> Contents/Resources/ROM
+        return binary.parent_path().parent_path()/"Resources"/"ROM";
     }
 
     bool begin(const std::filesystem::path& binary,
@@ -233,11 +233,11 @@ public:
         demandLead_=demandLead;
         // Real original owner material ONLY. Do not start a fake engine.
         const auto rom=privateDir/"awe32.raw";
-        const auto guest=privateDir/"DEMO.EXE";
+        const auto guest=privateDir/"Driver.exe";
         const auto sf2=privateDir/"SYNTHGM.SF2";
         if(!isUsableFile(rom,1048576)||!isUsableFile(guest)||
            !isUsableFile(sf2))return false;
-        const auto dll=binary.parent_path()/"AWE64DOSBoxRuntime.dll";
+        const auto dll=binary.parent_path()/"Engine.dll";
         if(!isUsableFile(dll))return false;
         // Non-RT: copy the installed original runtime into this activation's
         // existing private staging directory. Fail rather than reuse a copy.
@@ -276,7 +276,7 @@ public:
         }
         try {
             std::string guestBank="D:\\SYNTHGM.SF2";
-            std::string guestProgram="DEMO.EXE";
+            std::string guestProgram="Driver.exe";
             // Original files remain untouched. Only the exact proven original
             // Creative executable gets a disposable one-byte compatibility fix.
             if(isUsableFile(guest,40197)) {
@@ -332,7 +332,7 @@ public:
             // A sounding AWE64 must NEVER include the -silent flag.
             // -nogui and -nomenu suppress UI without disabling hardware.
             argvStorage_={
-                "AWE64DOSBoxRuntime", "-noconfig", "-nogui", "-nomenu",
+                "Engine", "-noconfig", "-nogui", "-nomenu",
                 "-set", "sblaster sbtype=sbawe",
                 "-set", "sblaster awe32ram=28672",
                 "-set", "sblaster awe32rom="+utf8(stagedDirectory_/"awe32.raw"),

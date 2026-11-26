@@ -130,15 +130,15 @@ class SyntheticDosExeTests(unittest.TestCase):
 
     def test_stage_fixture_rejects_existing_owner_data(self):
         with tempfile.TemporaryDirectory() as work:
-            bundle = Path(work) / "AWE64GoldDOSBoxDev.vst3"
+            bundle = Path(work) / "125A AWE64 Gold.vst3"
             native = bundle / "Contents" / "x86_64-win"
             native.mkdir(parents=True)
-            (native / "AWE64GoldDOSBoxDev.vst3").write_bytes(b"fixture VST3 stub")
-            (native / "AWE64DOSBoxRuntime.dll").write_bytes(b"fixture DLL stub")
+            (native / "125A AWE64 Gold.vst3").write_bytes(b"fixture VST3 stub")
+            (native / "Engine.dll").write_bytes(b"fixture DLL stub")
             stage_fixture(bundle)
-            private = bundle / "Contents" / "Resources" / "PRIVATE"
+            private = bundle / "Contents" / "Resources" / "ROM"
             self.assertEqual((private / "awe32.raw").stat().st_size, 1048576)
-            self.assertEqual((private / "DEMO.EXE").read_bytes(), build_test_mz_exe())
+            self.assertEqual((private / "Driver.exe").read_bytes(), build_test_mz_exe())
             with self.assertRaises(FileExistsError):
                 stage_fixture(bundle)
             self.assertTrue((private / "SYNTHGM.SF2").is_file())
