@@ -9,6 +9,12 @@
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
 
+## 26.11.2026 — Abschlussregression nach A09/A22-Sicherheitskorrekturen (ausstehend)
+
+- `f513c0db`: [45879596716](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45879596716) SUCCESS, 20/20 gezielte native DLL-Fälle, config-isolation unverändert=1, SDL und Host-Policy PASS; Bridge, Adversarial und Version SUCCESS. Vollständige Originalregression damals NOT RUN.
+- `831dd244`: [45881429683](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45881429683) SUCCESS, 24/24 Kaltstarts (12 historische, 12 aktuelle Produktrevision; beide Launcher jeweils 6/6); erste Note in jedem Versuch hörbar, process errors 0. Historische Ursache nicht reproduziert, NOT VERIFIED. Details in docs/AUDIT-COLD-START-INVESTIGATION.md.
+- Besitzerauftrag: vollständige Original-/VST3-Regression der inzwischen gebündelten Sicherheitskorrekturen. Temporären Push-Shortcut [fatal-only] aus dem Hauptworkflow entfernt; damit laufen alle bisherigen Gates wieder verpflichtend. Separater manueller Fatal-Workflow bleibt für gezielte Prüfungen erhalten. Keine Änderung an Plugin-, GUI-, DSP- oder Emulationsquellen. Neue Regression NOT RUN bis tatsächliche Logs vorliegen; keine Releasefreigabe. Historische Kaltstartursache, vollständige In-process-Absturzabsicherung, Besitzer-Assets/Studio Pro und andere offene Auditrisiken bleiben gesondert zu bewerten.
+
 ## 26.11.2026 — A09/A22: Isolation der Host-Konfigurationsdateien (Kandidat)
 
 - `7bf11818`: [Gezielter nativer Fatal-Audit 45877513159](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45877513159) SUCCESS 19/19, gemessene Host-Policy (16384,0,510) vor und nach Boot identisch, SDL-Fehlerreturn -12566 PASS. Adversarial [45877513162](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45877513162) SUCCESS, synthetischer Kaltstart peak 0,304871, process errors 0. Bridge und Version SUCCESS. Vollständige Originalregression NOT RUN.

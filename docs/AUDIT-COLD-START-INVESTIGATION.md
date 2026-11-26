@@ -13,4 +13,8 @@
 
 Build both historical ebbc14895fbe41c57eb08ea14af67b81586334bf and current f513c0dbca5f951f895f29be5230fdc241aa1fc7 at exact commits and pinned upstream, same diagnostic host from investigation checkout. Product implementation unmodified. For each, interleave 6 inherited-stream and 6 captured-stream fresh child processes. Original 220-block early and 70-block late deadlines remain unchanged; on silence the common diagnostic host continues only for evidence, then deactivates and emits counters. Failure remains failure even if delayed audio succeeds. Capture full streams, exit status, duration, current UART/PCM/prime diagnostic and available historical queue/pull counters. Results are not interchangeable with authentic Creative or owner ASIO tests. Separate runners for versions limit cross-version causality; launcher methods are compared within each runner. No retries-to-green. A zero-failure experiment cannot retrospectively identify a non-reproduced event; further instrumentation or controlled reproduction would still be needed.
 
-Only this focused workflow is triggered by these files. No product edits or full 128-preset run. Execution evidence pending.
+## Executed result
+
+[Run 45881429683](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45881429683), historical job 140121462697 and current job 140121462412, both SUCCESS. Exact historical: 6/6 captured + 6/6 inherited. Exact current: 6/6 captured + 6/6 inherited. All 24 measured first-note peaks 0.304871–0.304901, PROCESS_ERRORS=0. All 12 current shutdown diagnostics UART=1, max_pcm=1024, primed=1, timeout=0, pulled_notes=1. Historical failure did not recur; no evidence supports launcher attribution. Historical root cause remains NOT VERIFIED; no further speculative product changes. Retain the proven mitigations and diagnostic visibility, resume full regression.
+
+This was a synthetic fixture experiment, not a 128-preset Original Creative or owner DAW acceptance.

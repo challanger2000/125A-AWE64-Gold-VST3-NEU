@@ -1,5 +1,5 @@
 name: DOSBox-X original + VST3 MIDI/PCM end-to-end (synthetic DOS)
-run-name: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[fatal-only]') && 'Targeted native fatal audit (full regression NOT RUN)' || 'Full original DOSBox-X + VST3 regression' }}
+run-name: Full original DOSBox-X + VST3 regression
 on:
   push:
     branches: [main]
@@ -167,26 +167,19 @@ jobs:
           $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           python tools/audit_dosbox_fatal.py $dll
           if ($LASTEXITCODE -ne 0) { throw "Embedded ROM entry/recovery regression failed" }
-      - name: Declare targeted scope (not full regression)
-        if: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[fatal-only]') }}
-        run: |
-          echo "TARGETED_FATAL_AUDIT_ONLY; FULL_VST3_ORIGINAL_REGRESSION=NOT_RUN" >> $env:GITHUB_STEP_SUMMARY
       - name: Prove non-silent PCM from real DOS PC-speaker hardware through ORIGINAL DOSBox-X mixer
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         run: |
           $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           python tests/WindowsSpeakerPcmSmoke.py --parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Original DOS hardware speaker PCM callback test FAILED" }
       - name: Prove actual 16-bit guest MPU401 UART receives host MIDI through original DOSBox-X
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         run: |
           $dll=Join-Path $pwd 'third_party/dosbox-x-AWE32/bin/x64/Release SDL2/AWE64DOSBoxRuntime.dll'
           python tests/WindowsMpuGuestSmoke.py --parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Original MPU401 guest hardware path failed" }
       - name: Research two independent original runtime DLL mappings in one Windows process
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         timeout-minutes: 2
         run: |
@@ -194,7 +187,6 @@ jobs:
           python tests/WindowsDualRuntimeSmoke.py --parent $dll
           if ($LASTEXITCODE -ne 0) { throw "Dual-runtime research failed; single-instance product remains unchanged" }
       - name: Compile VST3 host and stage original internal DOSBox-X runtime DLL
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         run: |
           git clone --depth 1 --branch v3.7.12_build_20 --recurse-submodules --shallow-submodules https://github.com/steinbergmedia/vst3sdk.git "$env:RUNNER_TEMP\vst3sdk"
@@ -211,7 +203,6 @@ jobs:
           if (-not (Test-Path (Join-Path $bundle 'AWE64DOSBoxRuntime.dll'))) { throw "In-bundle runtime DLL missing" }
           Write-Output "Single VST3 bundle contains real original DOSBox-X-AWE32 DLL; no private Creative ROM/DEMO/SF2, no real playback proof"
       - name: Prepare asset-free developer test bundle BEFORE synthetic DOS staging
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         run: |
           $source='build-vst3/VST3/Release/AWE64GoldDOSBoxDev.vst3'
@@ -231,7 +222,6 @@ jobs:
           Set-Content -LiteralPath (Join-Path $stage 'BUILD-COMMIT.txt') -Value $env:GITHUB_SHA
           Write-Host 'Prepared original-free development test bundle; no original Creative bytes and no release.'
       - name: Verify REAL VST3 MIDI NoteOn -> original DOS MPU-401 -> PC speaker -> VST3 PCM
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         timeout-minutes: 2
         run: |
@@ -243,7 +233,6 @@ jobs:
           python tests/WindowsRunVst3HostPcmSmoke.py --exe $hostTestExe --plugin $plugin
           if ($LASTEXITCODE -ne 0) { throw 'VST3 process() failed to deliver original mixer audio' }
       - name: Verify two actual VST3 components play and tear down independently
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         timeout-minutes: 2
         run: |
@@ -254,7 +243,6 @@ jobs:
           $log | ForEach-Object { Write-Host $_ }
           if ($code -ne 0 -or @($log | Where-Object { "$_" -eq 'REAL_VST3_DUAL_SYNTHETIC_PCM_LIFECYCLE_PASS' }).Count -ne 1) { throw "Native dual VST3 gate FAILED; exit=$code" }
       - name: NEGATIVE CONTROL real VST3 must silence PC-speaker+OPL in private-Creative-only mode
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         timeout-minutes: 2
         run: |
@@ -267,7 +255,6 @@ jobs:
           python tests/WindowsVst3CreativeOnlyNegative.py --exe $hostTestExe --plugin $plugin
           if ($LASTEXITCODE -ne 0) { throw 'Private-only original-Creative anti-spoof negative control FAILED' }
       - name: Full pinned Steinberg SDK validator (synthetic assets, no Creative data)
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         timeout-minutes: 8
         run: |
@@ -285,7 +272,6 @@ jobs:
           $code=$LASTEXITCODE
           if ($code -ne 0 -or $summary.Count -ne 1) { throw "Full SDK validator failed; exit=$code" }
       - name: Verify actual P165 editor lifecycle and MOD RESET click in independent Win32 host
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         timeout-minutes: 2
         run: |
@@ -297,7 +283,6 @@ jobs:
           $reset = @($log | Where-Object { "$_" -match '^REAL_VST3_MOD_RESET_CLICK_PASS; PARAMS=12; GESTURES=12; PRESERVED=5; PASS=[01]$' })
           if ($code -ne 0 -or $reset.Count -ne 2 -or ($reset | Select-Object -Unique).Count -ne 2) { throw "Native editor/MOD RESET gate FAILED; exit=$code" }
       - name: Original Creative archival-reference research in actual Windows VST3 (no private owner files)
-        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]') }}
         shell: pwsh
         timeout-minutes: 28
         env:
@@ -329,7 +314,7 @@ jobs:
       # distribution permissions are cleared. A private-repo runner can
       # deliver the prebuilt asset-free package after BOTH existing gates.
       - name: Upload prebuilt developer-only test package (private repositories only)
-        if: ${{ (github.event_name != 'push' || !contains(github.event.head_commit.message, '[fatal-only]')) && github.event.repository.private == true }}
+        if: ${{ github.event.repository.private == true }}
         uses: actions/upload-artifact@v4
         with:
           name: AWE64-private-test-preparation-${{ github.sha }}
