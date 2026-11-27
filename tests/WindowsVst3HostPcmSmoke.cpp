@@ -37,7 +37,64 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <set>
 #include <thread>
+
+// Optional visual evidence from the real VSTGUI child HWND, never from a
+// reconstructed image or a desktop-wide capture. Fail on blank captures.
+static bool captureEditorBitmap(HWND hwnd,const wchar_t* path) {
+    RECT rc{};
+    if(!GetClientRect(hwnd,&rc)||rc.right<=0||rc.bottom<=0||
+       rc.right>4000||rc.bottom>4000)return false;
+    const int w=rc.right,h=rc.bottom;
+    HDC dc=CreateCompatibleDC(nullptr);
+    if(!dc)return false;
+    BITMAPINFO info{};
+    info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
+    info.bmiHeader.biWidth=w;info.bmiHeader.biHeight=-h;
+    info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;
+    info.bmiHeader.biCompression=BI_RGB;
+    const DWORD bytes=DWORD(w)*DWORD(h)*4;
+    info.bmiHeader.biSizeImage=bytes;
+    void* bits=nullptr;
+    HBITMAP bmp=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0);
+    if(!bmp||!bits){if(bmp)DeleteObject(bmp);DeleteDC(dc);return false;}
+    HGDIOBJ prev=SelectObject(dc,bmp);
+    if(!prev||prev==HGDI_ERROR){DeleteObject(bmp);DeleteDC(dc);return false;}
+    auto* pixels=static_cast<std::uint32_t*>(bits);
+    auto varied=[&](){
+        GdiFlush();
+        std::set<std::uint32_t> colors;
+        for(DWORD i=0;i<bytes/4;i+=37)colors.insert(pixels[i]&0x00ffffffu);
+        return colors.size()>=64;
+    };
+    std::memset(bits,0,bytes);
+    bool ok=PrintWindow(hwnd,dc,PW_CLIENTONLY|2)&&varied();
+    if(!ok){
+        // Some VSTGUI/D2D backends cannot print into an HDC. Try the
+        // visible plugin's own client DC; never capture the whole screen.
+        std::memset(bits,0,bytes);
+        HDC src=GetDC(hwnd);
+        if(src){ok=BitBlt(dc,0,0,w,h,src,0,0,SRCCOPY)&&varied();ReleaseDC(hwnd,src);}
+    }
+    if(ok){
+        BITMAPFILEHEADER fh{};
+        fh.bfType=0x4d42;
+        fh.bfOffBits=sizeof(fh)+sizeof(BITMAPINFOHEADER);
+        fh.bfSize=fh.bfOffBits+bytes;
+        HANDLE f=CreateFileW(path,GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(f==INVALID_HANDLE_VALUE)ok=false;
+        else{
+            DWORD written=0;
+            auto write=[&](const void* p,DWORD n){return WriteFile(f,p,n,&written,nullptr)&&written==n;};
+            ok=write(&fh,sizeof(fh))&&write(&info.bmiHeader,sizeof(BITMAPINFOHEADER))&&write(bits,bytes);
+            CloseHandle(f);
+            if(!ok)DeleteFileW(path);
+        }
+    }
+    SelectObject(dc,prev);DeleteObject(bmp);DeleteDC(dc);
+    return ok;
+}
 
 namespace S = Steinberg;
 namespace V = Steinberg::Vst;
@@ -444,6 +501,10 @@ int main(int argc,char** argv) {
         HWND parent=CreateWindowExW(0,L"STATIC",L"125A editor host",WS_OVERLAPPEDWINDOW,
             0,0,1050,780,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
         if(!parent)return fail("Native editor parent HWND creation failed");
+        wchar_t screenshotPath[32768]{};
+        const DWORD screenshotLen=GetEnvironmentVariableW(L"AWE64_EDITOR_SCREENSHOT",screenshotPath,32768);
+        if(screenshotLen>=32768)return fail("Editor screenshot path too long");
+        if(screenshotLen)ShowWindow(parent,SW_SHOWNOACTIVATE);
         NativeEditorFrame frame(parent);
         ResetHostHandler resetHandler;
         if(controller->setComponentHandler(&resetHandler)!=S::kResultOk)
@@ -558,6 +619,16 @@ int main(int argc,char** argv) {
             if(!resetHandler.passed())return fail("RESET did not recover after host refusal");
             for(unsigned i=0;i<12;++i)if(controller->getParamNormalized(1100u+i)!=0.)
                 return fail("RESET recovery did not restore neutral values");
+            if(pass==0&&screenshotLen){
+                RedrawWindow(parent,nullptr,nullptr,RDW_INVALIDATE|RDW_UPDATENOW|RDW_ALLCHILDREN);
+                for(unsigned frameWait=0;frameWait<10;++frameWait){
+                    while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                }
+                if(!captureEditorBitmap(surface,screenshotPath))
+                    return fail("Actual editor screenshot unavailable or blank");
+                std::cout<<"REAL_VST3_EDITOR_BITMAP_CAPTURED; SYNTHETIC_ASSETS_ONLY\n";
+            }
             std::cout<<"EDITOR_REMOVE_ENTER "<<pass<<"\n";
             if(view->removed()!=S::kResultOk)return fail("Actual P165 editor detach failed");
             if(view->setFrame(nullptr)!=S::kResultOk)return fail("Actual editor clearFrame failed");

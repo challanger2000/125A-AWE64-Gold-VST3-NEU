@@ -13,6 +13,16 @@ class DisplayGeometry(unittest.TestCase):
             self.assertEqual(src.count(marker),1,marker)
         self.assertNotIn('CREATIVE WIN95"',src)
         self.assertNotIn('MakeLabel({350,',src)
+    def test_owner_contrast_and_english_labels(self):
+        src=(ROOT/"gui/PresetBrowserView.cpp").read_text(encoding="utf-8")
+        cmake=(ROOT/"CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertEqual(src.count("CColor(7,11,16,186)"),2)
+        for marker in ('Search instruments...', 'Bank selection failed: audio engine unavailable.'):
+            self.assertIn(marker,src)
+        for old in ('Instrument suchen...', 'Bank-Neuauswahl fehlgeschlagen', 'Alle Dateien (*.*)'):
+            self.assertNotIn(old,src)
+        self.assertIn('Host rejected the preset selection.',cmake)
+        self.assertNotIn('Host hat die Preset-Auswahl abgelehnt.',cmake)
     def test_display_uses_validated_default_bank(self):
         shell=(ROOT/"src/DosBoxVst3Shell.cpp").read_text(encoding="utf-8")
         self.assertIn('DisplayStatus::bankName(requestedBankDigestValid_,requestedBank_)',shell)

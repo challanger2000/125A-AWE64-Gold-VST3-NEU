@@ -1,5 +1,9 @@
 # AGENTS.md — verbindliche Anweisung für Codex und folgende Chats
 
+## 27.11.2026 — Owner GUI correction and native visual evidence
+
+- Preserve the authoritative NEU DOSBox implementation, existing factory CID, installed names, graphics, both CPU optimizations and upstream pin `81d0fde`. Restored P168 LCD coordinates and original 73% control-area overlay remain unchanged; remaining compiled search/selection messages translated to English. Add a source regression for both overlay regions and English labels. The actual Windows editor test now optionally captures its own child HWND before any original-asset test, with a separate non-release artifact; blank capture is explicitly NOT VERIFIED, not a visual PASS. Native screenshot and exact-commit original regression pending. No package or Studio Pro approval.
+
 ## 27.11.2026 — Owner NO-GO 015c182; display and private package
 
 - Recovered later P168 label layout from prior repository; preserve P165 images and DOSBox-X 81d0fde with both optimizations. See `docs/OWNER-REJECTION-015c182.md`. Source correction candidate; native GUI and full original regression NOT RUN. Complete private original asset delivery remains blocked. No Studio Pro release.

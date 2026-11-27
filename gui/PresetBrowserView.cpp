@@ -415,8 +415,8 @@ bool NativeChooseFile(std::string& chosen,bool forRom) {
     ofn.lpstrFile=file;
     ofn.nMaxFile=32768;
     ofn.lpstrFilter=forRom
-        ? L"EMU8000 Wave-ROM (*.raw;*.rom;*.bin)\0*.raw;*.rom;*.bin\0Alle Dateien (*.*)\0*.*\0\0"
-        : L"SoundFont 2 (*.sf2)\0*.sf2\0Alle Dateien (*.*)\0*.*\0\0";
+        ? L"EMU8000 Wave-ROM (*.raw;*.rom;*.bin)\0*.raw;*.rom;*.bin\0All Files (*.*)\0*.*\0\0"
+        : L"SoundFont 2 (*.sf2)\0*.sf2\0All Files (*.*)\0*.*\0\0";
     ofn.nFilterIndex=1;
     ofn.lpstrDefExt=forRom?L"raw":L"sf2";
     ofn.Flags=OFN_EXPLORER|OFN_FILEMUSTEXIST|OFN_PATHMUSTEXIST;
@@ -593,7 +593,7 @@ PresetBrowserView::PresetBrowserView(const CRect& rect,
     AddToCurrentPage(bankMenu_);
     searchCaption_=MakeLabel({506,247,572,282},"SEARCH",true);
     search_=new CTextEdit(PageRect({586,249,968,282}),this,kFilter,"");
-    search_->setPlaceholderString("Instrument suchen...");
+    search_->setPlaceholderString("Search instruments...");
     search_->setImmediateTextChange(true);
     // Underlying CTextEdit still owns typing, caret, search and focus.
     // Its metal bezel is a separate non-interactive view behind the edit.
@@ -738,7 +738,7 @@ void PresetBrowserView::Select(uint16_t bank,uint8_t program) {
         // parameter edit while CC0 continues to select a different bank.
         // Do not pretend a new program selection succeeded.
         if(hint_) {
-            hint_->setText("Bank-Neuauswahl fehlgeschlagen: Verbindung zum Prozessor pruefen.");
+            hint_->setText("Bank selection failed: audio engine unavailable.");
             hint_->setFontColor(CColor(255,143,122,255));
         }
         return;

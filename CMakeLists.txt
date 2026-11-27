@@ -117,7 +117,7 @@ if(AWE64_BUILD_VST3_DEV)
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     OUTPUT_VARIABLE AWE64_APPROVED_GUI_BLOB
     OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT AWE64_APPROVED_GUI_BLOB STREQUAL "a5bdfe6e44b60f79dc5e897f207515e1995e7b02")
+  if(NOT AWE64_APPROVED_GUI_BLOB STREQUAL "ace59c1d3303e6375987b7d1da31b43d6a39b913")
     message(FATAL_ERROR "Approved P165 display-corrected GUI changed unexpectedly; verify before continuing.")
   endif()
   file(READ "${CMAKE_CURRENT_SOURCE_DIR}/gui/PresetBrowserView.cpp" AWE64_GUI_SRC)
@@ -273,7 +273,7 @@ void PresetBrowserView::Select(uint16_t bank,uint8_t program) {
     SyncActiveMenuSelection();
     SyncBrowserSelection();
     if(!ok&&hint_){
-        hint_->setText("Host hat die Preset-Auswahl abgelehnt.");
+        hint_->setText("Host rejected the preset selection.");
         hint_->setFontColor(CColor(255,143,122,255));
     }
 }
@@ -330,7 +330,7 @@ void PresetBrowserView::Select(uint16_t bank,uint8_t program) {
   add_executable(awe64_vst3_host_pcm_smoke tests/WindowsVst3HostPcmSmoke.cpp
     "${AWE64_VST3SDK}/public.sdk/source/common/memorystream.cpp")
   target_include_directories(awe64_vst3_host_pcm_smoke PRIVATE "${AWE64_VST3SDK}")
-  target_link_libraries(awe64_vst3_host_pcm_smoke PRIVATE sdk sdk_hosting base user32 ole32 advapi32)
+  target_link_libraries(awe64_vst3_host_pcm_smoke PRIVATE sdk sdk_hosting base user32 ole32 advapi32 gdi32)
   target_compile_features(awe64_vst3_host_pcm_smoke PRIVATE cxx_std_20)
 
   smtg_target_configure_version_file(AWE64GoldDOSBoxDev)

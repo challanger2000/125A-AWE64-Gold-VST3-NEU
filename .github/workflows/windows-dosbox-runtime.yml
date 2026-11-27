@@ -293,6 +293,27 @@ jobs:
           $log | ForEach-Object { Write-Host $_ }
           $reset = @($log | Where-Object { "$_" -match '^REAL_VST3_MOD_RESET_CLICK_PASS; PARAMS=12; GESTURES=12; PRESERVED=5; PASS=[01]$' })
           if ($code -ne 0 -or $reset.Count -ne 2 -or ($reset | Select-Object -Unique).Count -ne 2) { throw "Native editor/MOD RESET gate FAILED; exit=$code" }
+      - name: Capture actual compiled editor for visual review (synthetic assets only)
+        id: editor-visual
+        continue-on-error: true
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $plugin=(Resolve-Path 'build-vst3/VST3/Release/125A AWE64 Gold.vst3/Contents/x86_64-win/125A AWE64 Gold.vst3').Path
+          $hostTestExe=(Resolve-Path 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe').Path
+          $env:AWE64_EDITOR_SCREENSHOT=Join-Path $env:RUNNER_TEMP 'awe64-editor.bmp'
+          $log = & $hostTestExe $plugin --editor 2>&1
+          $code=$LASTEXITCODE
+          $log | ForEach-Object { Write-Host $_ }
+          if ($code -ne 0 -or -not (Test-Path -LiteralPath $env:AWE64_EDITOR_SCREENSHOT) -or @($log | Where-Object { "$_" -eq 'REAL_VST3_EDITOR_BITMAP_CAPTURED; SYNTHETIC_ASSETS_ONLY' }).Count -ne 1) { throw 'Native visual evidence NOT VERIFIED; no screenshot PASS' }
+      - name: Retain native editor screenshot (not a release)
+        if: steps.editor-visual.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AWE64-native-editor-${{ github.sha }}
+          path: ${{ runner.temp }}/awe64-editor.bmp
+          if-no-files-found: error
+          retention-days: 3
       - name: Original Creative archival-reference research in actual Windows VST3 (no private owner files)
         shell: pwsh
         timeout-minutes: 28
