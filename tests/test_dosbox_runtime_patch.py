@@ -85,7 +85,9 @@ emu8k_init
     emu8k->hwcf3 = 0x00;
 }
 emu8k_close(emu8k_t *emu8k)
-{'''
+{
+        for (pos = emu8k->pos; pos < wavetable_pos_global; pos++) {
+            int32_t dat;'''
         patched = patch.patch_emu_c_init(s)
         self.assertIn('if (bad || count != 1048576)', patched)
         self.assertIn('emu8k->empty = failure == 4', patched)
@@ -93,6 +95,9 @@ emu8k_close(emu8k_t *emu8k)
         self.assertIn('if (rom_read(emu8k->rom, 1048576) < 1048574)', patched)
         self.assertIn('emu8k->mod_attack_cache = calloc', patched)
         self.assertIn('free(emu8k->mod_attack_cache);', patched)
+        self.assertIn('!emu_voice->volumeslide.last', patched)
+        self.assertIn('!CCCA_DMA_ACTIVE(emu_voice->ccca)', patched)
+        self.assertIn('emu_voice->filt_oct_curr = emu_voice->filt_oct_target;', patched)
         with self.assertRaises(ValueError):
             patch.patch_emu_c_init(patched)
 

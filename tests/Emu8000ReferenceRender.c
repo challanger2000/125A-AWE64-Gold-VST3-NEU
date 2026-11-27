@@ -236,7 +236,70 @@ static int check_lifetime(void) {
     return 0;
 }
 
+/* Same-pin differential fixture: near misses and fixed points, full voice
+   bytes and raw PCM, including resumption after a silent interval. */
+#ifdef AWE64_CANDIDATE
+static int idle_state(const char *path) {
+    emu8k_t *chip = new_chip();
+    if (!valid_chip(chip)) return 20;
+    memset(chip->voice, 0, sizeof(chip->voice));
+    chip->hwcf3 = 4;
+    for (unsigned i = 0; i < 32; ++i) {
+        emu8k_voice_t *v = &chip->voice[i];
+        v->addr.int_address = 10;
+        v->addr.fract_address = 123;
+        v->loop_start.int_address = 5;
+        v->loop_end.int_address = 20;
+        v->vtft_filter_target = 100 + i;
+        v->filt_oct_target = i & 1 ? -0.0 : -0.25;
+        v->vol_l = v->vol_r = 170;
+        v->overshoot_samples = -1;
+        v->ifatn_init_filter = 255;
+    }
+    chip->voice[1].vtft_vol_target = 20000;
+    chip->voice[2].volumeslide.last = 20000;
+    chip->voice[3].cvcf_curr_volume = 20000;
+    chip->voice[4].ptrx_pit_target = 0x4000;
+    chip->voice[5].cpf_curr_pitch = 0x4000;
+    chip->voice[6].env_engine_on = 1;
+    chip->voice[6].ip = 0xe000;
+    chip->voice[6].vol_envelope.state = 5;
+    chip->voice[6].vol_envelope.value_db_oct = 180000;
+    chip->voice[7].addr.int_address = 34;
+    chip->voice[8].loop_start.int_address = 10;
+    chip->voice[8].loop_end.int_address = 10;
+    chip->voice[9].addr.int_address = 0x01000010;
+    chip->voice[9].loop_start.int_address = 10;
+    chip->voice[9].loop_end.int_address = 10;
+    chip->voice[10].ccca_qcontrol = 4;
+    FILE *f = fopen(path, "wb");
+    if (!f) return 21;
+    ++opens;
+    const unsigned chunks[] = {1, 44, 512, 3, 128, 1, 44};
+    for (unsigned n = 0; n < sizeof(chunks)/sizeof(chunks[0]); ++n) {
+        if (n == 3) configure_voices(chip, 12, filter_wet);
+        if (n == 5) {
+            /* Release: zero target is not zero current volume. */
+            chip->voice[0].vtft_vol_target = 0;
+            chip->voice[0].env_engine_on = 0;
+        }
+        wavetable_pos_global = (int)chunks[n];
+        emu8k_update(chip);
+        if (fwrite(chip->voice, sizeof(chip->voice), 1, f) != 1 ||
+            fwrite(chip->buffer, 2 * sizeof(int32_t), chunks[n], f) != chunks[n]) return 22;
+        emu8k_reset_buffer(chip);
+        wavetable_pos_global = 0;
+    }
+    if (fclose(f)) return 23;
+    release_chip(chip);
+    return live_allocations || opens ? 24 : 0;
+}
+#endif
+
 int main(int argc, char **argv) {
+#ifdef AWE64_CANDIDATE
+    if (argc == 3 && !strcmp(argv[1], "idle-state")) return idle_state(argv[2]);
+#endif
     if (argc == 2 && !strcmp(argv[1], "lifetime")) return check_lifetime();
     if (argc != 9) return 64;
     const unsigned voices = (unsigned)atoi(argv[1]);

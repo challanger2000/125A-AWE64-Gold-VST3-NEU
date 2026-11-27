@@ -64,10 +64,12 @@ def compile_hosts(directory, upstream, cc, sanitize=False):
     if len(register_patterns) != 4:
         raise RuntimeError("Reference effect register fixture is incomplete")
     (directory / "emu8k_test_effect_registers.h").write_text("\n".join(register_patterns) + "\n")
-    for index, core in enumerate((old_core, new_core)):
+    for index, core in enumerate((old_core, new_core, new_core)):
         flags = [*COMPILER_FLAGS]
         if index:
             flags.append("-DAWE64_CANDIDATE")
+        if index == 2:
+            flags.append("-DAWE64_DISABLE_IDLE_FASTPATH")
         if sanitize:
             flags += ["-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                       "-fno-omit-frame-pointer", "-no-pie"]
@@ -86,6 +88,22 @@ def compare(directory, repeats, seconds):
 
     for index in (0, 1):
         print(run(index, "lifetime").strip())
+
+    # Same upstream and same patch, with only the fixed-point fast path disabled.
+    state_on, state_off = directory / "idle-on.bin", directory / "idle-off.bin"
+    run(1, "idle-state", state_on)
+    run(2, "idle-state", state_off)
+    require_equal("idle fixed-point/near-miss state and PCM", state_off.read_bytes(), state_on.read_bytes())
+    print("IDLE_STATE_AND_PCM_PASS")
+    idle_times = [[], []]
+    for repeat in range(repeats):
+        for slot in ((1, 0) if repeat % 2 else (0, 1)):
+            path = directory / f"idle-{slot}.pcm"
+            log = run(1 + slot, 0, 0, 44, seconds, -1, 0, 0, path)
+            idle_times[slot].append(float(log.split()[0].split("=")[1]))
+        require_equal("same-pin idle PCM", (directory / "idle-0.pcm").read_bytes(),
+                      (directory / "idle-1.pcm").read_bytes())
+    print(f"IDLE_SAME_PIN_MS off={median(idle_times[1]):.3f} on={median(idle_times[0]):.3f}")
 
     # Each entry records voices, filter/attack mode, chunk size and effect preset.
     cases = [(v, mode, 44, -1) for v, mode in

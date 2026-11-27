@@ -3,11 +3,17 @@
 **Produkt:** 125A AWE64 Gold (Windows x64 VST3, DOSBox-X)  
 **Stand:** 27.11.2026  
 **Entwicklungskennung:** `0.0.0-dev`  
-**Release / abgenommenes Instrument:** **NEIN – lokaler EMU8000-Kandidat; native Abnahme und CPU-Ziel offen, Klangreferenz 609ab17**
+**Release / abgenommenes Instrument:** **NEIN – Leerlauf-Kandidat in Prüfung; Studio Pro und CPU-Ziel offen, Klangreferenz 609ab17**
 **Einziger Branch:** `main`  
 **Exakter neuester Quellstand:** [oberster Commit auf main](../../commits/main) (nicht auf eine veraltende SHA im Text verlassen)
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
+
+## 27.11.2026 — Separater Leerlauf-Kandidat
+
+- Referenz `0be3d8c` (Upstream `81d0fde`): alle sieben gestarteten Workflows SUCCESS, originale Creative/VST3-Regressionsprüfung 45997748041, 47/47 Validator, unabhängiges Test Lab 45997748254, gezielte Performance 45997748024. Kein Studio-Pro-CPU-Nachweis. Privater Lieferbuild 46002394682 bleibt auf dieser bereits geprüften Referenz.
+- Separater konservativer Fixpunkt-Fastpath nur bei abgeschalteter Hüllkurve, exakt null aktuellem/Zielvolumen und Slide sowie aktuellem/Zielpitch, stabiler Loop-Adresse und ohne DMA. Filterzustand und Registerfortschreibung unverändert; Effekte, Audiozeit, MIDI und alle aktiven Stimmen bleiben unangetastet.
+- Neuer Same-Pin-Differentialtest mit abschaltbarem Fastpath, vollständigen Stimmzuständen, PCM, Grenzfällen und erneuter Aktivierung, zusätzlich 22 Referenz-PCM-Fälle mit Sanitizern. Diese Prüfungen sowie die native Originalregression sind für den neuen Kandidaten **NOT RUN** bis zum tatsächlichen Ergebnis. Keine Freigabe und kein nachgewiesener CPU-Gewinn auf dem Besitzerrechner.
 
 ## 27.11.2026 — Lokaler EMU8000-Übernahmekandidat
 

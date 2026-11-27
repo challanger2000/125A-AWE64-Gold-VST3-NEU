@@ -557,11 +557,33 @@ emu8k_mod_attack_value(emu8k_t *emu8k, int32_t phase)
 #endif
 }''')
     anchor = "emu8k_close(emu8k_t *emu8k)\n{"
-    return once(s, anchor, anchor + r'''
+    s = once(s, anchor, anchor + r'''
 #ifdef AWE64_VST3_RUNTIME
     free(emu8k->mod_attack_cache);
     emu8k->mod_attack_cache = NULL;
 #endif''')
+    return patch_emu_idle_fastpath(s)
+
+
+def patch_emu_idle_fastpath(s):
+    # Only skip a proven fixed point. No oscillator, envelope, DMA, or
+    # volume ramp activity. Reproduce the final filter and voice register
+    # updates; never skip the global reverb/chorus/EQ or timing.
+    anchor = "        for (pos = emu8k->pos; pos < wavetable_pos_global; pos++) {\n            int32_t dat;"
+    return once(s, anchor, r'''#if defined(AWE64_VST3_RUNTIME) && !defined(AWE64_DISABLE_IDLE_FASTPATH)
+        if (!emu_voice->env_engine_on &&
+            !emu_voice->cvcf_curr_volume && !emu_voice->vtft_vol_target &&
+            !emu_voice->volumeslide.last &&
+            !emu_voice->cpf_curr_pitch && !emu_voice->ptrx_pit_target &&
+            !CCCA_DMA_ACTIVE(emu_voice->ccca) &&
+            (emu_voice->addr.addr < emu_voice->loop_end.addr ||
+             (emu_voice->loop_end.int_address == emu_voice->loop_start.int_address &&
+              (emu_voice->addr.int_address & EMU8K_MEM_ADDRESS_MASK) == emu_voice->addr.int_address))) {
+            emu_voice->cvcf_curr_filt_ctoff = emu_voice->vtft_filter_target;
+            emu_voice->filt_oct_curr = emu_voice->filt_oct_target;
+        } else
+#endif
+''' + anchor)
 
 
 def patch_main(s):

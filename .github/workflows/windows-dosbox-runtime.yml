@@ -9,6 +9,8 @@ on:
       - 'third_party/dosbox-x-AWE32'
       - 'research/p165-control-port/**'
       - 'tests/test_dosbox_runtime_patch.py'
+      - 'tests/compare_emu8000.py'
+      - 'tests/Emu8000ReferenceRender.c'
       - 'tests/Audit*'
       - 'tests/MakeAuditSf2Cases.py'
       - 'tests/WindowsTimedVst3Acceptance.py'
@@ -57,6 +59,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+          fetch-depth: 0
       - name: Verify upstream commit and apply real source patch
         run: |
           test "$(git -C third_party/dosbox-x-AWE32 rev-parse HEAD)" = "81d0fde73917b57a1716e610dec2605c36def555"
@@ -66,6 +69,8 @@ jobs:
           PYTHONPATH=tests python -m unittest discover -s tests -p test_mpu_probe.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_ram_sample_sf2.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_voice_overlay_report.py -v
+          python tests/compare_emu8000.py third_party/dosbox-x-AWE32 --seconds 2 --repeats 3
+          python tests/compare_emu8000.py third_party/dosbox-x-AWE32 --sanitize --seconds 2 --repeats 1
           python integration/patch_dosbox_runtime.py third_party/dosbox-x-AWE32
           grep -q 'AweHostRead.Install(0xBEE0u' third_party/dosbox-x-AWE32/src/hardware/emu8000.cpp
           grep -q 'AWE64_HostRegisterPCM' third_party/dosbox-x-AWE32/src/hardware/mixer.cpp
