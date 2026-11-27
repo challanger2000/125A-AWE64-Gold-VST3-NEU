@@ -55,6 +55,9 @@ class DosBoxRuntimeCore final {
     unsigned demandLead_=0;
     bool pcmPrimed_=false;
     // Consumer-only boot deadline. No sleep, allocation or logging in ready().
+    // Set during begin(), immutable once worker/callbacks can access it.
+    unsigned bootTimeoutSeconds_=30;
+    bool boostBankLoad_=false;
     std::chrono::steady_clock::time_point startupDeadline_{};
     std::atomic<bool> startupTimedOut_{false};
     bool firstPrimeCompleted_=false;
@@ -304,6 +307,11 @@ public:
                     stop();return false;
                 }
                 guestBank="D:\\BANK.SF2";
+                // Actual original-driver transfer measurements show a 23.4 MB
+                // bank can require 66 s even at 24000 cycles/ms on CI.
+                // Keep the existing 30 s bound for small/ROM/synthetic boots.
+                boostBankLoad_=authenticGuest_&&(validatedBank?validatedBank->size():bytes.size())>1024u*1024u;
+                bootTimeoutSeconds_=boostBankLoad_?180u:30u;
             } else {
                 // Use the very same default-bank snapshot as the VST3
                 // catalog. Preserve bytes, do not adapt the original bank.
@@ -358,6 +366,11 @@ public:
             if(!stagedDirectory_.empty()) {
                 argvStorage_.push_back("-c");
                 argvStorage_.push_back("mount d \""+utf8(stagedDirectory_)+"\"");
+            }
+            if(boostBankLoad_){
+                argvStorage_.push_back("-awe64-boot-boost");
+                argvStorage_.push_back("-c");
+                argvStorage_.push_back("config -set \"cpu cycles=fixed 24000\"");
             }
             argvStorage_.push_back("-c");
             // Private diagnostic of the UNMODIFIED Creative DOS program.
@@ -498,9 +511,8 @@ public:
     // Non-RT candidate-bank preparation only: do not prime/dequeue PCM
     // or alter host timing while the former runtime is still processing.
     bool waitForGuestMidiReady() noexcept {
-        // Same boot deadline as the independent original Creative bank
-        // sweep, which allows large banks 30 seconds to load.
-        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+        // Same bounded budget as initial activation and offline startup.
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(bootTimeoutSeconds_);
         while(std::chrono::steady_clock::now()<deadline){
             if(finished()){
                 std::fprintf(stderr,"AWE64_CANDIDATE_BOOT_EXIT=%d\n",guestExitCode());
@@ -509,7 +521,7 @@ public:
             if(ready_&&ready_()&&!finished())return true;
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
-        std::fprintf(stderr,"AWE64_CANDIDATE_BOOT_TIMEOUT_MS=30000\n");
+        std::fprintf(stderr,"AWE64_CANDIDATE_BOOT_TIMEOUT_MS=%u\n",bootTimeoutSeconds_*1000u);
         return false;
     }
     void startReplacementCapture() noexcept {if(adapter_)adapter_->startReplacementCapture();}
@@ -540,7 +552,7 @@ public:
         if(hostBlock&&!firstPrimeCompleted_){
             const auto now=std::chrono::steady_clock::now();
             if(startupDeadline_==std::chrono::steady_clock::time_point{})
-                startupDeadline_=now+std::chrono::seconds(30);
+                startupDeadline_=now+std::chrono::seconds(bootTimeoutSeconds_);
             else if(now>=startupDeadline_)
                 startupTimedOut_.store(true,std::memory_order_release);
         }
@@ -549,6 +561,7 @@ public:
     [[nodiscard]] bool running() const noexcept {
         return running_.load(std::memory_order_acquire);
     }
+    unsigned bootTimeoutSeconds() const noexcept {return bootTimeoutSeconds_;}
     [[nodiscard]] bool startupTimedOut() const noexcept {return startupTimedOut_.load(std::memory_order_acquire);}
     [[nodiscard]] bool finished() const noexcept {
         return startupTimedOut()||finished_.load(std::memory_order_acquire)||(clockFault_&&clockFault_());
@@ -723,6 +736,7 @@ public:
     bool ready(std::size_t frames=0) noexcept {return core_&&core_->ready(frames);}
     bool running() const noexcept {return core_&&core_->running();}
     bool finished() const noexcept {return !core_||core_->finished();}
+    unsigned bootTimeoutSeconds() const noexcept {return core_?core_->bootTimeoutSeconds():30u;}
     bool startupTimedOut() const noexcept {return core_&&core_->startupTimedOut();}
     int guestExitCode() const noexcept {return core_?core_->guestExitCode():-1;}
     bool setVoiceControls(std::uint64_t lo,unsigned hi) noexcept {return core_&&core_->setVoiceControls(lo,hi);}

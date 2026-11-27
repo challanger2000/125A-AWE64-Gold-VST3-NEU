@@ -330,8 +330,12 @@ static std::atomic<bool> awe64_guest_midi_ready{false};
 static unsigned char awe64_overlay_tags[32]{};
 static uint64_t awe64_overlay_epoch=0,awe64_overlay_context=0;
 uint64_t AWE64_OverlayMidiContext() noexcept { return awe64_overlay_context; }
+extern bool AWE64_BootClockSettled() noexcept;
+bool AWE64_RawGuestMidiReady() noexcept {
+    return awe64_guest_midi_ready.load(std::memory_order_acquire);
+}
 extern "C" __declspec(dllexport) int __cdecl AWE64_IsGuestMidiReady() noexcept {
-    return awe64_guest_midi_ready.load(std::memory_order_acquire)?1:0;
+    return AWE64_RawGuestMidiReady()&&AWE64_BootClockSettled()?1:0;
 }
 extern "C" __declspec(dllexport) void __cdecl AWE64_HostRegisterMidi(
     void* p,Awe64PullMidi fn) noexcept {
@@ -361,6 +365,8 @@ static void AWE64_PumpGuestMidi() {
         if(mpu.queue_used!=0)return;
         awe64_guest_midi_ready.store(true,std::memory_order_release);
     }
+    // Never consume host MIDI until the original playback clock is restored.
+    if(!AWE64_BootClockSettled())return;
     auto pull=awe64_mpu_pull.load(std::memory_order_acquire);
     if(!pull)return;
     // The original UART FIFO holds 32 bytes. Queue complete messages only.
@@ -768,7 +774,8 @@ static bool AWE64_ValidateEmbeddedArgs(int argc,char** argv) noexcept {
         const char* arg=argv[i];
         if(!arg)return false;
         if(std::strcmp(arg,"-noconfig")==0){noConfig=true;continue;}
-        if(std::strcmp(arg,"-awe64-audit-sdl-init")==0||AWE64_EmuAuditMode(arg))continue;
+        if(std::strcmp(arg,"-awe64-audit-sdl-init")==0||AWE64_EmuAuditMode(arg)||
+           std::strcmp(arg,"-awe64-boot-boost")==0)continue;
         if(std::strcmp(arg,"-nogui")==0||std::strcmp(arg,"-nomenu")==0||
            std::strcmp(arg,"-noconsole")==0||std::strcmp(arg,"-silent")==0||
            std::strcmp(arg,"-test")==0)continue;
@@ -809,6 +816,7 @@ static bool AWE64_ValidateExplicitRom(int argc,char** argv,AWE64RomEntryGuard& g
     return !awe;
 }
 // Must be invoked on a dedicated host-owned worker, inside the VST3 process.
+extern void AWE64_SetBootClockPending(bool enabled) noexcept;
 extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
     int argc,char** argv) {
     if(!AWE64_ValidateEmbeddedArgs(argc,argv)){
@@ -830,19 +838,26 @@ extern "C" __declspec(dllexport) int __cdecl AWE64_StartGuest(
     char* forwarded[129]{};
     int count=0;
     bool inject=false;
+    bool boost=false,boostCommand=false;
     int emuInject=0;
     forwarded[count++]=argv[0];
     for(int i=1;i<argc;++i){
         if(std::strcmp(argv[i],"-awe64-audit-sdl-init")==0){inject=true;continue;}
+        if(std::strcmp(argv[i],"-awe64-boot-boost")==0){boost=true;continue;}
         if(const int mode=AWE64_EmuAuditMode(argv[i])){emuInject=mode;continue;}
         forwarded[count++]=argv[i];
-        if(std::strcmp(argv[i],"-c")==0||std::strcmp(argv[i],"-set")==0)
+        if(std::strcmp(argv[i],"-c")==0||std::strcmp(argv[i],"-set")==0){
+            if(std::strcmp(argv[i],"-c")==0&&std::strcmp(argv[i+1],"config -set \\"cpu cycles=fixed 24000\\"")==0)
+                boostCommand=true;
             forwarded[count++]=argv[++i];
+        }
     }
     struct AWE64AuditScope {
         AWE64AuditScope(bool enabled,int emu){awe64_audit_sdl_init_failure=enabled;awe64_audit_emu_init_failure=emu;}
         ~AWE64AuditScope(){awe64_audit_sdl_init_failure=false;awe64_audit_emu_init_failure=0;}
     } audit(inject,emuInject);
+    if(boost&&!boostCommand)return -12565;
+    AWE64_SetBootClockPending(boost);
     const int result=main(count,forwarded);
     control=nullptr; // Config stack object has already been destroyed
     if(awe64_emu_init_failed){
@@ -1014,6 +1029,30 @@ def patch_dosbox_clock(s):
 using Awe64TickDecision = int (__cdecl *)(void*);
 static std::atomic<void*> awe64_clock_ctx{nullptr};
 static std::atomic<Awe64TickDecision> awe64_clock_decision{nullptr};
+static std::atomic<bool> awe64_boot_clock_pending{false};
+extern bool AWE64_RawGuestMidiReady() noexcept;
+void AWE64_SetBootClockPending(bool enabled) noexcept {
+    awe64_boot_clock_pending.store(enabled,std::memory_order_release);
+}
+bool AWE64_BootClockSettled() noexcept {
+    return !awe64_boot_clock_pending.load(std::memory_order_acquire);
+}
+// Only on the guest CPU thread, between virtual milliseconds after
+// PIC_RunQueue exhausted the previous cycle budget. No host-thread
+// mutation of DOSBox CPU state and no change to EMU8000 sample processing.
+static void AWE64_RestoreBootClock() noexcept {
+    if(!awe64_boot_clock_pending.load(std::memory_order_relaxed)||!AWE64_RawGuestMidiReady())return;
+    const auto previous=CPU_CycleMax;
+    RDTSC_rebase();
+    if(previous==24000)CPU_CycleLeft/=8;
+    CPU_CycleMax=3000;
+    CPU_OldCycleMax=3000;
+    CPU_CyclesSet=3000;
+    CPU_CycleAutoAdjust=false;
+    CPU_AutoDetermineMode|=CPU_AUTODETERMINE_CYCLES;
+    awe64_boot_clock_pending.store(false,std::memory_order_release);
+    std::fprintf(stderr,"AWE64_BOOT_CLOCK_RESTORED from=%lld to=3000\n",static_cast<long long>(previous));
+}
 extern "C" __declspec(dllexport) void __cdecl AWE64_HostRegisterClock(void* ctx,Awe64TickDecision fn) noexcept {
     awe64_clock_decision.store(nullptr,std::memory_order_release);
     awe64_clock_ctx.store(ctx,std::memory_order_release);
@@ -1033,6 +1072,7 @@ static int AWE64_HostTickDecision() noexcept {
 #ifdef AWE64_VST3_RUNTIME
                 // At the original safe tick boundary, after the original
                 // cooperative stop check. Boot/direct reference returns 0.
+                AWE64_RestoreBootClock();
                 const int hostTick=AWE64_HostTickDecision();
                 if(hostTick!=0) {
                     if(hostTick==1 && !DOSBox_Paused())TIMER_AddTick();

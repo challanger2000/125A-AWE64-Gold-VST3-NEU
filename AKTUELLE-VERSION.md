@@ -3,11 +3,20 @@
 **Produkt:** 125A AWE64 Gold (Windows x64 VST3, DOSBox-X)  
 **Stand:** 27.11.2026  
 **Entwicklungskennung:** `0.0.0-dev`  
-**Release / abgenommenes Instrument:** **NEIN – Besitzer hat 015c182 abgelehnt; Display-/Lieferkorrektur in Prüfung; keine Abnahme**
+**Release / abgenommenes Instrument:** **NEIN – 22 SF2-Banken und Bankwechsel noch nicht vollständig nativ verifiziert**
 **Einziger Branch:** `main`  
 **Exakter neuester Quellstand:** [oberster Commit auf main](../../commits/main) (nicht auf eine veraltende SHA im Text verlassen)
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
+
+## 27.11.2026 — SF2-Kompatibilität und Ladezeit: Entwicklungskandidat
+
+- Besitzer-Abnahmebedingung: 22/22 tatsächliche Original-Soundbanks müssen laden und spielbar sein, einschließlich direkter Bankwechsel. Manifest: 125A-Engineering/docs/AWE64-OWNER-SF2-ACCEPTANCE.md.
+- [Vergleich der drei Engine-Versionen](https://github.com/challanger2000/125A-Engineering/actions/runs/46059582888): 32 KB akzeptiert, 6,9 MB/23,4 MB bei allen drei nach 30 s abgelehnt. Beide Performance-Patches bleiben unverändert.
+- [Original-DOS-Transferdiagnose](https://github.com/challanger2000/125A-Engineering/actions/runs/46059256089): bei 24000 Zyklen 6,9 MB in 20,4 s und 23,4 MB in 66,0 s bereit, MIDI und nichtstilles PCM beobachtet. 48000 scheiterte; 3000 große Banken nach 80 s nicht bereit. Diagnose in direktem Guest, nicht identische VST3-Callbacks; kein Owner-SF2-Nachweis.
+- Neue Kandidatenlogik: nur authentische externe Banken >1 MiB erhalten während Boot/Transfer 24000 Zyklen und maximal 180 s. Gast stellt vor Host-MIDI-Bereitschaft am ursprünglichen virtuellen Tickwechsel 3000 Zyklen wieder her; identisches Boot-Zeitbudget für Wechsel, Erstaktivierung und Offline. Klein/ROM/Synthetik bleiben 30 s. Vorherigen aktiven Gast nicht vor erfolgreichem Kandidatenstart ersetzen.
+- SF2-Fallback: ausschließlich inaktive ungültige Loops in Staging-Kopie bereinigen; aktive 1–2-Wort-Loop-Enden nur bei vorhandener, nachgewiesener Null-Guardzone akzeptieren, ohne ihre aktiven Header oder PCM zu ändern; strikten Validator auf Beweiskopie erneut anwenden. Lokales Experiment 22/22 akzeptiert und 19/19 Grenzproben; native End-to-End-Abnahme des integrierten Kandidaten NOT RUN.
+- GUI, Original-Driver, DSP, EMU8000-Pin, beide Optimierungen und bisherige Parameter unverändert. Kein Release. Nativer Nachweis der Boost-Rückstellung, großer SF2, tatsächlicher Owner-SF2, Rollback/Recall und Klang/CPU zwingend offen.
 
 ## 27.11.2026 — Owner GUI correction and native visual evidence
 

@@ -412,7 +412,7 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
     bool ready=engine.ready(hostBlock);
     // Offline may wait for the native guest; realtime must never wait.
     if(offline&&hostBlock&&!ready){
-        const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+        const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(engine.bootTimeoutSeconds());
         while(!ready&&!engine.finished()&&std::chrono::steady_clock::now()<until){
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             ready=engine.ready(hostBlock);
