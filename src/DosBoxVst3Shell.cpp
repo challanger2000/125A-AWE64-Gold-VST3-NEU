@@ -3,6 +3,7 @@
 #include "CreativeMidiControllers.hpp"
 #include "CreativeEffectMidi.hpp"
 #include "ExternalSoundFont.hpp"
+#include "DisplayStatus.hpp"
 #include "PresetBrowserView.h"
 #include "pluginterfaces/base/ustring.h"
 #include "pluginterfaces/base/ibstream.h"
@@ -110,7 +111,7 @@ std::string DosBoxVst3Shell::requestedSoundFont() {
 std::string DosBoxVst3Shell::soundFontStatus() {
     std::lock_guard<std::mutex> lock(selectionMutex_);
     if(requestedBank_!=startedBank_)
-        return "SF2 vorgemerkt: beim naechsten Aktivieren laden.";
+        return "SoundFont change pending.";
     return {};
 }
 bool DosBoxVst3Shell::loadCatalog(const std::string& selected,AWE125::PresetCatalog& candidate,
@@ -234,7 +235,10 @@ bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle
         const bool loadFromDisk=!validatedBank;
         if(loadFromDisk) {
             if(selected.empty()){
-                if(!guest::readDefaultBankSnapshot(privateDir/"SYNTHGM.SF2",bytes))return false;
+                if(!guest::readDefaultBankSnapshot(privateDir/"SYNTHGM.SF2",bytes)){
+                    if(!runtime_)guestStatus_.store(-4,std::memory_order_release);
+                    return false;
+                }
             }else if(!guest::readExternalSf2(std::filesystem::u8path(selected),bytes,adapted))return false;
             validatedBank=&bytes;
         }
@@ -854,22 +858,18 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
             const auto selection=soundFontStatus();
             if(!selection.empty())return selection;
             const int s=guestStatus_.load(std::memory_order_acquire);
-            return s==2 ? std::string("DOSBOX-X: MIDI-GAST BEREIT") :
-                   s==1 ? std::string("DOSBOX-X: ORIGINALER CREATIVE-DOS-GAST STARTET") :
-                   s==-1 ? std::string("DOSBOX-X: ORIGINAL-DATEIEN ODER DLL FEHLEN") :
-                   s==-3 ? std::string("DOSBOX-X: STARTZEIT UEBERSCHRITTEN") :
-                   s==-2 ? std::string("DOSBOX-X: GAST IST BEENDET") :
-                           std::string("DOSBOX-X: GAST NICHT GESTARTET");
+            return std::string(AWE125::DisplayStatus::status(s));
         },
         [this](){
             const int s=guestStatus_.load(std::memory_order_acquire);
-            return s==2 ? std::string("ORIGINAL DOSBOX-X | MIDI-GAST BEREIT") :
-                   s==1 ? std::string("ORIGINAL DOSBOX-X STARTET") :
-                           std::string("AWE64 GOLD | KEIN AUDIO-GAST");
+            return std::string(AWE125::DisplayStatus::hardware(s));
         },
         [this](const std::string&){return requestSoundFont({});},
         [this](const std::string& path){return requestSoundFont(path);},
-        [this](){return requestedSoundFont();},
+        [this](){
+            std::lock_guard<std::mutex> lock(selectionMutex_);
+            return AWE125::DisplayStatus::bankName(requestedBankDigestValid_,requestedBank_);
+        },
         [this](){return refreshBrowserCatalog();},
         [](std::uint16_t bank){return bank==0;});
 }

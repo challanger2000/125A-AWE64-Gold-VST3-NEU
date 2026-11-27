@@ -8,6 +8,10 @@ include(CTest)
 if(BUILD_TESTING)
   find_package(Threads REQUIRED)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  add_executable(AuditDisplayStatusTest tests/AuditDisplayStatusTest.cpp)
+  target_include_directories(AuditDisplayStatusTest PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/gui")
+  add_test(NAME AWE64_DisplayStatus COMMAND AuditDisplayStatusTest)
+  add_test(NAME AWE64_DisplayGeometry COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_display_geometry.py")
   add_test(NAME AWE64_NeutralBundleSpacePaths COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_neutral_bundle_cmake.py")
   execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/MakeAuditSf2Cases.py" "${CMAKE_CURRENT_BINARY_DIR}/audit-sf2" RESULT_VARIABLE audit_fixture_result)
   if(NOT audit_fixture_result EQUAL 0)
@@ -106,15 +110,15 @@ if(AWE64_BUILD_VST3_DEV)
   endfunction()
   include(cmake/NeutralBundle.cmake)
 
-  # Preserve byte-identical owner GUI in Git. Old SDK VSTGUI 4 lacks
+  # Preserve approved P165 artwork and the recovered P168 display corrections. Old SDK VSTGUI 4 lacks
   # getVisibleClientRect(), so build ONLY an ephemeral compatibility copy.
   execute_process(
     COMMAND git hash-object "gui/PresetBrowserView.cpp"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     OUTPUT_VARIABLE AWE64_APPROVED_GUI_BLOB
     OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT AWE64_APPROVED_GUI_BLOB STREQUAL "922250ed10e864d3fc7eeabf261ff29f5cbe2040")
-    message(FATAL_ERROR "Owner P007Z GUI changed unexpectedly; verify before continuing.")
+  if(NOT AWE64_APPROVED_GUI_BLOB STREQUAL "a5bdfe6e44b60f79dc5e897f207515e1995e7b02")
+    message(FATAL_ERROR "Approved P165 display-corrected GUI changed unexpectedly; verify before continuing.")
   endif()
   file(READ "${CMAKE_CURRENT_SOURCE_DIR}/gui/PresetBrowserView.cpp" AWE64_GUI_SRC)
   set(AWE64_OLD_VIEWPORT "browser->getVisibleClientRect().getWidth()")
@@ -158,7 +162,7 @@ void PresetBrowserView::ChooseSf2() {
     if(!WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,filename,-1,path.data(),n,nullptr,nullptr))return;
     path.pop_back();
     if(!sf2LoadRequest_||!sf2LoadRequest_(path)) {
-        MessageBoxW(dialog.hwndOwner,L"SoundFont ungueltig oder vom Creative-DOS-Format nicht unterstuetzt.",
+        MessageBoxW(dialog.hwndOwner,L"Invalid or unsupported SoundFont.",
             L"125A AWE64 Gold",MB_OK|MB_ICONERROR);
         return;
     }
@@ -189,7 +193,7 @@ void PresetBrowserView::ChooseSf2() {
 void PresetBrowserView::ChooseRom() {
 #if defined(_WIN32)
     if(!romLoadRequest_||!romLoadRequest_(std::string{}))
-        MessageBoxW(GetForegroundWindow(),L"Originale ROM-Bank konnte nicht gestartet werden.",
+        MessageBoxW(GetForegroundWindow(),L"Could not load the original ROM bank.",
             L"125A AWE64 Gold",MB_OK|MB_ICONERROR);
     lastStatus_.clear();SyncSf2Status();
 #endif

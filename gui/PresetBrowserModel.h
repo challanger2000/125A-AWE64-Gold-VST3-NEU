@@ -66,7 +66,7 @@ public:
         char prefix[36]{};
         if(engine==0)std::snprintf(prefix,sizeof(prefix),"%u:%03u  ",bank,program);
         else std::snprintf(prefix,sizeof(prefix),"%03u  ",program);
-        return std::string(prefix)+(p?p->name:"Nicht in der Bank vorhanden");
+        return std::string(prefix)+(p?p->name:"Not in bank");
     }
     // P117 direct bank/program selector: only actual catalog entries, no
     // assumed GM-contiguous presets in the user's sparse SF2. Pure logic

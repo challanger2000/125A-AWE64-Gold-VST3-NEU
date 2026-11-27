@@ -402,7 +402,7 @@ std::string BankLabel(uint16_t id) {
     return id==128 ? "Bank 128 - Drumkits" : "Bank "+std::to_string(id);
 }
 std::string DisplayName(const std::string& path) {
-    if(path.empty())return "Noch keine SoundFont ausgewaehlt";
+    if(path.empty())return "No SoundFont";
     const auto i=path.find_last_of("/\\");
     return i==std::string::npos?path:path.substr(i+1);
 }
@@ -466,16 +466,16 @@ PresetBrowserView::PresetBrowserView(const CRect& rect,
 
     // P152: the amber LCD owns the complete live status line, including
     // the current filename. Its labels remain real host-driven VSTGUI views.
-    auto* lcd=MakeLabel({350,96,570,112},"EMU8000 / CREATIVE WIN95",true);
+    auto* lcd=MakeLabel({370,96,570,112},"EMU8000 / AWE64 GOLD",true);
     lcd->setFontColor(CColor(55,42,9,255));
     fileLabel_=MakeLabel({575,96,728,112},"",false);
     fileLabel_->setFont(kNormalFontSmall);
     fileLabel_->setFontColor(CColor(65,46,12,255));
     fileLabel_->setTextTruncateMode(CTextLabel::kTruncateTail);
-    programLabel_=MakeLabel({350,118,728,145},"NO PRESET",false);
+    programLabel_=MakeLabel({370,118,728,145},"NO PRESET",false);
     programLabel_->setFont(kNormalFontBig);
     programLabel_->setFontColor(CColor(41,31,6,255));
-    hardwareInfoLabel_=MakeLabel({350,145,728,163},"ROM: ERFORDERLICH",true);
+    hardwareInfoLabel_=MakeLabel({370,145,728,163},"ROM: AUTO",true);
     hardwareInfoLabel_->setFontColor(CColor(53,40,9,255));
     hardwareInfoLabel_->setTextTruncateMode(CTextLabel::kTruncateTail);
 
@@ -591,7 +591,7 @@ PresetBrowserView::PresetBrowserView(const CRect& rect,
     bankMenu_=new GoldHardwareMenu(PageRect({100,247,494,284}),this,kBankFilter);
     StyleGoldMenu(bankMenu_);
     AddToCurrentPage(bankMenu_);
-    searchCaption_=MakeLabel({506,247,572,282},"SUCHE",true);
+    searchCaption_=MakeLabel({506,247,572,282},"SEARCH",true);
     search_=new CTextEdit(PageRect({586,249,968,282}),this,kFilter,"");
     search_->setPlaceholderString("Instrument suchen...");
     search_->setImmediateTextChange(true);
@@ -621,8 +621,8 @@ PresetBrowserView::PresetBrowserView(const CRect& rect,
     empty_->setFontColor(CColor(204,167,108,255));
 
     buildingPanel_=nullptr;
-    hint_=MakeLabel({350,166,728,184},
-        "SF2-Audiostatus noch nicht vom Prozessor bestaetigt.",true);
+    hint_=MakeLabel({370,166,728,184},
+        "SoundFont audio status not yet confirmed.",true);
     hint_->setTextTruncateMode(CTextLabel::kTruncateTail);
     SetPage(0);
     setWantsIdle(true);
@@ -768,13 +768,13 @@ void PresetBrowserView::RebuildActiveMenus() {
     if(!activeBankMenu_ || !programMenu_)return;
     activeBanks_=PresetBrowserModel::Banks(0,sf_,fm_);
     activeBankMenu_->removeAllEntry();
-    if(activeBanks_.empty())activeBankMenu_->addEntry("Keine Bank geladen");
+    if(activeBanks_.empty())activeBankMenu_->addEntry("No bank loaded");
     else for(const auto bank:activeBanks_)
         activeBankMenu_->addEntry(BankLabel(bank).c_str());
 
     activePrograms_=PresetBrowserModel::Programs(sf_.Entries(),bank_);
     programMenu_->removeAllEntry();
-    if(activePrograms_.empty())programMenu_->addEntry("Keine Presets in der Bank");
+    if(activePrograms_.empty())programMenu_->addEntry("No presets in bank");
     else for(const auto id:activePrograms_) {
         const auto* p=sf_.Find(bank_,id);
         char label[8]{};
@@ -799,7 +799,7 @@ void PresetBrowserView::SyncActiveMenuSelection() {
 void PresetBrowserView::RebuildBanks() {
     filterBanks_=PresetBrowserModel::Banks(0,sf_,fm_);
     bankMenu_->removeAllEntry();
-    bankMenu_->addEntry("Alle Baenke");
+    bankMenu_->addEntry("All banks");
     bool exists=false;
     for(const auto id:filterBanks_) {
         bankMenu_->addEntry(BankLabel(id).c_str());
@@ -816,8 +816,8 @@ void PresetBrowserView::RebuildRows() {
     table_->recalculateLayout();
     if(rows_.empty()) {
         empty_->setText(sf_.Entries().empty()?
-            "Keine SF2 geladen. Oben auf SF2 LADEN klicken.":
-            "Keine Treffer. Suche oder Bankfilter aendern.");
+            "No SoundFont loaded. Click SF2 to select one.":
+            "No matches. Change search or bank filter.");
         empty_->setVisible(currentPage_==1);
     } else empty_->setVisible(false);
     SyncBrowserSelection();
@@ -904,11 +904,11 @@ void PresetBrowserView::Sync(bool force) {
 void PresetBrowserView::SyncSf2Status() {
     if(!hint_||!sf2StatusProvider_)return;
     std::string text=sf2StatusProvider_();
-    if(text.empty())text="SF2-Status noch nicht verfuegbar.";
+    if(text.empty())text="SoundFont status unavailable.";
     if(text==lastStatus_)return;
     lastStatus_=text;
     hint_->setText(text.c_str());
-    const bool err=text.find("Fehler")!=std::string::npos;
+    const bool err=text.find("Error:")!=std::string::npos;
     hint_->setFontColor(err?CColor(112,30,18,255):CColor(63,47,13,255));
 }
 void PresetBrowserView::SyncHardwareInfo() {
@@ -917,7 +917,7 @@ void PresetBrowserView::SyncHardwareInfo() {
     if(state==lastHardwareInfo_)return;
     lastHardwareInfo_=state;
     hardwareInfoLabel_->setText(state.empty()
-        ? "32 STIMMEN | 44,1 kHz | RAM/ROM: nicht ermittelt"
+        ? "32 VOICES | 44.1 kHz"
         : state.c_str());
 }
 void PresetBrowserView::SetPage(int page) {

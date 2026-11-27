@@ -1,5 +1,9 @@
 # Änderungsverlauf
 
+## 27.11.2026 — Owner NO-GO 015c182; display and private package
+
+- Recovered later P168 label layout from prior repository; preserve P165 images and DOSBox-X 81d0fde with both optimizations. See `docs/OWNER-REJECTION-015c182.md`. Source correction candidate; native GUI and full original regression NOT RUN. Complete private original asset delivery remains blocked. No Studio Pro release.
+
 ## 27.11.2026 — Separater Leerlauf-Kandidat
 
 - Referenz `0be3d8c` (Upstream `81d0fde`): alle sieben gestarteten Workflows SUCCESS, originale Creative/VST3-Regressionsprüfung 45997748041, 47/47 Validator, unabhängiges Test Lab 45997748254, gezielte Performance 45997748024. Kein Studio-Pro-CPU-Nachweis. Privater Lieferbuild 46002394682 bleibt auf dieser bereits geprüften Referenz.

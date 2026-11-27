@@ -3,11 +3,15 @@
 **Produkt:** 125A AWE64 Gold (Windows x64 VST3, DOSBox-X)  
 **Stand:** 27.11.2026  
 **Entwicklungskennung:** `0.0.0-dev`  
-**Release / abgenommenes Instrument:** **NEIN – Leerlauf-Kandidat in Prüfung; Studio Pro und CPU-Ziel offen, Klangreferenz 609ab17**
+**Release / abgenommenes Instrument:** **NEIN – Besitzer hat 015c182 abgelehnt; Display-/Lieferkorrektur in Prüfung; keine Abnahme**
 **Einziger Branch:** `main`  
 **Exakter neuester Quellstand:** [oberster Commit auf main](../../commits/main) (nicht auf eine veraltende SHA im Text verlassen)
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
+
+## 27.11.2026 — Owner NO-GO 015c182; display and private package
+
+- Recovered later P168 label layout from prior repository; preserve P165 images and DOSBox-X 81d0fde with both optimizations. See `docs/OWNER-REJECTION-015c182.md`. Source correction candidate; native GUI and full original regression NOT RUN. Complete private original asset delivery remains blocked. No Studio Pro release.
 
 ## 27.11.2026 — Separater Leerlauf-Kandidat
 

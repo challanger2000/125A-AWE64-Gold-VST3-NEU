@@ -1,5 +1,9 @@
 # AGENTS.md — verbindliche Anweisung für Codex und folgende Chats
 
+## 27.11.2026 — Owner NO-GO 015c182; display and private package
+
+- Recovered later P168 label layout from prior repository; preserve P165 images and DOSBox-X 81d0fde with both optimizations. See `docs/OWNER-REJECTION-015c182.md`. Source correction candidate; native GUI and full original regression NOT RUN. Complete private original asset delivery remains blocked. No Studio Pro release.
+
 ## 27.11.2026 — Lokaler EMU8000-Kandidat, native Abnahme offen
 
 - Zielpin `81d0fde73917b57a1716e610dec2605c36def555`; klanglich bestätigte Besitzerreferenz `609ab17`. Die portable Referenzprüfung `tests/compare_emu8000.py` benötigt die Git-Objekte beider exakter Upstream-Pins sowie die Produktreferenz.

@@ -33,7 +33,7 @@ public:
         entries_.reserve(128);
         for(unsigned i=0;i<128;++i)
             entries_.push_back({0u,static_cast<uint8_t>(i),
-                 "MIDI-PROGRAMM "+std::to_string(i),false});
+                 "MIDI PROGRAM "+std::to_string(i),false});
     }
     // The original Creative DEMO allocates one physical patch bank (0).
     // Expose only addressable SF2 bank-0 presets until other banks are proven.
