@@ -1,5 +1,11 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 27.11.2026 — RAM-Anzeige wiederhergestellt
+
+- Untere Hardware-Displayzeile bei READY: `32 VOICES | 44.1 kHz | RAM x.xx / 28 MB`. Grundlage ist die tatsächliche 16-Bit-`smpl`-Nutzlast der erfolgreich gestarteten Bank, einschließlich Sample-Guard-Wörter (ohne SF2-Metadaten oder Allocator-Overhead); binäre MB. Kein Schätzwert aus Dateigröße. Bei Boot/Fehler bleibt der Status sichtbar; abgelehnter Bankwechsel behält alten Wert. ROM ohne Samples: 0.00 MB.
+- Ausschließlich VST3-Shell/Display und Tests geändert; Engine aus dem geprüften Paket 65c419e unverändert wiederverwendbar. Native visuelle/Owner-Abnahme und alle 22 Originalbanken weiterhin offen.
+
+
 **Produkt:** 125A AWE64 Gold (Windows x64 VST3, DOSBox-X)  
 **Stand:** 27.11.2026  
 **Entwicklungskennung:** `0.0.0-dev`  

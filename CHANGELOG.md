@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 27.11.2026 — RAM-Anzeige wiederhergestellt
+
+- Untere Hardware-Displayzeile bei READY: `32 VOICES | 44.1 kHz | RAM x.xx / 28 MB`. Grundlage ist die tatsächliche 16-Bit-`smpl`-Nutzlast der erfolgreich gestarteten Bank, einschließlich Sample-Guard-Wörter (ohne SF2-Metadaten oder Allocator-Overhead); binäre MB. Kein Schätzwert aus Dateigröße. Bei Boot/Fehler bleibt der Status sichtbar; abgelehnter Bankwechsel behält alten Wert. ROM ohne Samples: 0.00 MB.
+- Ausschließlich VST3-Shell/Display und Tests geändert; Engine aus dem geprüften Paket 65c419e unverändert wiederverwendbar. Native visuelle/Owner-Abnahme und alle 22 Originalbanken weiterhin offen.
+
+
 ## 27.11.2026 — SF2-Kompatibilität und Ladezeit: Entwicklungskandidat
 
 - Besitzer-Abnahmebedingung: 22/22 tatsächliche Original-Soundbanks müssen laden und spielbar sein, einschließlich direkter Bankwechsel. Manifest: 125A-Engineering/docs/AWE64-OWNER-SF2-ACCEPTANCE.md.

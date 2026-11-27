@@ -4,6 +4,7 @@
 #include "CreativeEffectMidi.hpp"
 #include "ExternalSoundFont.hpp"
 #include "DisplayStatus.hpp"
+#include "Sf2SampleRam.hpp"
 #include "PresetBrowserView.h"
 #include "pluginterfaces/base/ustring.h"
 #include "pluginterfaces/base/ibstream.h"
@@ -244,6 +245,7 @@ bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle
         }
         BankDigest diskDigest{};
         if(loadFromDisk&&!hashBank(*validatedBank,diskDigest))return false;
+        const auto candidateSampleRam=guest::sampleRamBytes(*validatedBank);
         AWE125::PresetCatalog candidate;
         if(preparedCatalog)candidate=std::move(*preparedCatalog);
         else if(!loadCatalog(selected,candidate,validatedBank))return false;
@@ -282,7 +284,10 @@ bool DosBoxVst3Shell::startRuntimeLocked(std::unique_lock<std::mutex>& lifecycle
             startedBank_.swap(acceptedStarted);
             if(loadFromDisk){requestedBankDigest_=diskDigest;requestedBankDigestValid_=true;}
         }
+        // Publish only after successful replacement; a rejected load keeps
+        // the previous RAM value and bank. Initial boot hides RAM until ready.
         guestStatus_.store(1,std::memory_order_release);
+        startedSampleRamBytes_.store(candidateSampleRam,std::memory_order_release);
         initialProgramSent_=false;
         absoluteSamplePosition_=0;
         rateConverter_.reset();
@@ -862,7 +867,7 @@ VSTGUI::CView* DosBoxVst3Shell::createCustomView(
         },
         [this](){
             const int s=guestStatus_.load(std::memory_order_acquire);
-            return std::string(AWE125::DisplayStatus::hardware(s));
+            return AWE125::DisplayStatus::hardware(s,startedSampleRamBytes_.load(std::memory_order_acquire));
         },
         [this](const std::string&){return requestSoundFont({});},
         [this](const std::string& path){return requestSoundFont(path);},

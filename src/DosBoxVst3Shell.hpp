@@ -29,6 +29,7 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::atomic<bool> legacyProcessing_{true};
     std::unique_ptr<integration::DosBoxRuntimeHost> runtime_;
     std::atomic<int> guestStatus_{0};
+    std::atomic<std::uint32_t> startedSampleRamBytes_{0xffffffffu};
     std::uint64_t absoluteSamplePosition_=0;
     bool initialProgramSent_=false;
     std::uint8_t lastBank_=0,lastProgram_=0;
