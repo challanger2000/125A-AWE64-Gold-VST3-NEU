@@ -87,8 +87,13 @@ emu8k_init
 emu8k_close(emu8k_t *emu8k)
 {
         for (pos = emu8k->pos; pos < wavetable_pos_global; pos++) {
-            int32_t dat;'''
+            int32_t dat;
+                if (emu_voice->filterq_idx || emu_voice->ifatn_init_filter != 0xFF || emu_voice->filt_oct_curr < 0.0) {'''
         patched = patch.patch_emu_c_init(s)
+        self.assertIn('if (emu_voice->filterq_idx || emu_voice->ifatn_init_filter != 0xFF || emu_voice->filt_oct_curr < 0.0 || emu_voice->fmmod_lfo1_filt_mod != 0 || emu_voice->pefe_modenv_filter_height < 0) {', patched)
+        # Keep the source patch fail-closed if the pinned upstream changes.
+        with self.assertRaises(ValueError):
+            patch.patch_emu_c_init(s.replace('emu_voice->filt_oct_curr < 0.0', 'false'))
         self.assertIn('if (bad || count != 1048576)', patched)
         self.assertIn('emu8k->empty = failure == 4', patched)
         self.assertIn('emu8k->ram = failure == 5', patched)

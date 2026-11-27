@@ -1,5 +1,12 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 27.11.2026 — Preset-Wiedergabe und Filtermodulation: Korrekturkandidat
+
+- Fehlerfälle: Bass Synth 000/015 (Knistern); Synth 512 Bank 008/012/021 (stumm). Private lokale Voruntersuchung und Korrekturkandidat siehe [Diagnosebericht](docs/2026-11-27-preset-playback-repair.md).
+- DOS-Loader-Kompatibilität: additive Generatoren nur unter den im Quellcode geprüften Bedingungen in private Staging-Kopie umgruppieren; unveränderte PCM-Daten. Filter: kein abruptes Bypass-Umschalten bei aktiver bipolarer Modulation. RAM-Anzeige bleibt erhalten.
+- Commit 2bb012e: Patch-Unit-Test-Fixture enthielt den neu benötigten Quellcode-Anker nicht; verpflichtende Versionsdateien fehlten. Windows-Kompilierung deshalb NICHT ERFOLGT. Diese Korrektur ergänzt Fixture und Versionsdokumentation, ohne Produktcode erneut zu ändern. Integrierte native PCM- und Owner-SF2-Prüfung weiterhin OPEN. Kein Release.
+
+
 ## 27.11.2026 — RAM-Anzeige wiederhergestellt
 
 - Untere Hardware-Displayzeile bei READY: `32 VOICES | 44.1 kHz | RAM x.xx / 28 MB`. Grundlage ist die tatsächliche 16-Bit-`smpl`-Nutzlast der erfolgreich gestarteten Bank, einschließlich Sample-Guard-Wörter (ohne SF2-Metadaten oder Allocator-Overhead); binäre MB. Kein Schätzwert aus Dateigröße. Bei Boot/Fehler bleibt der Status sichtbar; abgelehnter Bankwechsel behält alten Wert. ROM ohne Samples: 0.00 MB.
