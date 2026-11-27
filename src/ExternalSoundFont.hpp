@@ -2,6 +2,7 @@
 #include "Sf2CreativeDosCompatibility.hpp"
 #include "Sf2StructuralValidation.hpp"
 #include "Sf2LegacyLoopCompatibility.hpp"
+#include "Sf2CreativePresetBudget.hpp"
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -41,6 +42,7 @@ inline bool readExternalSf2(const std::filesystem::path& path,
     if(result!=BankStageResult::OriginalSf2_200 &&
        result!=BankStageResult::AdaptedSf2_201)return false;
     if(!validateSf2Structure(candidate)&&!stageLegacyLoopMetadata(candidate))return false;
+    if(!stageCreativePresetBudget(candidate))return false;
     adapted=result==BankStageResult::AdaptedSf2_201;
     bytes.swap(candidate);
     return true;

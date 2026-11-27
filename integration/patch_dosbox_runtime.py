@@ -432,6 +432,11 @@ def patch_emu_header(s):
 def patch_emu_c_init(s):
     if 'awe64_release_init_memory(' in s:
         raise ValueError('Already patched EMU8000 C init')
+    # A full-open unmodulated voice still bypasses exactly as upstream.
+    # A bipolar filter LFO must not abruptly switch out the Chamberlin state
+    # at every zero crossing. Keep its continuous, bounded cutoff path.
+    s = once(s, "if (emu_voice->filterq_idx || emu_voice->ifatn_init_filter != 0xFF || emu_voice->filt_oct_curr < 0.0) {",
+             "if (emu_voice->filterq_idx || emu_voice->ifatn_init_filter != 0xFF || emu_voice->filt_oct_curr < 0.0 || emu_voice->fmmod_lfo1_filt_mod != 0 || emu_voice->pefe_modenv_filter_height < 0) {")
     anchor = "/* onboard_ram in kilobytes */\nvoid\nemu8k_init"
     s = once(s, anchor, r'''#ifdef AWE64_VST3_RUNTIME
 extern int AWE64_AuditEmuInitFailure(void);
