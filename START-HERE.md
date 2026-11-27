@@ -34,7 +34,7 @@
 
 Ein einziges Windows-x64-VST3 mit internem gepinntem **DOSBox-X AWE32 + originalem Creative-DOS-SF2LIB/DEMO.EXE**. Originale P165-GUI mit nachträglich um 73 % abgedunkelten Reglergruppen. **Kein Win95/86Box-PC**, keine getrennt zu startende DOSBox-EXE, kein eigener nativer Ersatz-SF2-Player.
 
-**Submodul:** `third_party/dosbox-x-AWE32` auf `f3a95b9f19a7f9863295e6481f271cf04733c635` gepinnt. **Einziger Branch:** `main`.
+**Submodul:** `third_party/dosbox-x-AWE32` auf `81d0fde73917b57a1716e610dec2605c36def555` gepinnt. **Einziger Branch:** `main`.
 
 ## Neue private Creative-Startdiagnose: Originalfehler statt bloßer Stille
 

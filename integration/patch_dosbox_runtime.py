@@ -413,13 +413,156 @@ static void AWE64_PumpGuestMidi() {
 #endif''')
     return s
 
+def patch_emu_header(s):
+    if "int32_t *mod_attack_cache;" in s:
+        raise ValueError("Already patched EMU8000 header")
+    anchor = "typedef struct emu8k_t {\n    emu8k_voice_t voice[32];"
+    return once(s, anchor, anchor + r'''
+#ifdef AWE64_VST3_RUNTIME
+    int32_t *mod_attack_cache;
+#endif''')
+
+
 def patch_emu_c_init(s):
-    if 'awe64_release_init_memory(' in s:raise ValueError('Already patched EMU8000 C init')
-    s=once(s,"/* onboard_ram in kilobytes */\nvoid\nemu8k_init","#ifdef AWE64_VST3_RUNTIME\nextern int AWE64_AuditEmuInitFailure(void);\nstatic void awe64_release_init_memory(emu8k_t *e)\n{\n    free(e->rom); free(e->empty); free(e->ram);\n    e->rom=NULL; e->empty=NULL; e->ram=NULL;\n}\n#endif\n/* onboard_ram in kilobytes */\nvoid\nemu8k_init")
-    s=once(s,"    fp = rom_fopen(EMU8K_ROM_PATH, \"rb\");\n    if (!fp)\n        fatal(\"AWE32.RAW not found\\n\");\n\n    emu8k->rom = calloc(1024, 1024);\n    /* AWE32Emu: also accept a card dump without the leading AWE-DUMP word\n     * (1048574 bytes); the missing last word stays zero. */\n    if (fread(emu8k->rom, 1, 1048576, fp) < 1048574)\n        fatal(\"emu8k_init(): Error reading data\\n\");\n    fclose(fp);","#ifdef AWE64_VST3_RUNTIME\n    const int failure=AWE64_AuditEmuInitFailure();\n    fp=failure==1?NULL:rom_fopen(EMU8K_ROM_PATH,\"rb\");\n    if(!fp)return;\n    emu8k->rom=failure==2?NULL:calloc(1024,1024);\n    if(!emu8k->rom){fclose(fp);return;}\n    /* Exact locked 1 MiB image. Diagnostic short read uses the actual CRT. */\n    const size_t count=fread(emu8k->rom,1,failure==3?1024:1048576,fp);\n    const int bad=ferror(fp);\n    fclose(fp);\n    if(bad||count!=1048576){awe64_release_init_memory(emu8k);return;}\n#else\n    fp = rom_fopen(EMU8K_ROM_PATH, \"rb\");\n    if (!fp)\n        fatal(\"AWE32.RAW not found\\n\");\n\n    emu8k->rom = calloc(1024, 1024);\n    /* AWE32Emu: also accept a card dump without the leading AWE-DUMP word\n     * (1048574 bytes); the missing last word stays zero. */\n    if (fread(emu8k->rom, 1, 1048576, fp) < 1048574)\n        fatal(\"emu8k_init(): Error reading data\\n\");\n    fclose(fp);\n#endif")
-    s=once(s,"    emu8k->empty = calloc(2, BLOCK_SIZE_WORDS);","#ifdef AWE64_VST3_RUNTIME\n    emu8k->empty=failure==4?NULL:calloc(2,BLOCK_SIZE_WORDS);\n    if(!emu8k->empty){awe64_release_init_memory(emu8k);return;}\n#else\n    emu8k->empty = calloc(2, BLOCK_SIZE_WORDS);\n#endif")
-    s=once(s,"        emu8k->ram = calloc(1024, onboard_ram);","#ifdef AWE64_VST3_RUNTIME\n        emu8k->ram=failure==5?NULL:calloc(1024,onboard_ram);\n        if(!emu8k->ram){awe64_release_init_memory(emu8k);return;}\n#else\n        emu8k->ram = calloc(1024, onboard_ram);\n#endif")
-    return s
+    if 'awe64_release_init_memory(' in s:
+        raise ValueError('Already patched EMU8000 C init')
+    anchor = "/* onboard_ram in kilobytes */\nvoid\nemu8k_init"
+    s = once(s, anchor, r'''#ifdef AWE64_VST3_RUNTIME
+extern int AWE64_AuditEmuInitFailure(void);
+static void awe64_release_init_memory(emu8k_t *e)
+{
+    free(e->rom);
+    free(e->empty);
+    free(e->ram);
+    e->rom = NULL;
+    e->empty = NULL;
+    e->ram = NULL;
+}
+#endif
+''' + anchor)
+    # Keep remc2 and standalone ROM handling intact. The embedded DOSBox
+    # integration owns an explicit file and requires an exact, checked read.
+    anchor = r'''#ifndef EMU8K_ROM_READ
+    fp = rom_fopen(EMU8K_ROM_PATH, "rb");
+    if (!fp)
+        fatal("AWE32.RAW not found\n");
+
+#endif
+    emu8k->rom = calloc(1024, 1024);
+    /* AWE32Emu: also accept a card dump without the leading AWE-DUMP word
+     * (1048574 bytes); the missing last word stays zero.
+     * remc2: the image comes from rom_read (it may be stored packed), not rom_fopen
+     * (EMU8K_ROM_READ, defined by its rom.h). */
+#ifdef EMU8K_ROM_READ
+    if (rom_read(emu8k->rom, 1048576) < 1048574)
+        fatal("emu8k_init(): Error reading data\n");
+#else
+    if (fread(emu8k->rom, 1, 1048576, fp) < 1048574)
+        fatal("emu8k_init(): Error reading data\n");
+    fclose(fp);
+#endif'''
+    s = once(s, "#ifndef EMU8K_ROM_READ\n    FILE          *fp;\n#endif",
+                "#if !defined(EMU8K_ROM_READ) && !defined(AWE64_VST3_RUNTIME)\n    FILE          *fp;\n#endif")
+    s = once(s, anchor, r'''#ifdef AWE64_VST3_RUNTIME
+    const int failure = AWE64_AuditEmuInitFailure();
+    FILE *fp = failure == 1 ? NULL : rom_fopen(EMU8K_ROM_PATH, "rb");
+    if (!fp)
+        return;
+    emu8k->rom = failure == 2 ? NULL : calloc(1024, 1024);
+    if (!emu8k->rom) {
+        fclose(fp);
+        return;
+    }
+    const size_t count = fread(emu8k->rom, 1, failure == 3 ? 1024 : 1048576, fp);
+    const int bad = ferror(fp);
+    fclose(fp);
+    if (bad || count != 1048576) {
+        awe64_release_init_memory(emu8k);
+        return;
+    }
+#else
+''' + anchor + "\n#endif")
+    s = once(s, "    emu8k->empty = calloc(2, BLOCK_SIZE_WORDS);", r'''#ifdef AWE64_VST3_RUNTIME
+    emu8k->empty = failure == 4 ? NULL : calloc(2, BLOCK_SIZE_WORDS);
+    if (!emu8k->empty) {
+        awe64_release_init_memory(emu8k);
+        return;
+    }
+#else
+    emu8k->empty = calloc(2, BLOCK_SIZE_WORDS);
+#endif''')
+    s = once(s, "        emu8k->ram = calloc(1024, onboard_ram);", r'''#ifdef AWE64_VST3_RUNTIME
+        emu8k->ram = failure == 5 ? NULL : calloc(1024, onboard_ram);
+        if (!emu8k->ram) {
+            awe64_release_init_memory(emu8k);
+            return;
+        }
+#else
+        emu8k->ram = calloc(1024, onboard_ram);
+#endif''')
+
+    # The upstream static pointer outlives the chip and has no free site.
+    # Embedded chips prepare and own their optional cache, so neither the
+    # first attack nor a failed cache allocation can allocate in render().
+    anchor = r'''/* The values of emu8k_mod_attack_calc by the phase 0..1 << 21 (it clamps the
+ * phase there), each computed at its first use and kept as value + 1 (0 = not
+ * yet): the pow of every attack sample is the hot spot of the voice loop. The
+ * table (8 MB) is allocated at the first use; without it the value is computed. */
+static int32_t *emu8k_mod_attack_cache = NULL;
+
+static inline int32_t
+emu8k_mod_attack_value(int32_t phase)
+{
+    const int32_t index = (phase < 0) ? 0 : (phase > (1 << 21)) ? (1 << 21) : phase;
+    if (!emu8k_mod_attack_cache) {
+        emu8k_mod_attack_cache = (int32_t *) calloc((1 << 21) + 1, sizeof(int32_t));
+        if (!emu8k_mod_attack_cache)
+            return emu8k_mod_attack_calc(phase);
+    }
+    if (!emu8k_mod_attack_cache[index])
+        emu8k_mod_attack_cache[index] = emu8k_mod_attack_calc(index) + 1;
+    return emu8k_mod_attack_cache[index] - 1;
+}'''
+    s = once(s, anchor, r'''#ifndef AWE64_VST3_RUNTIME
+static int32_t *emu8k_mod_attack_cache = NULL;
+#endif
+
+static inline int32_t
+emu8k_mod_attack_value(emu8k_t *emu8k, int32_t phase)
+{
+#ifdef AWE64_VST3_RUNTIME
+    int32_t *cache = emu8k->mod_attack_cache;
+#else
+    (void) emu8k;
+    if (!emu8k_mod_attack_cache)
+        emu8k_mod_attack_cache = (int32_t *) calloc((1 << 21) + 1, sizeof(int32_t));
+    int32_t *cache = emu8k_mod_attack_cache;
+#endif
+    if (!cache)
+        return emu8k_mod_attack_calc(phase);
+
+    const int32_t index = (phase < 0) ? 0 : (phase > (1 << 21)) ? (1 << 21) : phase;
+    if (!cache[index])
+        cache[index] = emu8k_mod_attack_calc(index) + 1;
+    return cache[index] - 1;
+}''')
+    s = once(s, "emu8k_mod_attack_value(modenv->value_amp_hz)",
+                "emu8k_mod_attack_value(emu8k, modenv->value_amp_hz)")
+    s = once(s, "emu8k_mod_attack_value(mod_env->value_amp_hz)",
+                "emu8k_mod_attack_value(emu8k, mod_env->value_amp_hz)")
+    anchor = "    emu8k->hwcf3 = 0x00;\n}"
+    s = once(s, anchor, r'''    emu8k->hwcf3 = 0x00;
+#ifdef AWE64_VST3_RUNTIME
+    emu8k->mod_attack_cache = calloc((1 << 21) + 1, sizeof(*emu8k->mod_attack_cache));
+#endif
+}''')
+    anchor = "emu8k_close(emu8k_t *emu8k)\n{"
+    return once(s, anchor, anchor + r'''
+#ifdef AWE64_VST3_RUNTIME
+    free(emu8k->mod_attack_cache);
+    emu8k->mod_attack_cache = NULL;
+#endif''')
+
 
 def patch_main(s):
     a='int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {'
@@ -882,6 +1025,7 @@ PATCHES={
     'src/dosbox.cpp':patch_dosbox_clock,
     'src/hardware/emu8000.cpp':patch_emu,
     'src/hardware/emu8k/snd_emu8k.c':patch_emu_c_init,
+    'src/hardware/emu8k/include/86box/snd_emu8k.h':patch_emu_header,
     'src/hardware/mixer.cpp':patch_mixer,
     'src/hardware/mpu401.cpp':patch_mpu,
     'src/gui/sdlmain.cpp':patch_main,

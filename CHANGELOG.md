@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 27.11.2026 — Lokaler EMU8000-Übernahmekandidat
+
+- Original-Upstream `81d0fde` mit unveränderten Filtergleichungen, B-Spline-Interpolation, Effektalgorithmen und 32 Stimm-Slots. Geänderten ROM-Quellanker unterstützt und den optionalen Attack-Cache der jeweiligen eingebetteten Chipinstanz zugeordnet.
+- Gitlink, Live-Prüfpins und private Quellvorbereitung auf denselben Upstream-Commit abgestimmt. Kein neuer Build-Scope. Der Leerlaufversuch bleibt außerhalb des Kandidaten.
+- Lokaler Linux-Release-Build, Fault-/Lifecycle-Prüfungen und 22 rohe Stereo-PCM-Vergleiche gegen den eingefrorenen Referenzkern bestanden. Native Windows-Abnahme und Studio Pro bleiben offen.
+
 ## 27.11.2026 — Original-SysEx-Testpfad nach Neutralisierung korrigiert
 
 - `e124559`: Audio-Bridge und Versionsworkflow SUCCESS; privater Windows-Lieferbuild [45913827374](https://github.com/challanger2000/125A-Engineering/actions/runs/45913827374) SUCCESS. Vollständige Originalregression [45913772791](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45913772791) FAIL im isolierten SysEx-Referenztest: Original MPU konsumierte keine Bank/Program/Note. Tatsächlicher Quellbefund: Test schrieb FXDEMO.EXE, rief aber nach versehentlicher Teilstring-Umbenennung FXDriver.exe auf. Produktionspfad in DosBoxRuntimeHost.hpp verwendet weiterhin korrekt FXDEMO.EXE.

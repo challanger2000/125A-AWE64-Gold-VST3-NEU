@@ -28,7 +28,7 @@ if (-not (Test-Path -PathType Leaf (Join-Path $sub 'vs/dosbox-x.sln'))) {
     & git -C $root submodule update --init --recursive
     if ($LASTEXITCODE -ne 0) { throw 'Pinned DOSBox-X submodule is unavailable.' }
 }
-$pinned = 'f3a95b9f19a7f9863295e6481f271cf04733c635'
+$pinned = '81d0fde73917b57a1716e610dec2605c36def555'
 $actual = (& git -C $sub rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $actual -ne $pinned) {
     throw "Unexpected DOSBox-X source SHA: $actual"

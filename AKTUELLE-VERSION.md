@@ -3,11 +3,17 @@
 **Produkt:** 125A AWE64 Gold (Windows x64 VST3, DOSBox-X)  
 **Stand:** 27.11.2026  
 **Entwicklungskennung:** `0.0.0-dev`  
-**Release / abgenommenes Instrument:** **NEIN – neutrale Paketrevision noch nicht abgenommen; Klangreferenz 609ab17, CPU-Optimierung offen**  
+**Release / abgenommenes Instrument:** **NEIN – lokaler EMU8000-Kandidat; native Abnahme und CPU-Ziel offen, Klangreferenz 609ab17**
 **Einziger Branch:** `main`  
 **Exakter neuester Quellstand:** [oberster Commit auf main](../../commits/main) (nicht auf eine veraltende SHA im Text verlassen)
 
 Alle nachfolgenden Aussagen beziehen sich auf **nachgewiesene Prüfungen oder klar gekennzeichnete Implementierung**. Ein erfolgreicher Windows-Build oder ein DOS-Shell-Test beweist keinen AWE64-Sound.
+
+## 27.11.2026 — Lokaler EMU8000-Übernahmekandidat
+
+- Klangreferenz bleibt der in Studio Pro bestätigte Stand `609ab17525a986c2c4a55106724e87b3ec098764`. Der Kandidat basiert auf dem lokalen Quellstand `49e526c` und pinnt Original-DOSBox-X-AWE32 auf `81d0fde73917b57a1716e610dec2605c36def555`. Bestehende unabhängige historische Kaltstart-Pins bleiben gültig.
+- Der Integrationspatch erhält exakten ROM-Read und Fehler-Cleanup und bindet den optionalen Modulations-Attack-Cache an den EMU8000-Chip. Freigabe beim Schließen, Originalberechnung bei fehlendem Speicher. Keine Attack-Allokation im Renderer. Werkswerte, Polyphonie, Interpolation, Creative-Treiber und P165 unverändert.
+- Portable Release-Suite 23/23 CTest, 51 Python-Prüfungen, adverse Orakel und 22/22 rohe PCM-Vergleiche gegen den gepatchten Referenzkern erfolgreich. PCM-Vergleich auch unter ASan/UBSan bestanden. Ergebnisse gelten für die beschriebenen Linux-Fixtures. Windows-VST3, Original-Creative-Regression und Studio Pro/ASIO mit Besitzerbank für diesen Kandidaten **NOT RUN**. Kein freigegebenes Produkt und keine Aussage zum 10-%-Ziel.
 
 ## 27.11.2026 — Original-SysEx-Testpfad nach Neutralisierung korrigiert
 

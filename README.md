@@ -5,7 +5,7 @@
 ## Festgelegte Architektur
 
 - **Ein einziges Windows-x64-VST3-Instrument**, das seine Laufzeitkomponenten intern betreibt; keine separat zu startende DOSBox.
-- **DOSBox-X-AWE32** von `turican0/dosbox-x-AWE32`, unverändert auf **`masterAWE32` Commit `f3a95b9f19a7f9863295e6481f271cf04733c635`** fixiert.
+- **DOSBox-X-AWE32** von `turican0/dosbox-x-AWE32`, unverändert auf **`masterAWE32` Commit `81d0fde73917b57a1716e610dec2605c36def555`** fixiert.
 - **Originale Creative-DOS-Treiber-/SF2LIB-Laufzeit**, sobald ihre korrekte Funktion und die Nutzungsrechte nachgewiesen sind. Keine Eigenimplementierung als stiller Ersatz.
 - **Authentischer EMU8000**, echtes AWE-ROM und SF2/SBK über die emulierte Hardware; Hardwareverhalten messbar testen.
 - **Die bestehende P165/P007Z-GUI behalten**, insbesondere das originale 1000×708-Frontpanel und die späteren **73 % mattschwarzen Reglergruppen (Alpha 186)**.

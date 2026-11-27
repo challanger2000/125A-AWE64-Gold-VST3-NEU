@@ -2,7 +2,8 @@
 
 ## Die festgelegte Laufzeit
 - `turican0/dosbox-x-AWE32`, Branch `masterAWE32`.
-- Git-Commit `f3a95b9f19a7f9863295e6481f271cf04733c635`.
+- Lokaler Kandidat mit Git-Commit `81d0fde73917b57a1716e610dec2605c36def555`. Die Besitzer-Klangreferenz `609ab17` verwendet `f3a95b9f19a7f9863295e6481f271cf04733c635`.
+- Der Original-Commit ändert nur EMU8000-C-Code und Header. Der produktseitige Patcher erhält die strikte Datei-ROM-Initialisierung und gibt den optionalen Modulations-Attack-Cache mit dem Chip frei.
 - Als Git-Submodul gepinnt; keine 86Box-VM, kein Windows-95-Gastsystem und keine native P009-Engine.
 - Der Upstream enthält **EMU8000-Chipcode aus 86Box/AWE32Emu**. Das ist ein Teil der DOSBox-X-AWE32-Hardwareemulation, **kein** eingebetteter 86Box-PC.
 

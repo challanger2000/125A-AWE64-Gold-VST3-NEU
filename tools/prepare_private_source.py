@@ -8,7 +8,7 @@ import subprocess
 import sys
 import tempfile
 
-PINNED = "f3a95b9f19a7f9863295e6481f271cf04733c635"
+PINNED = "81d0fde73917b57a1716e610dec2605c36def555"
 
 def git(source, *args):
     return subprocess.check_output(["git", "-C", str(source), *args],

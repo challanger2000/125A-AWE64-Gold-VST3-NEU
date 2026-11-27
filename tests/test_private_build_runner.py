@@ -13,7 +13,7 @@ class PrivateBuildRunnerContract(unittest.TestCase):
         source = (root / "tools" / "Build-And-Test-Private-AWE64.ps1").read_text(
             encoding="utf-8")
         for token in (
-            "f3a95b9f19a7f9863295e6481f271cf04733c635",
+            "81d0fde73917b57a1716e610dec2605c36def555",
             "4e143b94f758734f594ded78f4e5115635975c16fa37fabeae0baa4938ca710e",
             "v3.7.12_build_20",
             "AWE64GoldDOSBoxDev",

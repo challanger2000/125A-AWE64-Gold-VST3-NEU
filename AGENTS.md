@@ -1,5 +1,10 @@
 # AGENTS.md — verbindliche Anweisung für Codex und folgende Chats
 
+## 27.11.2026 — Lokaler EMU8000-Kandidat, native Abnahme offen
+
+- Zielpin `81d0fde73917b57a1716e610dec2605c36def555`; klanglich bestätigte Besitzerreferenz `609ab17`. Die portable Referenzprüfung `tests/compare_emu8000.py` benötigt die Git-Objekte beider exakter Upstream-Pins sowie die Produktreferenz.
+- DOSBox-Patcher weiterhin ausschließlich auf frischer Arbeitskopie ausführen. Die Standalone-ROM-Pfade und bisherigen DLL-Sicherheitskorrekturen bleiben erhalten. Windows-Binary, Original-Audio und i9-11900K/Studio Pro bei 512 ASIO noch **NOT RUN**. Kein Commit, Push oder Actions-Start ohne Freigabe für diesen lokalen Kandidaten.
+
 ## 27.11.2026 — Original-SysEx-Testpfad nach Neutralisierung korrigiert
 
 - `e124559`: Audio-Bridge und Versionsworkflow SUCCESS; privater Windows-Lieferbuild [45913827374](https://github.com/challanger2000/125A-Engineering/actions/runs/45913827374) SUCCESS. Vollständige Originalregression [45913772791](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45913772791) FAIL im isolierten SysEx-Referenztest: Original MPU konsumierte keine Bank/Program/Note. Tatsächlicher Quellbefund: Test schrieb FXDEMO.EXE, rief aber nach versehentlicher Teilstring-Umbenennung FXDriver.exe auf. Produktionspfad in DosBoxRuntimeHost.hpp verwendet weiterhin korrekt FXDEMO.EXE.
@@ -68,7 +73,7 @@
 
 ## Einzige festgelegte Architektur
 - **Ein einziges Windows-x64-VST3-Instrument**, das die **DOSBox-X-AWE32-Emulation intern** betreibt. Kein separat gestartetes DOSBox-Programm.
-- Fixierte Grundlage `turican0/dosbox-x-AWE32`, `masterAWE32`, Commit `f3a95b9f19a7f9863295e6481f271cf04733c635` als Git-Submodul `third_party/dosbox-x-AWE32`. Upstream-Upgrades nur bei belegtem Bedarf und bestandenen Regressionen.
+- Fixierte Grundlage `turican0/dosbox-x-AWE32`, `masterAWE32`, Commit `81d0fde73917b57a1716e610dec2605c36def555` als Git-Submodul `third_party/dosbox-x-AWE32`. Upstream-Upgrades nur bei belegtem Bedarf und bestandenen Regressionen.
 - **Originale Creative-DOS-Software** zur Ansteuerung der emulierten EMU8000-Hardware verwenden; keinen nachgebauten Creative-Treiber oder nativen SF2-Player als stillschweigenden Ersatz.
 - **MPU401-Startmodus: `intelligent` (nicht `uart`)**. Die Original-Creative-DOS-Demo schaltet selbst mit Befehl 0x3F in UART und erwartet 0xFE ACK; bei vorab eingestelltem UART ignoriert die Original-DOSBox-X-Emulation den Befehl. Diese Einstellung ist für Original-Creative-Kompatibilität zwingend.
 - **Primäre MIDI-Architektur ab 23.11.2026:** DAS ORIGINALE Creative-DOS-DEMO.EXE liest UART-Port 330h/331h. Deshalb MIDI vom VST3 in die **originale MPU-401-Eingangsqueue der gepinnten DOSBox-X** einspeisen (AWE64_HostRegisterMidi). Den älteren BEE0/BEF0-Patch eines DOS-Gastprogramms nur als nicht gleichzeitig aktives, experimentelles Fallback behandeln. Nicht beide auf denselben SPSC-MIDI-Consumer schalten.

@@ -34,15 +34,72 @@ class DosBoxPatchTests(unittest.TestCase):
         self.assertIn('voice<30 && !(emu->voice[voice].ccca&0x04000000u)',r)
         with self.assertRaises(ValueError):patch.patch_emu(r)
     def test_emu_c_partial_initialization(self):
-        s="/* onboard_ram in kilobytes */\nvoid\nemu8k_init\n    fp = rom_fopen(EMU8K_ROM_PATH, \"rb\");\n    if (!fp)\n        fatal(\"AWE32.RAW not found\\n\");\n\n    emu8k->rom = calloc(1024, 1024);\n    /* AWE32Emu: also accept a card dump without the leading AWE-DUMP word\n     * (1048574 bytes); the missing last word stays zero. */\n    if (fread(emu8k->rom, 1, 1048576, fp) < 1048574)\n        fatal(\"emu8k_init(): Error reading data\\n\");\n    fclose(fp);\n    emu8k->empty = calloc(2, BLOCK_SIZE_WORDS);\n        emu8k->ram = calloc(1024, onboard_ram);"
-        r=patch.patch_emu_c_init(s)
-        self.assertIn('if(!fp)return;',r)
-        self.assertIn('if(!emu8k->rom){fclose(fp);return;}',r)
-        self.assertIn('if(bad||count!=1048576){awe64_release_init_memory(emu8k);return;}',r)
-        self.assertIn('if(!emu8k->empty){awe64_release_init_memory(emu8k);return;}',r)
-        self.assertIn('if(!emu8k->ram){awe64_release_init_memory(emu8k);return;}',r)
-        self.assertIn('emu8k->rom=NULL; e->empty=NULL; e->ram=NULL;'.replace('emu8k->rom','e->rom'),r)
-        with self.assertRaises(ValueError):patch.patch_emu_c_init(r)
+        s = r'''/* The values of emu8k_mod_attack_calc by the phase 0..1 << 21 (it clamps the
+ * phase there), each computed at its first use and kept as value + 1 (0 = not
+ * yet): the pow of every attack sample is the hot spot of the voice loop. The
+ * table (8 MB) is allocated at the first use; without it the value is computed. */
+static int32_t *emu8k_mod_attack_cache = NULL;
+
+static inline int32_t
+emu8k_mod_attack_value(int32_t phase)
+{
+    const int32_t index = (phase < 0) ? 0 : (phase > (1 << 21)) ? (1 << 21) : phase;
+    if (!emu8k_mod_attack_cache) {
+        emu8k_mod_attack_cache = (int32_t *) calloc((1 << 21) + 1, sizeof(int32_t));
+        if (!emu8k_mod_attack_cache)
+            return emu8k_mod_attack_calc(phase);
+    }
+    if (!emu8k_mod_attack_cache[index])
+        emu8k_mod_attack_cache[index] = emu8k_mod_attack_calc(index) + 1;
+    return emu8k_mod_attack_cache[index] - 1;
+}
+emu8k_mod_attack_value(modenv->value_amp_hz)
+emu8k_mod_attack_value(mod_env->value_amp_hz)
+/* onboard_ram in kilobytes */
+void
+emu8k_init
+#ifndef EMU8K_ROM_READ
+    FILE          *fp;
+#endif
+#ifndef EMU8K_ROM_READ
+    fp = rom_fopen(EMU8K_ROM_PATH, "rb");
+    if (!fp)
+        fatal("AWE32.RAW not found\n");
+
+#endif
+    emu8k->rom = calloc(1024, 1024);
+    /* AWE32Emu: also accept a card dump without the leading AWE-DUMP word
+     * (1048574 bytes); the missing last word stays zero.
+     * remc2: the image comes from rom_read (it may be stored packed), not rom_fopen
+     * (EMU8K_ROM_READ, defined by its rom.h). */
+#ifdef EMU8K_ROM_READ
+    if (rom_read(emu8k->rom, 1048576) < 1048574)
+        fatal("emu8k_init(): Error reading data\n");
+#else
+    if (fread(emu8k->rom, 1, 1048576, fp) < 1048574)
+        fatal("emu8k_init(): Error reading data\n");
+    fclose(fp);
+#endif
+    emu8k->empty = calloc(2, BLOCK_SIZE_WORDS);
+        emu8k->ram = calloc(1024, onboard_ram);
+    emu8k->hwcf3 = 0x00;
+}
+emu8k_close(emu8k_t *emu8k)
+{'''
+        patched = patch.patch_emu_c_init(s)
+        self.assertIn('if (bad || count != 1048576)', patched)
+        self.assertIn('emu8k->empty = failure == 4', patched)
+        self.assertIn('emu8k->ram = failure == 5', patched)
+        self.assertIn('if (rom_read(emu8k->rom, 1048576) < 1048574)', patched)
+        self.assertIn('emu8k->mod_attack_cache = calloc', patched)
+        self.assertIn('free(emu8k->mod_attack_cache);', patched)
+        with self.assertRaises(ValueError):
+            patch.patch_emu_c_init(patched)
+
+    def test_emu_header_keeps_embedded_cache_per_chip(self):
+        s = "typedef struct emu8k_t {\n    emu8k_voice_t voice[32];"
+        self.assertIn('#ifdef AWE64_VST3_RUNTIME\n    int32_t *mod_attack_cache;', patch.patch_emu_header(s))
+
     def test_true_pcm_tap(self):
         s=('#define MIXER_SSIZE 4\n'
            'SDL_AudioDeviceID SDL2_AudioDevice = 0; /* valid IDs are 2 or higher, 1 for compat, 0 is never a valid ID */\n'
