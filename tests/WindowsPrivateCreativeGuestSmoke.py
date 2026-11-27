@@ -282,6 +282,14 @@ def corrected_sysex_copy(original: bytes) -> bytes:
     return repair_sysex_compare(original)
 
 
+def stage_corrected_sysex_guest(assets: Path, work: Path, launch: list[str]):
+    """Use one filename for both the disposable image and its DOS command."""
+    image = work / "FXDEMO.EXE"
+    image.write_bytes(corrected_sysex_copy((assets / "Driver.exe").read_bytes()))
+    return launch[:-2] + ["-c", 'mount d "' + str(work) + '"',
+                          "-c", "D:\\" + image.name + " /SBK:C:\\SYNTHGM.SF2"]
+
+
 def repair_sysex_compare(original: bytes) -> bytes:
     # At file offset 21834: the original far function initializes AX with
     # a small template offset (0x12 or 0x28), hence AH=0. The subsequent
@@ -449,11 +457,7 @@ def run_child(bundle: Path, seconds: float, reference: bool = False,
             register_pcm(None, read_pcm)
             launch = guest_arguments(assets, ram_dir)
             if corrected_sysex:
-                original = (assets / "Driver.exe").read_bytes()
-                fixed = corrected_sysex_copy(original)
-                (Path(work) / "FXDEMO.EXE").write_bytes(fixed)
-                launch[-2:] = ["-c", 'mount d "' + str(work) + '"',
-                               "-c", r"D:\FXDriver.exe /SBK:C:\SYNTHGM.SF2"]
+                launch = stage_corrected_sysex_guest(assets, Path(work), launch)
                 print("PRIVATE_SYSEX_COMPARE_FIX_STAGED_ONE_BYTE")
             args = [s.encode("mbcs") for s in launch]
             argv = (ctypes.c_char_p * (len(args) + 1))(*args, None)

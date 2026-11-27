@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 27.11.2026 — Original-SysEx-Testpfad nach Neutralisierung korrigiert
+
+- `e124559`: Audio-Bridge und Versionsworkflow SUCCESS; privater Windows-Lieferbuild [45913827374](https://github.com/challanger2000/125A-Engineering/actions/runs/45913827374) SUCCESS. Vollständige Originalregression [45913772791](https://github.com/challanger2000/125A-AWE64-Gold-VST3-NEU/actions/runs/45913772791) FAIL im isolierten SysEx-Referenztest: Original MPU konsumierte keine Bank/Program/Note. Tatsächlicher Quellbefund: Test schrieb FXDEMO.EXE, rief aber nach versehentlicher Teilstring-Umbenennung FXDriver.exe auf. Produktionspfad in DosBoxRuntimeHost.hpp verwendet weiterhin korrekt FXDEMO.EXE.
+- Korrektur ausschließlich Testharness: gemeinsamer Pfad für temporäres Image und DOS-Startkommando; synthetische Regression überprüft tatsächliche Dateibytes und Befehlsargumente sowie unveränderte Originaldatei. Keine Produktions-, GUI-, DSP- oder Upstream-Änderung. Neue native Originalregression noch NOT RUN.
+- Codex separat: isolierte Performance-Untersuchung, 19 A/B-Fälle byteidentisch laut Besitzerbericht; bis 73 % CPU-Zeit-Einsparung im EMU8000 bei stabilen Filtern, keine messbare Verbesserung im Leerlauf. Integrationspatch/ROM-Init und 8-MiB-Allokation noch offen. Keine Upstream-Übernahme auf main bis zur getrennten Freigabe und Prüfung.
+
 ## 27.11.2026 — SDK-Pfadkorrektur für neutrales Windows-Bundle
 
 - `6a9bb61`: sechs native Produkt-Workflows FAIL, außerdem privater Lieferbuild FAIL (45913103630). Gleiche bestätigte Ursache: SDK 3.7.12 `smtg_target_add_plugin_resource` ersetzt bei VS den Bundle-Namen durch `$(TargetFileName)` in einem nicht VERBATIM gesetzten Copy-Befehl. MSBuild expandiert Leerzeichen und meldet `Gold.vst3/Contents/Resources/p007_p165.uidesc is not a directory`. Original-Klang- und native VST3-Prüfungen nicht erreicht; keine sechs unterschiedlichen DSP-Fehler.
