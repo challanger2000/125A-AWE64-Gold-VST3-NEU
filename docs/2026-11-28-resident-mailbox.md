@@ -36,3 +36,15 @@ Verified exact downloaded private asset-free artifact 15259027279, product ce4e3
 | A 441 Hz | .0275166 | .0000915527 | 117.041 | 82.2754 |
 
 Three resident commit markers, both State=MATCH, invalid recalled bank state rejected and prior state preserved; actual host terminal marker is emitted after teardown. No boot ERROR. Local resident log SHA256 999bab523070a4f330157f55c737aaf9696834934d7c33693c6b995e4fd498c5. The Linux launch collected the full completion marker but did not separately retain the process exit code (portable report parser did run). This is an actual VST3 small-bank result under Wine, not a native Windows speed or release result. Previous non-resident path deliberately tested independently: first A tone RMS .0640189, idle .179126, ratio 47.8116, fails before first bank change. Repeated isolated run RMS .0633979, idle .177121, ratio 50.8553, exit 1. Thus baseline noise defect or environment effect is reproducible and relative acceleration is NOT VERIFIED. Do not waive idle requirement. Investigate before declaring final performance, large bank VST3, destructive rollback, CC recall, cancellation, multi-instance resident, or enabling by default. No new build, no product changes. All private audio/logs remain local.
+
+## Large synthetic-bank actual VST3 transition (Wine, ce4e300)
+
+Same artifact/engine/VST3/test host identities as previous local candidate. Original A fixture 15972 bytes; generated B fixture 23408772 bytes with extended referenced 735-Hz sample (11700000 samples, whole cycles, adjusted later sample offsets and terminal, valid inventory). A/B SHA256 32b7e2bd61e6cfb538ff9818b941dc16a7d76aff33a3ad68b8e69688e469f780 / d7bd09327ca5602a006a3b2955371b7e5c76739defcffbb048f6a5ce46802098 unchanged after test. Same pinned resident DOS guest/extender. Actual exit 0; independent validate_report confirmed exact sequence, all three resident markers, state and quiet gates; unique boot log and no ERROR.
+
+|Stage|RMS|Idle RMS|Desired/other spectral energy ratio|setState ms|
+|---|---:|---:|---:|---:|
+|441 Hz initial|.0275124|.0000545512|117.861|initial|
+|735 Hz large|.0289374|.0000610352|119.231|3278.87|
+|441 Hz return|.027512|.0000915527|117.902|92.101|
+
+Invalid recalled state rejected, prior state retained, host shutdown success. Private resident-large.json SHA256 b76379ff91119a886f52c7a0fa776738ea2b3a832053f80ec38fcd2c392088bc, log SHA256 53ea86f08452561ed89da5c1a2b1f0cd9b04eaf60dc0efe50cba43515174349b. This is measured under Wine on a synthetic large bank, not a native Windows or DAW guarantee or a relative old-path speedup. The old-path baseline still has the previous high idle defect. Actual owner large-bank VST3 transition, native destructive rollback, CC restore, concurrency, final release and default path remain unverified. No new build.

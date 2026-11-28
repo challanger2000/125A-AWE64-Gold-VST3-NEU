@@ -31,3 +31,31 @@ Private Ausführung nach Erstellung des konsolidierten nativen Testpakets: `pyth
 Actual ce4e300 Windows binaries under Wine 10.0, artifact 15259027279. Sf2LegacyStageDump.exe SHA256 9af8c0f97ef6d9e9428d64a52fdfe1a8d312bda2966a47bcc981e0ee30d9e66b. All 22 source files passed actual staging (all exit codes zero; original SHA256 before/after unchanged); 20 adapted, two byteidentical. Independent parser comparison of all original and staged files: 955 preset (bank/program/name) identities, reachable zone counts and both screening/extended probe selections unchanged; all 22 sdta/smpl chunks byteidentical. Original files untouched, no audio or source uploads. Local stage-results.json SHA256 5a8564208ead982bbc3160610de6913b82bc594a293c435b21179aaeade3b62a. These checks do not prove complete generator equivalence, loading in Creative, or individual layer audio.
 
 Actual compiled VST3 host targeted note 60 / velocity 100, 133120 hold frames and 44032 release frames for five known cases. Three previously silent Synth-512 programs now produce dynamic PCM; both Bass-Synth cases have zero jumps above .15. One large step in Synth-512 program 12 remains a review case; large steps may be authentic attacks. Numeric report parser verified all five rows and complete sweep markers; no DOS boot error observed. The Linux wrapper did not separately retain exit status for these two completed sweeps (terminal markers present). No complete native original reference waveform comparison or full owner sweep. 5 of 2778 planned bank-0 screening probes covered; 2773 remain; 29 non-bank-0 addresses still unsupported. Logs private (SHA256 synth 8c4288d19746df53b76c35888040adbc91ad40f78b4e9b0871aeb0a0c8071d69, bass 3f5a6e39d245346af3411704d4d5073c877819b3c6f03deafa2b47672493d239). No new build. Keep all aggregate results separate from native Windows and Studio Pro release status.
+
+## 28.11.2026 — Actual compiled VST3: all overloaded Synth 512 programs sound (PARTIAL)
+
+Candidate ce4e300, artifact 15259027279, Wine 10.0. Identity from prior manifest checked; original Synth 512 SHA256 d5b99ec38fddf59f53f66b90921e170d207bf3bbd73960f6e4175c39ef68349b unchanged. The real host executed 15 Note60/velocity100 probes; all report numeric evidence except program 32 (CONTAMINATED after program 21, not played). Isolated fresh instance for program 32 then produced AC-RMS .122111, peak .295593, max step .105682, 0 jumps. All three completed runs retain process exit 0, fresh boot log, no ERROR, full report parser coverage. 133120 held and 44032 release frames for each measured note.
+
+| Program | Max block-centered AC-RMS | Sample steps >.15 |
+|---:|---:|---:|
+|8|.0933198|0|
+|12|.0539212|1|
+|21|.0783117|0|
+|32 (isolated)|.122111|0|
+|34|.0559609|118|
+|35|.0504106|99|
+|45|.137364|0|
+|47|.0749958|168|
+|50|.079741|0|
+|52|.0554139|0|
+|55|.114703|0|
+|57|.0822107|6|
+|70|.141453|2|
+|74|.134488|0|
+|77|.054952|1|
+
+Program 12 (Electric Slap Bass) separate 3-probe recheck: (key/velocity, AC-RMS, max step, jumps): 48/65 .0247196/.0212708/0, 60/100 .0558717/.058197/0, 72/115 .0658443/.0698242/0. Previous single jump reproduced once in first batch, not in this three-probe run. Active original sample dm2_a1 has raw adjacent-sample max difference 1.960449 full-scale units and W8_1 max difference .108826, so a large output step is not sufficient evidence of a playback bug. No automatic waveform smoothing. Six remaining large-step programs (34,35,47,57,70,77) require reference/periodicity checks. One initial second-Wine-prefix launch failed before loading kernel32 (exit 53, no PCM); retry used working prefix and distinct bundle copy, succeeded. No performance comparison from concurrent tests.
+
+Private report SHA256: overloaded-15.json 3fe66cc360560eabe35ed5a97c601dddd9b85a91a628b2e70bee0523420e8359, slap-3-retry.json 4e33f30f0465b6cfbbfb8f93f2760057bb71f8e887b323313ad996b089ac14fb, p32-alone.json 4ecf884552f371f3251c21ac9cccf7dfe4ad58ccec2715fe55875ee40fecb4e3. Combined distinct planned screening coverage now 19/2778, not 19 final sound approvals. Original 29 non-bank-0 addresses still unsupported.
+
+Additional read-only comparison over all original/staged files: independent Python zone extraction compared the sum of all 15 additive relocation candidates and all other effective generator values, ignoring implicit zero loop offsets. 952/955 preset lists match; differences only Synth 512 program 10 (sample 18), 11 (17), 68 (10), previously invalid loop-offset metadata reset to zero. Sample headers changed only for Synth 512 samples 14–18 and Vintage Drums 2001 samples 80,81,128,129, correcting loop points to sample bounds. All referring zones (Synth 512 programs 10,11,18,44,53,68; Vintage Drums 2001 programs 3,10,11 in banks 0/128) have sampleModes=0 before/after. Both pmod and imod chunks remain byteidentical in all 22 banks; per-zone modulator routing not independently verified. Sample data unchanged. This check is not a full acoustic equivalence proof; preserve original files. No product changes and no additional CI builds.

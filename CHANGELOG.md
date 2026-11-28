@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 28.11.2026 — Alle 15 überladenen Synth-512-Presets hörbar; 23,4-MB-Wechsel (PARTIAL)
+
+- Exakter ce4e300-Kandidat aus Artefakt 15259027279, Wine 10.0, unveränderte Originaldateien. Alle 15 vorher als überladen identifizierten Synth-512-Presets bei Note 60/Velocity 100 geprüft: 15/15 dynamisches Signal; keine stumme Probe. Programm 32 im zusammenhängenden Lauf wegen Restpegel nicht messbar, deshalb isoliert wiederholt (AC-RMS .122111, Peak .295593, 0 große Sprünge). Sieben Programme im ersten Lauf mit großen Sprüngen >.15, darunter Programm 12: bei separater Wiederholung mit 48/65, 60/100, 72/115 jeweils 0 Sprünge. Keine nachträgliche Löschung der früheren Beobachtung. Sechs weitere Sprungkandidaten müssen verglichen werden. Signalnachweis ist keine Klangidentität.
+- 19 unterschiedliche der 2778 geplanten Ersttest-Proben insgesamt tatsächlich gemessen (17 Synth 512, 2 Bass Synth). Die 15 Programme sind nur bei einer Note/Velocity vollständig erreicht; restliche Zonen und Banken nicht als PASS werten.
+- Zusatzprüfung der Staging-Generatoren: alle 955 Presets, mathematische Summe der verschobenen additiven Generatoren und übrige effektive Generatorwerte verglichen; 952 unveränderte kanonische Generatorlisten, drei Abweichungen ausschließlich reparierte Loop-Offsets. Neun Sampleheader mit korrigierten Loopgrenzen; alle betroffenen Zonen vor/nach Staging ohne Loopmodus. Keine Modulator-Chunk- oder PCM-Byteabweichung; keine vollständige Modulator-Routing- oder akustische Äquivalenzbehauptung.
+- Resident-VST3 mit synthetischer 15.972-Byte-A-Bank und 23.408.772-Byte-B-Bank: A→B 3278,87 ms, B→A 92,101 ms, richtige 441/735/441-Hz-Signaturen, drei echte Commitmarker, State-MATCH, invaliden Recall abgewiesen, Exit 0. Kein neuer Build; native Windows, Produkt-Standardpfad, reale große Owner-Bank und destruktiver Rollback weiterhin offen.
+
 ## 28.11.2026 — Erster privater PCM-/Resident-Nachweis des kompilierten Kandidaten (PARTIAL)
 
 - Exaktes assetfreies Artefakt 15259027279 aus [Run 46133924576](https://github.com/challanger2000/125A-Engineering/actions/runs/46133924576) lokal unter Wine 10.0 ausgeführt; alle vier Binärdatei-Hashes aus BUILD-IDENTITY.json stimmen. Windows-Run: 10/10 gerichtete Regler-Klangproben und Register-Gates, 47/47 Validator, Cheezoids 128/128, absolute Sends, Effekttypen, timed drei Raten, Editor/MOD RESET. Ein 48-kHz-Callback 5,9023 ms statt 2,6667 ms; 1 Deadline-Overrun bei 0 Audio-/MIDI-Drops und 0 Underruns; deshalb Gesamt-FAIL, Ursache offen.
