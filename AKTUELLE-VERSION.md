@@ -1,5 +1,12 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 28.11.2026 — Owner-Screening fortgesetzt: 168/2778, neun vollständige Banken (PARTIAL)
+
+- Exakter ce4e300-Kandidat unter wiederhergestelltem Wine 10.0, kein neuer CI-Lauf. ALESIS D4 Programme 0/1/2, Bass XXL Killer String Four und Five jeweils 28/29/30: alle 27 geplanten Noten mit Signal. Magnus Choir v1.6 jetzt vollständig: 39/39 Noten, alle 13 Bank-0-Presets, keine großen Steps. Die zuvor erfassten 13 Magnus-Proben nicht doppelt gezählt.
+- Bass XXL Four P29/72/115: zwei Steps >.15, max .151947. Wiederholung mit alter Engine 972e862: keine Steps >.15, max .13678, RMS .0825692 gegenüber .0825713. Beide aktiven Original-Samples haben jeweils sechs Steps >.15, max .304901. Unterschied in Step-Zahl nicht abschließend erklärt, nicht als bitidentisch oder als bewiesener Fehler werten; kein Glätten.
+- 66 abgeschlossene Kandidatenproben in sechs Reports, 53 zusätzliche unterschiedliche Screening-Proben. Gesamt 168/2778, 82 Presets mit Signal, 9/22 vollständige Ersttest-Banken; 2610 Screening-Proben verbleiben. Alle sieben Prozesse einschließlich Referenz mit Exit 0, frischem Bootlog ohne ERROR, tatsächlichem Resident-Commit und unveränderten Quellen. Zwei Logs erhielten nach Prozessende Xvfb-Shutdown-Zeilen: exakter ursprünglicher SHA256 durch isolierten Prefix nachgewiesen; vollständige Logs nicht überschrieben. Keine neue Produktänderung. Native Windows-/DAW-Abnahme und bisherige offene Gates unverändert.
+- Lokale Wiederherstellung aus bereits vorhandenen Artefakten: Debian-Wine 10.0 Archiv erfordert ursprüngliche Bibliotheks-/Wine-Pfade und zlib1.dll im 64-bit-Prefix. Reproduzierbar kompiliertes Resident.exe/Extender mit exakten bekannten Prüfsummen. Kein kostenpflichtiger Build.
+
 ## 28.11.2026 — Owner-Screening fortgesetzt: 115/2778, acht vollständige Banken (PARTIAL)
 
 - Exakter ce4e300 Windows-Kandidat unter Wine 10.0, kein neuer Build. Choral Aahs 15/15 und Vintage Dreams Drums 24/24 Bank-0-Screening-Proben mit dynamischem Signal. Callanish 23/23 und Magnus Choir 13/13 Bank-0-Presets jeweils bei einer gültigen Note/Velocity mit Signal. Bass Synth P0/15 (60/100) isoliert erneut mit Resident-Pfad geprüft: jeweils 0 große Sprünge, max .0120544/.0803833; jetzt auch Exit 0 und vollständige Log-Evidenz.
