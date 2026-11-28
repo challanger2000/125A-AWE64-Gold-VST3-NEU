@@ -48,3 +48,7 @@ Same artifact/engine/VST3/test host identities as previous local candidate. Orig
 |441 Hz return|.027512|.0000915527|117.902|92.101|
 
 Invalid recalled state rejected, prior state retained, host shutdown success. Private resident-large.json SHA256 b76379ff91119a886f52c7a0fa776738ea2b3a832053f80ec38fcd2c392088bc, log SHA256 53ea86f08452561ed89da5c1a2b1f0cd9b04eaf60dc0efe50cba43515174349b. This is measured under Wine on a synthetic large bank, not a native Windows or DAW guarantee or a relative old-path speedup. The old-path baseline still has the previous high idle defect. Actual owner large-bank VST3 transition, native destructive rollback, CC restore, concurrency, final release and default path remain unverified. No new build.
+
+## Six actual owner banks on resident VST3 path (Wine)
+
+ce4e300 with pinned guest/extender: actual Elisse Moans (23,433,218-byte source), PIANO, Boom Bass, Classhit, Perco Bass, JR_pad_voice. All six isolated host runs exit 0, exactly one actual resident commit each during active ROM-to-external transition, 21/21 planned probes with measurable signal and no contamination; one Piano step-review also present on older engine. Original hashes unchanged. Details in 2026-11-27-preset-playback-repair.md. This adds real-owner-bank load/playback evidence; it does not prove resident speed in Windows/DAW, actual destructive rollback, CC restore, simultaneous resident instances in one process, or production default readiness. No new build.

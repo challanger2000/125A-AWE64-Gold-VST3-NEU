@@ -59,3 +59,40 @@ Program 12 (Electric Slap Bass) separate 3-probe recheck: (key/velocity, AC-RMS,
 Private report SHA256: overloaded-15.json 3fe66cc360560eabe35ed5a97c601dddd9b85a91a628b2e70bee0523420e8359, slap-3-retry.json 4e33f30f0465b6cfbbfb8f93f2760057bb71f8e887b323313ad996b089ac14fb, p32-alone.json 4ecf884552f371f3251c21ac9cccf7dfe4ad58ccec2715fe55875ee40fecb4e3. Combined distinct planned screening coverage now 19/2778, not 19 final sound approvals. Original 29 non-bank-0 addresses still unsupported.
 
 Additional read-only comparison over all original/staged files: independent Python zone extraction compared the sum of all 15 additive relocation candidates and all other effective generator values, ignoring implicit zero loop offsets. 952/955 preset lists match; differences only Synth 512 program 10 (sample 18), 11 (17), 68 (10), previously invalid loop-offset metadata reset to zero. Sample headers changed only for Synth 512 samples 14–18 and Vintage Drums 2001 samples 80,81,128,129, correcting loop points to sample bounds. All referring zones (Synth 512 programs 10,11,18,44,53,68; Vintage Drums 2001 programs 3,10,11 in banks 0/128) have sampleModes=0 before/after. Both pmod and imod chunks remain byteidentical in all 22 banks; per-zone modulator routing not independently verified. Sample data unchanged. This check is not a full acoustic equivalence proof; preserve original files. No product changes and no additional CI builds.
+
+## 28.11.2026 — Repeated targeted audio comparisons and six full first-pass bank screenings (PARTIAL)
+
+Actual ce4e300 candidate, Wine 10.0, private artifact 15259027279, unchanged VST3 SHA256 520f4410252ae420d9cc177bc62c2d40ed628b35ae99d461e5921fcdf003360d and host fb91bca8ccc71f867e568e4be490660dd680545193c12745960a220bd8ef1527. Comparisons use isolated private copies of the *same* current shell/host; only Engine.dll changes, so do not claim a whole-product revision comparison. Reference Engine 972e862 SHA256 4167cbb8ff8ee7cd344574316589466e76d3927f5f7dc1abcd6da6b3abd1c1c9 already includes the filter-bypass correction (verified patcher). Additional pre-fix Engine 65c419e SHA256 ffba0174a546d873570da02a4242d074db145d7457fb233ab08c075697de802f downloaded from existing artifact 15231538925, identity verified against its BUILD-IDENTITY.json, source patcher lacks the correction. No new compilation. All listed reports are actual completed runs, exit 0, fresh boot logfile without ERROR, strict numeric parser coverage, input hashes unchanged. Concurrent isolated host executions are not a timing benchmark.
+
+| Synth 512 program (60/100) | Old Engine RMS | New Engine RMS | Old steps >.15 | New steps >.15 |
+|---:|---:|---:|---:|---:|
+|34|.0155073|.0152933|119|107|
+|35|.0106264|.0106268|91|101|
+|47|.0603732|.0604376|147|154|
+|57|.00905255|.00903948|6|4|
+|70|.0209347|.0209351|0|0|
+|77|.0438294|.0437989|0|0|
+
+Every row has nonzero AC, relative mean RMS change below 1.4%, no newly introduced large-step category; counts/peaks vary, waveform identity is not proven. Independent source zone inspection: programs 34,35,47,57 use Saw_a1 with original adjacent-sample max difference 1.99506 full-scale units, program 70 W12_1 .70233, program 77 FM5-0440 .55219. These raw samples contain intrinsic sharp transitions; do not flatten them. No claim that all steps are intentional or hardware-faithful, no PCM equality. Private report SHA256 six-current b359f0ed3b082433159b57cd834b1fe71958c56a89812435acfa71fbf008b5db; six-oldengine 2fa00f679b32bfe9167551eed65b0c3f59cac159857c27c868a8e26bbcbf4335.
+
+| Bass Synth (60/100) | Pre-fix RMS | Corrected RMS | Pre-fix max step / count | Corrected max step / count |
+|---:|---:|---:|---:|---:|
+|0|.0354408|.0354462|.328613 / 24|.0119629 / 0|
+|15|.0426357|.0425256|.0842285 / 0|.0751648 / 0|
+
+Pre-fix report SHA256 209d6add03351bcf9e25aa7b1d1c63dc2a73933766fe563ff611834f6c4897b3; corrected measurements from previously recorded bass.log SHA256 3f5a6e39d245346af3411704d4d5073c877819b3c6f03deafa2b47672493d239. The pre-fix positive fault reproduces the large-step defect while the corrected version preserves mean energy; no claim of bitwise identity or exact periodicity measured by this VST3 host. Program 15 not a positive-fault case at this pitch/velocity.
+
+| Actual owner bank, resident opt-in | Presets | All planned screening probes | Signal rows | Step reviews |
+|---|---:|---:|---:|---:|
+|Elisse Moans|1|3|3|0|
+|PIANO|1|3|3|1|
+|Boom Bass|1|3|3|0|
+|Classhit|1|3|3|0|
+|Perco Bass|1|3|3|0|
+|JR_pad_voice|2|6|6|0|
+
+All six actual resident runs have exactly one AWE64_RESIDENT_BANK_COMMIT and source SHA unchanged, valid complete reports, exit 0. No contamination/silence. Private report digests: Elisse 39bff5d4e149e44a18f7eb619dd9e337f91b4654097ca155c85e58e62709aad0; PIANO 20666201a44817c175ebe2ea66cb08e365f2d96574d9939db67a81701f98d6a0; Boom Bass 6d4034acec67f3f794958a27292fcc34dee04d7fefbe01ad9cab487f3171a9ac; Classhit b4f0138feb1e2d4a87bc8b07c70fe8d797f3e09222d8918042261203358a79c6; Perco Bass 48cca806ad3d6c303e675ca48e70695ff1cf7598da047e850d5b5a97e913532e; JR_pad_voice 313a7bf090b9018e34973f231597b8dfecace18eee207a6f66f0cee12d316046. Elisse actual source 23433218 bytes, SHA256 b37c3241d3db090402cad7b470ab6a5c8a0f8380c0f9d20aa678f8e364ffcb78; AC .00840696/.0282292/.027137; max steps .00656128/.0298462/.02005. Real bank resident transition and playback observed, timing not instrumented for this path.
+
+PIANO note72/velocity115 first current run 842 jumps, max .272369, RMS .0499819. Isolated repeat with 972e862 and ce4e300 Engines (both resident mode, one actual commit each): 852 jumps each, max .288361/.288422, RMS .0499898/.0499973. At 48/65 and 60/100 no jumps in either; source stereo piano(L/R) raw sample max adjacent difference .34622/.34561, 3525/3112 source jumps over .15. Repeat reports SHA256 old 048a1f8cec15452c1eb99b722b9071f2b6c49bf3d01587406b8358c6363038a7 and new 7844f4511b11a04237f9c6e1b7ac5076e569de45952df045061589f6a71a1a77. This does not establish hardware fidelity but no evidence of a recent regression in this case; no smoothing or source edits.
+
+Cumulative 40/2778 distinct screening probes of bank-zero owner inventory (previous 19 + 21; repeated probes/reference runs not double-counted). 2738 remaining plus extended zone testing. Six banks complete first-pass plan only. No native Windows/DAW/subjective sound acceptance, no full audit.
