@@ -1,5 +1,11 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 28.11.2026 — Regler-Nachweis nach Audit-Vertrag (PARTIAL)
+
+- Erneute lokale tatsächliche Soll/Ist-Ausgabe aller zehn Overlay-Register und beider unabhängigen Sendwerte; Master-Gain- und GS-SysEx-Gegenprobe. 16 separat kompilierte absichtliche Fehler (alle 13 Drehregler, beide Effekt-Typen, ursprüngliche UART-Reihenfolge) jeweils durch Laufzeitassertions erkannt. Konkrete Registerwörter, unabhängig aus Upstream abgeleitete Zeiten, Assertionstellen und genaue Einschränkungen in [P165-CONTROL-PORT](docs/P165-CONTROL-PORT.md).
+- Kein nativer Regler-Klang-PASS: bisheriger PCM-Differenztest allein beweist keine richtige Regelrichtung. Native Richtungs-, Interaktions-, Recall-, GUI- und Negativnachweise stehen aus. Self-Challenge, nicht unabhängiger FULL AUDIT. Kein kostenpflichtiger Build, keine Produktänderung.
+
+
 ## 28.11.2026 — Regler-Nachprüfung und MIDI-Steuerreihenfolge
 
 - 13 Drehregler, 2 Effekt-Typen, MOD RESET: Quellpfad GUI/VST3/ABI abgeglichen; lokale Register-Dispatcher-, Send-, Master-, SysEx- und Neutraltests PASS. Keine vertauschte Zuordnung. Vier absichtliche Zuordnungsfehler erkannt; echter bisheriger Legacy-MPU-Readahead-Fehler reproduziert und korrigiert (vorher FAIL, nachher PASS). Jetzt auch ohne Host-Demand keine Steueränderung vor vollständig abgearbeitetem vorherigen MIDI-Paket. Lokaler Test mit extrahiertem Produktcode und Fake-Register/UART, nicht nativer DOS-/PCM-Nachweis.
