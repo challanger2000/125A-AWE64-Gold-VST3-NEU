@@ -1,5 +1,11 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 28.11.2026 — Regler-Nachprüfung und MIDI-Steuerreihenfolge
+
+- 13 Drehregler, 2 Effekt-Typen, MOD RESET: Quellpfad GUI/VST3/ABI abgeglichen; lokale Register-Dispatcher-, Send-, Master-, SysEx- und Neutraltests PASS. Keine vertauschte Zuordnung. Vier absichtliche Zuordnungsfehler erkannt; echter bisheriger Legacy-MPU-Readahead-Fehler reproduziert und korrigiert (vorher FAIL, nachher PASS). Jetzt auch ohne Host-Demand keine Steueränderung vor vollständig abgearbeitetem vorherigen MIDI-Paket. Lokaler Test mit extrahiertem Produktcode und Fake-Register/UART, nicht nativer DOS-/PCM-Nachweis.
+- Neue portable Regression im vorhandenen Workflow; dokumentierte Einzelheiten und Grenzen in [P165-CONTROL-PORT](docs/P165-CONTROL-PORT.md). Kein kostenpflichtiger Build. Windows-Klang, GUI-Klicks, gehaltene Stimmen und Performance nach UART-Korrektur bleiben offen. Original-GUI, EMU8000-Upstream und Performance-Patches unverändert.
+
+
 ## 28.11.2026 — Hüllkurven-/Filter-Regelrichtung korrigiert (lokaler Kandidat)
 
 - 0 bleibt Originalwert, aktive Stellungen 1–255 absolut: Attack/Decay/Release werden länger, Sustain steigt, Cutoff öffnet, Resonance steigt. Bewusster Übergang zwischen Neutralstellung und erster aktiver Position; erlaubt kurze Hüllkurven auch auf ursprünglich langsamen Presets. Attack aktiv ohne zusätzliches Delay/Hold. Hardware-Rate 0 (Stillstand) ausgeschlossen. Gewählte Regelbereiche und PEFE-Kompensation siehe [P165-CONTROL-PORT](docs/P165-CONTROL-PORT.md). Alle Original-Registerflags, vorhandene signed Filter-/Pitch-Routen und neutralen Werte unverändert.

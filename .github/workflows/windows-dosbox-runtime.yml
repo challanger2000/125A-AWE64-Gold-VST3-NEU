@@ -65,6 +65,7 @@ jobs:
           test "$(git -C third_party/dosbox-x-AWE32 rev-parse HEAD)" = "81d0fde73917b57a1716e610dec2605c36def555"
           c++ -std=c++14 -Wall -Wextra -Werror -O2 research/p165-control-port/VoiceOverlayTest.cpp -o /tmp/awe64-overlay-math
           /tmp/awe64-overlay-math
+          python tests/test_control_route_contract.py
           python -m unittest discover -s tests -p test_dosbox_runtime_patch.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_mpu_probe.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_ram_sample_sf2.py -v

@@ -1019,12 +1019,11 @@ def patch_mpu(s):
     anchor = 'static unsigned char awe64_overlay_tags[32]{};'
     s = once(s, anchor, 'extern bool AWE64_HostDemandEnabled() noexcept;\n'+anchor)
     anchor = '    for(unsigned n=0;n<8 && mpu.queue_used<=MPU401_QUEUE-3;++n) {'
-    s = once(s, anchor, r"""    // The timed command stream is processed between complete original MIDI
-    // handlers. Never publish the next overlay while the previous packet is
-    // still pending in the guest UART. Legacy mode retains eight packets.
-    const bool clocked=AWE64_HostDemandEnabled();
-    if(clocked&&mpu.queue_used!=0)return;
-    for(unsigned n=0;n<(clocked?1u:8u) && mpu.queue_used<=MPU401_QUEUE-3;++n) {""")
+    s = once(s, anchor, r"""    // A control callback can update register overlays without emitting bytes.
+    // Only pull at an empty UART after the previous original MIDI handler.
+    // This applies to the asynchronous as well as the demand-clock path.
+    if(mpu.queue_used!=0)return;
+    for(unsigned n=0;n<1u && mpu.queue_used<=MPU401_QUEUE-3;++n) {""")
     return s
 
 def patch_dosbox_clock(s):
