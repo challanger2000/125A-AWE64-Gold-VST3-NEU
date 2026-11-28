@@ -81,21 +81,53 @@ def run_private_creative_host(command: list[str], plugin: Path, seconds: int):
         err.close()
 
 
+NUMBER = r"([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)"
+ROW = re.compile(r"VOICE_PCM_RESULT ID=(\d+) MID_DELTA=" + NUMBER +
+                 r" MAX_DELTA=" + NUMBER + r" NEUTRAL_DELTA=" + NUMBER +
+                 r" THRESHOLD=" + NUMBER + r" PROGRAM=(\d+) PASS")
+SILENCE = re.compile(r"FILTER_PRE_NOTE_SILENCE RMS=" + NUMBER + r" WINDOWS=(\d+) PASS")
+
+
 def validate_voice_overlay_report(stdout: str):
-    """Validate native evidence, including Windows CRLF from binary spools."""
+    """Reject labels unsupported by finite, consistent measurements."""
     lines = stdout.splitlines()
     if lines.count("REAL_VST3_VOICE_CONTROLS_PCM_PASS") != 1:
         raise RuntimeError("Bundled ten-control musical PCM gate failed")
     if lines.count("REAL_VST3_VOICE_PCM_SUMMARY=10/10 NEUTRAL_RESTORE=PASS") != 1:
         raise RuntimeError("Missing or ambiguous ten-control summary")
-    results = [re.fullmatch(r"VOICE_PCM_RESULT ID=(\d+) .* PASS", line)
-               for line in lines if line.startswith("VOICE_PCM_RESULT ")]
-    if any(m is None for m in results) or sorted(int(m[1]) for m in results) != list(range(1100,1110)):
+    seen = set()
+    for line in lines:
+        if not line.startswith("VOICE_PCM_RESULT "):
+            continue
+        row = ROW.fullmatch(line)
+        if not row:
+            raise RuntimeError("Malformed or failed per-control PCM evidence")
+        ident = int(row[1])
+        mid, maximum, noise, threshold = map(float, row.groups()[1:5])
+        program = int(row[6])
+        if ident not in range(1100, 1110) or ident in seen:
+            raise RuntimeError("Missing or ambiguous per-control PCM evidence")
+        if program != (17 if 1105 <= ident <= 1107 else 0):
+            raise RuntimeError(f"Wrong probe program for control {ident}")
+        if not all(math.isfinite(x) for x in (mid, maximum, noise, threshold)):
+            raise RuntimeError(f"Non-finite PCM evidence for control {ident}")
+        # The host prints rounded decimal values. Allow small rounding error
+        # in the reported noise-derived threshold, never zero or equality in
+        # the two measured effect deltas. Borderline rounding is inconclusive.
+        if not (threshold > 0 and threshold >= 2 * noise * (1 - 1e-5)
+                and mid > threshold and maximum > threshold):
+            raise RuntimeError(f"PCM values contradict PASS for control {ident}")
+        seen.add(ident)
+    if seen != set(range(1100, 1110)):
         raise RuntimeError("Missing or ambiguous per-control PCM evidence")
-    silence = [line for line in lines if line.startswith("FILTER_PRE_NOTE_SILENCE ")]
-    if len(silence) != 9 or any(not re.fullmatch(r"FILTER_PRE_NOTE_SILENCE .* PASS", line)
-                                for line in silence):
+    rows = [SILENCE.fullmatch(line) for line in lines
+            if line.startswith("FILTER_PRE_NOTE_SILENCE ")]
+    if len(rows) != 9:
         raise RuntimeError("Missing measured silence before a filter trial")
+    for row in rows:
+        if not row or not math.isfinite(float(row[1])) or not (
+                0 <= float(row[1]) <= .00025 and 3 <= int(row[2]) <= 100):
+            raise RuntimeError("Invalid measured silence before a filter trial")
 
 
 def run_dual_creative_command(command: list[str]):

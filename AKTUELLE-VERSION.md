@@ -1,5 +1,11 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 28.11.2026 — PCM-Bericht darf Messfehler nicht als PASS akzeptieren
+
+- Native Regler-Differenzprüfung: bisheriger Ergebnisparser akzeptierte sämtliche 14 widersprüchlichen Testberichte trotz PASS-Text (Nullwirkung, Delta gleich Schwelle, Rauschen oberhalb Schwelle, Schwelle null, unendliche/NaN/negative/fehlende Zahlen, falsche Probeprogramme, nicht stille oder ungültig gezählte Ruhefenster). Originalparser gegen exakt dieselben Gegenbeispiele ausgeführt: 14/14 falsch akzeptiert. Korrigierter Parser weist alle 14 zurück; beide gültigen Zeilenendformate und 10 bisherige Struktur-Gegenproben ebenfalls geprüft.
+- Korrektur im bestehenden WindowsRunVst3HostPcmSmoke.py, keine neue Paketabhängigkeit. Lokaler Python-Test mit exakt extrahiertem Parserfragment (2645 ASCII-Zeichen, FNV-1a32 8a9277c3) und Testblob e04f5b52c418b4e6df62dfcc3ef0b53cab3d2c4e ausgeführt: drei Unittest-Methoden OK. Diese Prüfung beweist ausschließlich Zahlenvalidierung und Differenzschwellen, NICHT akustische Richtung, tatsächliche PCM oder native Funktion. Windows-Lauf, Richtungsgates, Presetprüfung und Produktfreigabe bleiben offen. Keine Produktänderung und kein kostenpflichtiger Build.
+
+
 ## 28.11.2026 — Regler-Nachweis nach Audit-Vertrag (PARTIAL)
 
 - Erneute lokale tatsächliche Soll/Ist-Ausgabe aller zehn Overlay-Register und beider unabhängigen Sendwerte; Master-Gain- und GS-SysEx-Gegenprobe. 16 separat kompilierte absichtliche Fehler (alle 13 Drehregler, beide Effekt-Typen, ursprüngliche UART-Reihenfolge) jeweils durch Laufzeitassertions erkannt. Konkrete Registerwörter, unabhängig aus Upstream abgeleitete Zeiten, Assertionstellen und genaue Einschränkungen in [P165-CONTROL-PORT](docs/P165-CONTROL-PORT.md).

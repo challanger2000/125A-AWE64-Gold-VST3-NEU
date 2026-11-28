@@ -1,4 +1,4 @@
-"""Portable regression for the exact native output contract; no guest assets."""
+"""Portable regression for numeric native output; synthetic evidence only."""
 import unittest
 from WindowsRunVst3HostPcmSmoke import validate_voice_overlay_report
 
@@ -35,6 +35,31 @@ class VoiceOverlayReportTest(unittest.TestCase):
             with self.subTest(last=bad[-2:]):
                 with self.assertRaises(RuntimeError):
                     validate_voice_overlay_report("\r\n".join(bad)+"\r\n")
+
+    def test_false_pass_numeric_counterexamples(self):
+        good = self.report()
+        for index, old, new in (
+            (9, "MID_DELTA=0.001", "MID_DELTA=0"),
+            (9, "MAX_DELTA=0.002", "MAX_DELTA=0.0002"),
+            (9, "NEUTRAL_DELTA=0.0001", "NEUTRAL_DELTA=0.002"),
+            (9, "THRESHOLD=0.0002", "THRESHOLD=0"),
+            (9, "MID_DELTA=0.001", "MID_DELTA=1e999"),
+            (9, "MID_DELTA=0.001", "MID_DELTA=nan"),
+            (9, "MID_DELTA=0.001", "MID_DELTA=-1"),
+            (9, "MID_DELTA=0.001", "UNMEASURED"),
+            (9, "PROGRAM=0", "PROGRAM=17"),
+            (14, "PROGRAM=17", "PROGRAM=0"),
+            (0, "RMS=0.00018", "RMS=0.02"),
+            (0, "RMS=0.00018", "RMS=1e999"),
+            (0, "WINDOWS=3", "WINDOWS=1"),
+            (0, "WINDOWS=3", "WINDOWS=101"),
+        ):
+            with self.subTest(index=index, new=new):
+                bad = good.copy()
+                self.assertIn(old, bad[index])
+                bad[index] = bad[index].replace(old, new)
+                with self.assertRaises(RuntimeError):
+                    validate_voice_overlay_report("\n".join(bad)+"\n")
 
 
 if __name__ == "__main__":
