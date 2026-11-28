@@ -1,5 +1,11 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 28.11.2026 — Owner-Screening fortgesetzt: 115/2778, acht vollständige Banken (PARTIAL)
+
+- Exakter ce4e300 Windows-Kandidat unter Wine 10.0, kein neuer Build. Choral Aahs 15/15 und Vintage Dreams Drums 24/24 Bank-0-Screening-Proben mit dynamischem Signal. Callanish 23/23 und Magnus Choir 13/13 Bank-0-Presets jeweils bei einer gültigen Note/Velocity mit Signal. Bass Synth P0/15 (60/100) isoliert erneut mit Resident-Pfad geprüft: jeweils 0 große Sprünge, max .0120544/.0803833; jetzt auch Exit 0 und vollständige Log-Evidenz.
+- Callanish 10 Step-Reviews; die vier größten (Cymbals, Hihats, Snares 2, Percussion) mit alter Engine 972e862 erneut gemessen. Jeweilige RMS-Abweichung <0,05 %, ähnlich viele große Steps, Original-Samples bereits steil; kein neuer Klangfehler nachgewiesen. Vier Vintage-Dreams-Drum-Proben mit großen Steps, passende Original-Drum-/Noise-Samples mit starken Transienten; Referenzvergleich noch offen.
+- Neue private Coverage-Auswertung reparst tatsächliche Logs, prüft Manifest-, Source- und Log-Identität, Exit/Boot-Evidenz und geplante Tripel, zählt Wiederholungen nicht doppelt und behält frühere Auffälligkeiten. Tatsächlich 18 abgeschlossene Reports akzeptiert, 115 unterschiedliche Screening-Proben mit Signal, 73 verschiedene Bank-0-Presets, acht komplette Ersttest-Banken. 2663 Screening-Proben, weitere Zonen, 29 Nicht-Bank-0-Presets, Klang-/Resident-/DAW-Abnahme offen. Coverage-Unit-Test einschließlich elf negativer Fälle und wiederholter/ kontaminierter Proben lokal ausgeführt. Keine Produktänderung und kein neuer CI-Lauf.
+
 ## 28.11.2026 — PCM-Vergleich der auffälligen Presets und sechs vollständige Kleinbank-Screenings (PARTIAL)
 
 - Exakter Kandidat ce4e300, Artefakt 15259027279, Wine 10.0. Sechs auffällige Synth-512-Programme (34,35,47,57,70,77) mit aktuellem VST3/Host und je zwei Engine-Identitäten verglichen; frühere Engine 972e862 enthält bereits die Filterreparatur. Alle zwölf Proben erzeugen Signal. RMS-Abweichungen je Preset <1,4 %, große Schritte auch mit alter Engine; Original-Samples enthalten teils nahezu vollskalige Einzelsteps. Kein Nachweis neuer Klangfehler, aber keine bitidentische/akustische Freigabe und keine Glättung.

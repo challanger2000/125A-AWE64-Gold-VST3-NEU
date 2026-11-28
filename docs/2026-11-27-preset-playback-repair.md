@@ -96,3 +96,30 @@ All six actual resident runs have exactly one AWE64_RESIDENT_BANK_COMMIT and sou
 PIANO note72/velocity115 first current run 842 jumps, max .272369, RMS .0499819. Isolated repeat with 972e862 and ce4e300 Engines (both resident mode, one actual commit each): 852 jumps each, max .288361/.288422, RMS .0499898/.0499973. At 48/65 and 60/100 no jumps in either; source stereo piano(L/R) raw sample max adjacent difference .34622/.34561, 3525/3112 source jumps over .15. Repeat reports SHA256 old 048a1f8cec15452c1eb99b722b9071f2b6c49bf3d01587406b8358c6363038a7 and new 7844f4511b11a04237f9c6e1b7ac5076e569de45952df045061589f6a71a1a77. This does not establish hardware fidelity but no evidence of a recent regression in this case; no smoothing or source edits.
 
 Cumulative 40/2778 distinct screening probes of bank-zero owner inventory (previous 19 + 21; repeated probes/reference runs not double-counted). 2738 remaining plus extended zone testing. Six banks complete first-pass plan only. No native Windows/DAW/subjective sound acceptance, no full audit.
+
+## 28.11.2026 — Continued private owner screening, exact cumulative coverage (PARTIAL)
+
+Actual ce4e300 Windows candidate under Wine 10.0 (same 15259027279 artifact, engine/VST3/host SHA256 identities unchanged). Original SoundFonts read-only, exact source SHA verified before/after. All eight new candidate/reference reports below have actual process exit 0, fresh boot logfile without ERROR, strict numeric/complete report parser coverage. Resident opt-in on each. Parallel isolated Wine instances are not a performance benchmark. A first three-bank parallel invocation was interrupted by the tool execution limit after partial PCM rows; none of those aborted runs counted. Fresh completed subset runs were used instead.
+
+| Bank | Scope | Signal | Step-review rows |
+|---|---|---:|---:|
+| Choral Aahs | all 5 bank-0 presets × 3 probes | 15/15 | 0 |
+| Vintage Dreams Drums | all 8 bank-0 presets × 3 probes | 24/24 | 4 |
+| Callanish | one valid representative probe per 23 bank-0 presets | 23/23 | 10 |
+| Magnus Choir v1.6 | one valid representative probe per 13 bank-0 presets | 13/13 | 0 |
+| Bass Synth | P0/P15 note60/velocity100 repeat | 2/2 | 0 |
+
+Bass repeat P0 RMS .0354421, maximum step .0120544, P15 RMS .0424374, maximum step .0803833; no steps >.15, source unchanged. Previously measured two probes without retained exit status now have a completed independent report. Candidate report SHA256: choral-one 823b3bf3e60ad5a240a5ea72279a133c5f2faec8b41b04f3796884771be87a55; choral-rest 673d031cb3ad1cafeb9ecaca0b1cc453b8a321705ed532630795b618c926d54e; vddrums-one 393831c8fd3259d00c9bae124d881efd408633131bbd6becf0463da901a4e05d; vddrums-rest 2709869658a6a313bbf69a7dc67d2970372edc18bdbb13d5c6a810dd4a5cd2cf; callanish-one 549a3bbbc5df716f97e98f4dc4f384ed5e5f631d84ce42eb9b37980efae47695; magnus-one 2ebe12959e75feda9799e5a88e77debf00ab55f13ec82b4d0859df3f0a0282ab; bass-repeat 91988c199e568276c56ffc1d4eafb9b587b3bffa77d2a3bc455dc1a2970c174a.
+
+Callanish worst four step reviews at note 60 / velocity 100, current shell/host with prior 972e862 Engine versus candidate. Both runs completed; prior engine includes filter fix. Source active sample step count is read-only raw PCM, not output count.
+
+| Program | Old RMS | New RMS | Old steps >.15 | New steps >.15 | Source sample / steps >.15 |
+|---:|---:|---:|---:|---:|---|
+|5 Cymbals|.0349697|.0349698|2703|2701|crash01 / 8860|
+|3 Hihats|.012425|.0124311|252|254|hihat28 / 3070|
+|2 Snares 2|.00902704|.0090246|107|101|snare83 / 455|
+|7 Percussion|.00475519|.00475555|84|81|shala02 / 311|
+
+Old report SHA256 d947b6c9467469b81f17d9679adb51fb4969f80a1e4cf809c3c4a90b594c1a82. RMS deltas <0.05%, output step counts close. Six other Callanish step-review programs (1,13,14,15,18,22) not yet directly compared. Four Vintage Dreams Drums step-review triplets: 3/50/115 (2 steps), 4/72/115 (35), 5/47/65 (19), 7/70/115 (6). Active raw source samples include 909BD11 (2), SINE32 (1) + NOISE5 (2702), NOISE3 (7809) + FM90000 (242), white808-2 (3142) respectively. No smoothing or source modification; old-engine comparison for these four still open. Neither raw steps nor close RMS prove audible/hardware equivalence.
+
+Private coverage helper tests/OwnerPresetCoverage.py (blob 0fc11c7d7a1582f5702b04d6b1b22a386a136795) consumes completed local wrapper JSON and corresponding same-stem raw host log. It is not a reader for the original WindowsOwnerPresetSweep.py per-bank JSON schema. Requires exact three binary hashes from manifest, original bank SHA, integer exit 0, boot status, raw log digest, valid planned bank/program/key/velocity rows and re-parses actual raw report; checks exact stored rows. Deduplicates repeated probe keys, counts no contaminated rows as measured, retains all previous review statuses and produces remaining triplets by bank. Local test (blob 0f76d92e31d5185e4a3a24b64001f62a979909e0) executed 1 unittest method with 11 negative cases (bad exit or bool exit, missing boot, boot ERROR, source/identity/log mismatch, rows mismatch, unplanned probe, modified log, missing completion despite updated hash), duplicate-report positive and contamination/retest behavior. Actual aggregate of 18 completed candidate reports: 115/2778 distinct measured and signal-observed probe keys, 73 distinct presets with signal, 8 complete bank-0 first-pass screenings, 23 keys with historic review flags (including earlier contamination and subsequently clean repeats). No rejected reports in this selected completed-candidate set. Reference-engine and interrupted reports deliberately excluded. Private coverage JSON SHA256 a3157915a12ca1e1f18cae4bb7c5386e1fbf6d5008c3a51fc0cc798bdb6d50f9. Coverage is not sound approval. 2663 screening probes remain. All private logs/reports/source samples remain local. No product changes, no CI.
