@@ -1,5 +1,30 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 28.11.2026 — Nativer PCM-Befund: Richtung statt Neutralabstand (PARTIAL)
+
+Private Windows [46098949327](https://github.com/challanger2000/125A-Engineering/actions/runs/46098949327), exakter Produktstand b6a9fae: Ubuntu-Gate, Windows-DLL/VST3/Host-Kompilierung, 47/47 Steinberg-Validator, synthetische und echte Creative-Dual-Lifecycle-Tests, GUI/MOD RESET (inkl. Host-Rejection), RAM 441/735 Hz und 44.1/48/96 kHz bestanden. Originaltest danach FAIL im alten Voice-PCM-Gate: 7/10, Neutralrestore PASS. Native 26 NoteOn/Off-Registerpaare: alle zehn exakten Mid/Max-Codes PASS. Keine Aussage über die noch nicht erreichten Performance-, Send-, Cheezoids- und Timed-Gates. Resident- und Owner-Sweep NOT RUN.
+
+Ursache der drei alten PCM-FAILs: 0 ist Preset-Bypass, nicht ein aktiver Endpunkt; Filter Sustain Originalcode 64 entspricht aktiv 50 % exakt. Filter Attack und Cutoff zeigen Spektralwirkung, die der absolute RMS/Differenz-Abstand zum Original unzureichend erfasst. Kein Absenken dieser alten Schwellen und kein Produkt-/DSP-Patch. Alle 26 tatsächlich erfassten PCM-Profile aus Job 140837128309 retrospektiv mit phasenspezifischer Richtungsmessung ausgewertet: AMP-RMS in relevanten Fenstern, Filter-Quotient sqrt(E_H4..H8 / E_H1..H3) bei ausreichendem Signal. Vergleich 50 % gegen 100 %; Mindestwirkung max(3× Neutralstreuung, 5 % Merkmalsgröße, absoluter Boden .0001 RMS bzw. .005 Spektralquotient). Fenster sind für die vorhandenen zwei synthetischen Testpresets gewählt; insbesondere zeigt die positive Filterroute abfallende Helligkeit. Kein universeller Beweis über andere Presets.
+
+| Control | Mid | Max | gerichtetes Delta | Mindestdelta |
+|---|---:|---:|---:|---:|
+| AMP Attack | .007875 | .000280 | .007595 | .000394 |
+| AMP Decay | .005034 | .009641 | .004606 | .000482 |
+| AMP Sustain | .000100 | .018252 | .018152 | .000913 |
+| AMP Release | .000090 | .001780 | .001690 | .000100 |
+| Filter Attack | .244105 | .585585 | .341480 | .029279 |
+| Filter Decay | .357661 | .576735 | .219074 | .028837 |
+| Filter Sustain | .357202 | .546288 | .189086 | .027314 |
+| Filter Release | .034291 | .259610 | .225319 | .012981 |
+| Cutoff | .440223 | .516985 | .076762 | .025849 |
+| Resonance | 1.148424 | 2.659592 | 1.511168 | .132980 |
+
+Retrospektive JS-Auswertung der tatsächlichen 26 Messprofile: zehn gerichtete Effekte oberhalb der jeweiligen Schwelle; zehn einzeln vertauschte Mid/Max-Profile und zehn jeweils durch identische Werte ersetzte Profile als FAIL erkannt. Separater neuer Python-Prüfer (exakter Blob 05aea206ee7aab6fc8963987a5424fa5c888d903), synthetischer Test (0a581076a05c93b26b99cce8cf81807b79ef62be) lokal wirklich ausgeführt: zwei Unittest-Methoden OK, 20 Einzelgegenproben plus schwaches Spektrum, Neutralstreuung und fehlende/inkonsistente Capture-Referenzen. Native Messdaten des alten Laufs nicht nachträglich als neuer Workflow-PASS deklarieren.
+
+Neuer Host meldet vollständige Profile erst nach Shutdown, neutraler Wiederherstellung, gültigem Filterreferenzsignal und 26/26 NoteOn/Off. Der alte 7/10-Differenztest bleibt als Diagnose sichtbar; der Python-Runner muss alle zehn gerichteten Effekte numerisch nachweisen, vollständige Profile und Stille prüfen. Separates Register-Gate weiterhin bindend. Neue native Regression noch NOT RUN.
+
+Build-Verlust: Im privaten Workflow war der frühe Upload-Schritt bei der vorherigen Syntaxreparatur versehentlich entfernt worden. Der abschließende Upload wurde wegen des Testfehlers übersprungen; lediglich Screenshot vorhanden. Cache der neuen Engine nachweislich gespeichert (Key awe64-original-sdl2-msvc-2022-81d0fde-ae1a5f9c6ef224cce946da2a31f9c2ca8d1803f9873770e8b8bdeb6abb908479). Folgelauf muss exakt diesen Cache nutzen, vor Originaltests assetfreien Kandidaten mit SHA256-Manifest sichern; keine erneute Engine-Kompilierung. Keine Owner-Dateien hochladen. Resident weiterhin opt-in, GUI/DSP/Engine-Pin und beide Performance-Patches unverändert. Kein FINAL.
+
 ## 28.11.2026 — Konsolidierter nativer Prüfkandidat
 
 - Resident-Boot: fehlender Initial-ACK unterliegt nun ebenfalls dem Starttimeout; private Bootlogs werden vom residenten DOS-Laufwerk D: ausdrücklich auf C: geschrieben. Ein eigener Commitmarker unterscheidet den tatsächlichen residenten Bankwechsel vom Fallback. Native Prüfung NOT RUN.

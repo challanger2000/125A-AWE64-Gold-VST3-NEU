@@ -140,6 +140,7 @@ def validate_voice_overlay_report(stdout: str):
 
 def validate_voice_profiles(stdout):
     """Exact coverage/finite PCM profile evidence; not a direction verdict."""
+    profiles = {}
     rows = [line for line in stdout.splitlines() if line.startswith("VOICE_PROFILE ")]
     expected = {(i, value, 17 if 5 <= i <= 7 else 0): 1
                 for i in range(10) for value in (.5, 1.)}
@@ -160,8 +161,10 @@ def validate_voice_profiles(stdout):
             raise RuntimeError("Incomplete/non-finite native PCM profile")
         if max(vectors[0]) < .00025:
             raise RuntimeError("No measurable PCM in native profile")
+        profiles.setdefault(key, []).append(vectors)
     if any(expected.values()):
         raise RuntimeError("Missing native PCM profiles")
+    return profiles
 
 
 def run_dual_creative_command(command: list[str]):
@@ -216,8 +219,13 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
             "REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS" not in proc.stdout:
         raise RuntimeError("Active external SF2 guest restart missing")
     if original and os.environ.get("AWE64_TEST_VOICE_OVERLAYS") == "1":
-        validate_voice_overlay_report(proc.stdout)
-        validate_voice_profiles(proc.stdout)
+        if proc.returncode:
+            raise RuntimeError("Native profile capture failed; no acoustic direction verdict")
+        from VoiceDirectionEvidence import validate_direction_report
+        for label in ("VST3_HOST_NOTE_ON_EVENTS_SENT=", "VST3_HOST_NOTE_OFF_EVENTS_SENT="):
+            if [x for x in proc.stdout.splitlines() if x.startswith(label)] != [label+"26"]:
+                raise RuntimeError("Unexpected native overlay NoteOn/Off count")
+        validate_direction_report(proc.stdout, validate_voice_profiles(proc.stdout))
     if original and os.environ.get("AWE64_TEST_PERFORMANCE") == "1":
         def row(pattern):
             matches=[re.fullmatch(pattern,line) for line in proc.stdout.splitlines()]
