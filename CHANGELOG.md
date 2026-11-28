@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 28.11.2026 — Private Praxistestversion: vereinfachte Stichproben und Resident-Standardkandidat (PARTIAL)
+
+Owner-Entscheidung 16:50 MEZ: statt sämtlicher 2778 Screening-Tripel/erweiterter Zonenmatrix vor privater Auslieferung zunächst eine gültige Note/Velocity pro adressierbarem Preset, gezielte weitere Proben nur bei Auffälligkeiten; anschließend längerer eigener Studio-Pro-Praxistest vor öffentlichem Release. Stand 168 Testnoten, 82/926 Bank-0-Presets mit Klangnachweis. 29 nicht adressierbare Nicht-Bank-0-Presets bleiben offen. Die drei begonnenen neuen lokalen Bankstichproben (D4, Bass XXL Four/Five) brachen am Ausführungslimit ab; keine zusätzlichen Messergebnisse oder PASS gezählt.
+
+Produktkandidat: Resident-Start automatisch bei vollständig vorhandener Resident.exe/DOS4GW.EXE in der privaten Installation (beide weiterhin an exakte Hashes gebunden); exakter Engine-Pin 11353683854937df4690355b88fb85cfbac3395d1fc14a3021097909121a4ad4 aus privatem Artefakt 15259027279. Ohne beide Dateien bisheriger Legacy-Pfad, bei nur einer Datei Fehler statt stillen Fallbacks; clocked/offline weiterhin Legacy-Start. Expliziter diagnostischer Override 0/1 bleibt. Keine Änderung an Engine, DSP, P165-Grafik, GUI-Layout oder Parameter-IDs. Bereits vorhandener LCD-Text für Laden und Fehler bleibt für privaten Test; keine zusätzliche Prozentanzeige. 33 portable Policy-Fälle mit g++17 -O2 -Wall -Wextra -Werror tatsächlich PASS (Blobs 53949076f7b27797cd3882fc186c3497b6d1365d / 955a464ccddf040f7c814314ebc32208aeb062a2). Neue Binärintegration, Default-Resident-PCM/Fehler/Recall/Mehrfachinstanz und native Windows-Abnahme noch NOT RUN. Kein FINAL. Nur ein gezielter neuer VST3-Build mit unverändertem Engine-Cache erforderlich; privates Paket erst nach Nachweis, kein Originalmaterial in CI-Artefakt.
+
 ## 28.11.2026 — Owner-Screening fortgesetzt: 168/2778, neun vollständige Banken (PARTIAL)
 
 - Exakter ce4e300-Kandidat unter wiederhergestelltem Wine 10.0, kein neuer CI-Lauf. ALESIS D4 Programme 0/1/2, Bass XXL Killer String Four und Five jeweils 28/29/30: alle 27 geplanten Noten mit Signal. Magnus Choir v1.6 jetzt vollständig: 39/39 Noten, alle 13 Bank-0-Presets, keine großen Steps. Die zuvor erfassten 13 Magnus-Proben nicht doppelt gezählt.

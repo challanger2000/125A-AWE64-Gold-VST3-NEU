@@ -16,6 +16,7 @@
 #include <process.h>
 #include "CreativeSysexRepair.hpp"
 #include "ResidentBankMailbox.hpp"
+#include "ResidentStartupPolicy.hpp"
 #include "ResidentMidiState.hpp"
 #include "DosBoxHostAdapter.hpp"
 #include "ExternalSoundFont.hpp"
@@ -264,8 +265,18 @@ public:
                          demandLead>=rt::GuestDemandClock::ringFrames/2))return false;
         demandLead_=demandLead;
         const char* residentRequested=std::getenv("AWE64_TEST_RESIDENT_BANK");
-        residentMode_=residentRequested&&std::strcmp(residentRequested,"1")==0;
-        if(residentMode_&&demandLead_)return false; // legacy asynchronous path only
+        // Automatically use the fast guest in a complete private installation.
+        // No environment configuration is needed in Studio Pro. Keep the
+        // separately validated clocked/offline path and asset-free CI intact.
+        std::error_code residentError;
+        const bool residentPresent=std::filesystem::exists(privateDir/"Resident.exe",residentError);
+        if(residentError)return false;
+        const bool extenderPresent=std::filesystem::exists(privateDir/"DOS4GW.EXE",residentError);
+        if(residentError)return false;
+        const auto startup=guest::selectResidentStartup(residentRequested,demandLead_!=0,
+                                                         residentPresent,extenderPresent);
+        if(startup==guest::ResidentStartup::Invalid)return false;
+        residentMode_=startup==guest::ResidentStartup::Resident;
         // Real original owner material ONLY. Do not start a fake engine.
         const auto rom=privateDir/"awe32.raw";
         const auto guest=privateDir/"Driver.exe";
@@ -286,12 +297,13 @@ public:
                 stop();return false;
             }
             if(residentMode_){
-                // Old locally verified DLL remains the default reference.
-                // A private diagnostic may explicitly supply the verified
-                // digest from the consolidated build's artifact manifest.
-                // Never accept a missing/malformed/mismatched supplied hash.
-                const char* expected=std::getenv("AWE64_TEST_RESIDENT_ENGINE_SHA256");
-                if(!expected)expected="4167cbb8ff8ee7cd344574316589466e76d3927f5f7dc1abcd6da6b3abd1c1c9";
+                // The normal private installation uses the exact Engine
+                // from the previously measured, cached ce4e300 candidate.
+                // Only an explicit diagnostic opt-in permits a separately
+                // verified reference hash. Do not silently downgrade.
+                const char* expected=residentRequested?
+                    std::getenv("AWE64_TEST_RESIDENT_ENGINE_SHA256"):nullptr;
+                if(!expected)expected="11353683854937df4690355b88fb85cfbac3395d1fc14a3021097909121a4ad4";
                 if(!sha256Matches(isolated,expected)){stop();return false;}
             }
             module_=LoadLibraryExW(isolated.c_str(),nullptr,
