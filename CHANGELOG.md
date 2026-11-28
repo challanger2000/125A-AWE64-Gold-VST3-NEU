@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 28.11.2026 — Residenter Bankwechsel: Transport-Nachprüfung und Controller-Recall
+
+- Lokale C++20-Prüfung mit exakt verifizierten Git-Blobs aus 645cabb: ResidentBankAdapterTest PASS (MIDI-FIFO, explizite NoteOffs, PCM-Sperre, Ablehnung/Rollback, Reprime); zusätzlich ASan/UBSan PASS. ResidentBankDrainTest erneut 10.000 Transaktionen/1.000 Thread-Übergaben und Abbruchfälle PASS. Neuer ResidentMidiStateTest PASS: 16 Kanäle/144 mögliche Einträge, letzte Controllerwerte und Reihenfolge relativ zu CC121, keine gehaltenen Noten/Sustain/Panic-Replays, Fehler und Instanzisolation. Fünf separat kompilierte Negativkontrollen wiesen absichtlich falsche PCM-Freigabe, fehlendes FIFO-Drain, Sustain-Replay, ausgelassenen Reset und ignorierten Abbruch jeweils tatsächlich zurück.
+- Residenter Host stellt persistente MIDI-Controller vor Wiederfreigabe in die Queue. Ein nach Dispatch abgebrochener, noch unbestätigter Transfer wird fail closed gestoppt; finale ACKs werden konsistent übernommen. Keine neue Engine oder GUI, keine proprietären Daten, kein Windows-Build. Windows-Integration, echte native Controller-/Recall-/Bank-PCM-Prüfung, Paketierung und 22 Besitzerbanken bleiben NOT RUN.
+- Gepinnter Upstream `drive_local.cpp` 1569–1675 und 3008–3055: jedes erneute Öffnen erzeugt ein neues Host-Dateihandle, Seek nutzt dieses Handle; `drive_cache.cpp` 173–201 expandiert den Namen. Vorhandene feste Slotnamen werden nicht umbenannt. Eine zusätzliche pauschale Cache-Änderung ist damit nicht begründet; tatsächliche Größenwechsel müssen im echten Gast weiterhin geprüft werden.
+
+
 ## 28.11.2026 — Residenter Bankwechsel: opt-in Integrationskandidat
 
 - Privater Testmodus `AWE64_TEST_RESIDENT_BANK=1` verbindet den vorhandenen Host-I/O-Export mit der residenten Creative-SF2LIB-Mailbox. Exakte bekannte Engine-, Resident- und DOS4GW-Dateihashes erforderlich. Originale Standardlaufzeit bleibt ohne Opt-in unverändert; keine proprietären Dateien im Repo. Host-Demand-Modus nicht unterstützt.

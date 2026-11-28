@@ -20,6 +20,15 @@ public:
     State state() const noexcept {return state_.load(std::memory_order_acquire);}
     std::uint8_t current() const noexcept {return current_.load(std::memory_order_acquire);}
     bool transportOpen() const noexcept {return state()==State::Idle;}
+    // Only the transition owner polls. Once a final ACK is observed it
+    // must resolve the host transaction even if a cancellation arrives.
+    // Otherwise an aborted destructive transfer must fail closed.
+    State waitResult(bool runtimeFailed,bool cancelled) const noexcept {
+        if(runtimeFailed)return State::Failed;
+        const auto s=state();
+        if(s==State::Loaded||s==State::Rejected||s==State::Restored)return s;
+        return cancelled?State::Failed:s;
+    }
     bool begin(std::uint8_t slot) noexcept {
         if(state()!=State::Idle||!isBank(slot)||slot==current())return false;
         target_.store(slot,std::memory_order_relaxed);

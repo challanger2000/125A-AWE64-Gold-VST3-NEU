@@ -228,11 +228,11 @@ bool DosBoxVst3Shell::requestSoundFont(const std::string& path,int expectedProgr
             if(!engine->beginResidentBank(slot))return false;
             guestStatus_.store(1,std::memory_order_release);
             lifecycle.unlock();
-            const auto result=engine->waitResidentBank(large);
+            const auto result=engine->waitResidentBank(large,cancel);
             lifecycle.lock();
             // After command submission cancellation cannot expose a stale
-            // catalog. Complete the acknowledged transaction coherently;
-            // the superseding lifecycle/recall runs after the worker joins.
+            // catalog. Commit a final ACK or stop/quarantine an unresolved
+            // transfer; the superseding lifecycle runs after worker join.
             if(result==State::Failed){
                 guestStatus_.store(-2,std::memory_order_release);return false;
             }

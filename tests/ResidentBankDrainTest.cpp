@@ -44,5 +44,22 @@ int main(){
     CHECK(faultDrain.read(fault,M::commandPort,[]{},[]{return true;})==0);fault.fail();
     CHECK(faultDrain.read(fault,M::commandPort,[]{},[]{return true;})==0&&!faultDrain.shouldDrain(fault));
     faultDrain.write(fault,M::ackPort,M::bankB);CHECK(!fault.finish()&&!fault.transportOpen());
+    // Cancellation before acknowledgement closes transport; late ACKs
+    // cannot publish a bank. An already observed final ACK wins instead.
+    for(auto ack:{M::bankB,M::rejected,M::restored}){
+        M cancelled;cancelled.write(M::ackPort,M::bankA);CHECK(cancelled.begin(M::bankB));
+        CHECK(cancelled.read(M::commandPort)==M::bankB);cancelled.write(M::ackPort,M::busy);
+        CHECK(cancelled.waitResult(false,false)==M::State::Busy);
+        CHECK(cancelled.waitResult(false,true)==M::State::Failed);
+        cancelled.fail();cancelled.write(M::ackPort,ack);
+        CHECK(cancelled.waitResult(false,false)==M::State::Failed&&!cancelled.finish());
+        M acknowledged;acknowledged.write(M::ackPort,M::bankA);CHECK(acknowledged.begin(M::bankB));
+        CHECK(acknowledged.read(M::commandPort)==M::bankB);acknowledged.write(M::ackPort,M::busy);
+        acknowledged.write(M::ackPort,ack);
+        const auto expected=ack==M::bankB?M::State::Loaded:ack==M::rejected?M::State::Rejected:M::State::Restored;
+        CHECK(acknowledged.waitResult(false,true)==expected);
+        CHECK(acknowledged.waitResult(true,false)==M::State::Failed);
+        CHECK(acknowledged.finish()&&acknowledged.transportOpen());
+    }
     std::puts("RESIDENT_DRAIN_10000_TRANSACTIONS_1000_THREADED_EARLY_ACK_FAULT_PASS");
 }

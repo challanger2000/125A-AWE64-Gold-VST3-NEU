@@ -16,6 +16,7 @@
 #include <process.h>
 #include "CreativeSysexRepair.hpp"
 #include "ResidentBankMailbox.hpp"
+#include "ResidentMidiState.hpp"
 #include "DosBoxHostAdapter.hpp"
 #include "ExternalSoundFont.hpp"
 #include "AWE64_DOSBOX_ABI.h"
@@ -45,6 +46,7 @@ class DosBoxRuntimeCore final {
     AWE64_RegisterIOFn registerIO_=nullptr;
     bool residentMode_=false;
     guest::ResidentBankMailbox residentMailbox_;
+    guest::ResidentMidiState residentMidi_; // serialized host producer only
     AWE64_RegisterPCMFn registerPCM_=nullptr;
     AWE64_StartGuestFn startGuest_=nullptr;
     AWE64_RequestStopFn requestStop_=nullptr;
@@ -616,13 +618,17 @@ public:
     }
     // Resolve a destructive transfer or fail closed, never pretend to cancel
     // it. The transition owner holds lifetime, not the audio lock.
-    ResidentState waitResidentBank(bool largeTransfer) noexcept {
+    ResidentState waitResidentBank(bool largeTransfer,const std::atomic<bool>* cancel=nullptr) noexcept {
         const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(largeTransfer?180u:30u);
-        while(std::chrono::steady_clock::now()<until&&!finished()){
-            const auto s=residentMailbox_.state();
+        while(std::chrono::steady_clock::now()<until){
+            const auto s=residentMailbox_.waitResult(finished(),cancel&&cancel->load(std::memory_order_acquire));
             if(s==ResidentState::Loaded||s==ResidentState::Rejected||s==ResidentState::Restored)return s;
+            if(s==ResidentState::Failed)break;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
+        // Never expose unknown bank bytes, even if a late ACK arrives.
+        // On host cancellation, the superseding recall/deactivation can
+        // retire this stopped core instead of waiting the full load budget.
         failResidentBank();return ResidentState::Failed;
     }
     void failResidentBank() noexcept {
@@ -638,6 +644,11 @@ public:
         firstPrimeCompleted_=false;startupSawUart_=false;startupMaxPcm_=0;
         lastVoiceHi_=0x10000u;lastSends_=0x10000u;
         lostControllers_.fill({});haveLostControllers_=false;
+        // No audio producer can enter under runtimeMutex_. Queue the
+        // persistent controller snapshot before any new host NoteOn.
+        if(finished()||!queues_||!residentMidi_.replay([this](const rt::MidiEvent& e) noexcept {
+            return queues_->pushMidi(e);
+        }))return false;
         return residentMailbox_.finish();
     }
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
@@ -731,6 +742,7 @@ public:
     [[nodiscard]] bool midiRecoveryPending() const noexcept {return queues_&&queues_->midiRecoveryPending();}
     bool sendMidi(const rt::MidiEvent& e) noexcept {
         if(finished()||!queues_||residentBankChanging())return false;
+        if(residentMode_)residentMidi_.remember(e);
         if(performanceStats_&&!measurementStarted_&&(e.status&0xf0u)==0x90u&&e.data2) {
             // First actual NoteOn after warm-up establishes the baseline.
             measurementStart_=measurementEnd_=queues_->snapshot();
@@ -853,7 +865,9 @@ public:
     bool residentReloadAvailable() const noexcept {return core_&&core_->residentReloadAvailable();}
     std::uint8_t stageResidentBank(const std::vector<std::uint8_t>& bytes) {return core_?core_->stageResidentBank(bytes):0;}
     bool beginResidentBank(std::uint8_t slot) noexcept {return core_&&core_->beginResidentBank(slot);}
-    ResidentState waitResidentBank(bool largeTransfer) noexcept {return core_?core_->waitResidentBank(largeTransfer):ResidentState::Failed;}
+    ResidentState waitResidentBank(bool largeTransfer,const std::atomic<bool>* cancel=nullptr) noexcept {
+        return core_?core_->waitResidentBank(largeTransfer,cancel):ResidentState::Failed;
+    }
     bool finishResidentBank() noexcept {return core_&&core_->finishResidentBank();}
     void failResidentBank() noexcept {if(core_)core_->failResidentBank();}
     bool ready(std::size_t frames=0) noexcept {return core_&&core_->ready(frames);}
