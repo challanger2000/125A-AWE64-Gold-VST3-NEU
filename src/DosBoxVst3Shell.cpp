@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
+#include <cstdio>
 
 namespace awe64 {
 using namespace Steinberg;
@@ -246,6 +247,9 @@ bool DosBoxVst3Shell::requestSoundFont(const std::string& path,int expectedProgr
                 initialProgramSent_=false;absoluteSamplePosition_=0;
                 rateConverter_.reset();lastReverbType_=255;lastChorusType_=255;
                 if(!engine->finishResidentBank()){engine->failResidentBank();guestStatus_.store(-2,std::memory_order_release);return false;}
+                // Non-RT private resident test path: distinguish a real
+                // resident commit from successful full-runtime replacement.
+                if(result==State::Loaded)std::puts("AWE64_RESIDENT_BANK_COMMIT");
                 return result==State::Loaded;
             }catch(...){
                 engine->failResidentBank();guestStatus_.store(-2,std::memory_order_release);return false;

@@ -40,13 +40,16 @@ def shdr(label, start, end, ls, le, rate, pitch, sample_type):
                        rate, pitch, 0, 0, sample_type)
 
 
-def build(wet=False, overlay=False):
+def build(wet=False, overlay=False, resident_b=False):
     if wet and overlay:
         raise ValueError('Use either wet or overlay fixture')
     samples = []
     headers = []
-    for label, period, count in (("RAM 441 Hz", 100, 4000),
-                                 ("RAM 735 Hz", 60, 3600)):
+    # For live-bank identity test, program 0 deliberately changes pitch
+    # and sample size while its address stays identical.
+    layout = (("RAM 735 Hz", 60, 4800), ("RAM 441 Hz", 100, 4000)) if resident_b else (
+        ("RAM 441 Hz", 100, 4000), ("RAM 735 Hz", 60, 3600))
+    for label, period, count in layout:
         start = len(samples)
         if overlay:
             # Rich, periodic signal with enough harmonics for a real
@@ -85,12 +88,12 @@ def build(wet=False, overlay=False):
     instruments2 = len(voice2)//4 + 1
     pdta = list_chunk(
         b"pdta",
-        chunk(b"phdr", phdr("RAM 441 Hz", 0, 0) +
-              phdr("RAM 735 Hz", 17, 1) + phdr("EOP", 0, 2)),
+        chunk(b"phdr", phdr(layout[0][0], 0, 0) +
+              phdr(layout[1][0], 17, 1) + phdr("EOP", 0, 2)),
         chunk(b"pbag", struct.pack("<6H", 0, 0, 1, 0, 2, 0)),
         chunk(b"pmod", bytes(10)),
         chunk(b"pgen", gen(41, 0) + gen(41, 1) + gen(0, 0)),
-        chunk(b"inst", inst("RAM 441 Hz", 0) + inst("RAM 735 Hz", 1) + inst("EOI", 2)),
+        chunk(b"inst", inst(layout[0][0], 0) + inst(layout[1][0], 1) + inst("EOI", 2)),
         chunk(b"ibag", struct.pack("<6H", 0, 0, instruments, 0, instruments+instruments2, 0)),
         chunk(b"imod", bytes(10)),
         chunk(b"igen", voice + gen(53,0) + voice2 + gen(53,1) + gen(0,0)),

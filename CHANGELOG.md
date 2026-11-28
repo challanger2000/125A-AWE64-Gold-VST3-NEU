@@ -1,5 +1,14 @@
 # Änderungsverlauf
 
+## 28.11.2026 — Konsolidierter nativer Prüfkandidat
+
+- Resident-Boot: fehlender Initial-ACK unterliegt nun ebenfalls dem Starttimeout; private Bootlogs werden vom residenten DOS-Laufwerk D: ausdrücklich auf C: geschrieben. Ein eigener Commitmarker unterscheidet den tatsächlichen residenten Bankwechsel vom Fallback. Native Prüfung NOT RUN.
+- Privater A/B/A-VST3-Test: dieselbe Programmnummer mit 441/735/441 Hz, verschiedene Bankgrößen, gehaltene alte Note, Stille vor neuem NoteOn, Zustand und ungültiger Recall; echte Wechselzeit gegen bisherigen Pfad. Resident bleibt opt-in, kein ungeprüfter Standardwechsel.
+- Akustische Reglerprüfung liefert jetzt alle 26 Zeitprofile mit RMS, Differenzenergie und acht Harmonischen pro Fenster. Der Parser verlangt vollständige numerische Evidenz; dies ersetzt nicht die anschließende Richtungsanalyse.
+- Lokale DOS- und Wine-Umgebung aus vorhandenen privaten Artefakten 15241254500 / 15236467067 / 15236294325 / 15238729784 wiederhergestellt, kein zusätzlicher Build. Resident.exe reproduziert exakt fd0c30c0aa8c6651a5e08c715189bcd9966be713f60790159ef332a8060772f5. Tatsächlicher alter Engine-DLL-Direkttest: Bass Synth 301918 Bytes in 0,058 s geladen, Rückwechsel zur 15972-Byte-Testbank in 0,020 s, 441-Hz-Signatur wiederhergestellt. Kein Nachweis der neuen VST3-Integration oder reparierter Presets.
+- Lokal: A/B-Fixture-PCM Perioden 100/60 Samples und Größen 15972/18372 Bytes verifiziert; extrahierte numerische Parserfunktionen mit zehn falschen Berichten und gültigen Kontrollen geprüft; sechs Owner-Plan/Sweep-Unit-Tests und PCM-Metrik-Test erneut erfolgreich. Vollständige Workflow-Ausführung und neue Windows-Binärdateien noch ausstehend.
+- Für den nächsten einmaligen Windows-Build nur privates Engineering-Repository verwenden; assetfreien Kandidaten vor den langen Referenzprüfungen sichern. Keine Owner-Dateien, ROM, Creative-Binärdateien oder PCM hochladen. GUI und EMU8000-Baseline unverändert.
+
 ## 28.11.2026 — Owner-SF2-Massentest vorbereitet
 
 - 22 tatsächliche private Banken lokal inventarisiert: 955 Presets, 926 Bank 0, 29 außerhalb des derzeit adressierbaren Pfades. 14 Bank-0-Presets können mit der früheren einzigen Testnote nicht erreicht werden. 2.778 Screening-Proben, 11.722 erweiterte Bank-0-Proben; vollständiger unabhängiger Zonen-Rastervergleich für 955 Presets ausgeführt.

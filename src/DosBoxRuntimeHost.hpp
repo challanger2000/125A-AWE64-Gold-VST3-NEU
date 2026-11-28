@@ -456,7 +456,7 @@ public:
                             stop();return false;
                         }
                     }
-                    bootLog=requested;
+                    bootLog=residentMode_?std::string("C:\\")+requested:requested;
                 }
                 argvStorage_.push_back(guestProgram+" /SBK:"+guestBank+" > "+bootLog);
             } else {
@@ -659,8 +659,10 @@ public:
         return residentMailbox_.finish();
     }
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
-        if(finished()||(residentMode_&&!residentMailbox_.transportOpen()))return false;
-        const bool uart=ready_&&ready_();
+        if(finished())return false;
+        // A missing resident startup ACK is a readiness failure, not a
+        // reason to bypass the existing bounded startup deadline.
+        const bool uart=(!residentMode_||residentMailbox_.transportOpen())&&ready_&&ready_();
         if(finished())return false;
         if(pcmPrimed_)return uart;
         // Zero-sample queries do not start a deadline or open legacy MIDI.

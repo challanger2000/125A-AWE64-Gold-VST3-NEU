@@ -1,6 +1,6 @@
 """Portable regression for numeric native output; synthetic evidence only."""
 import unittest
-from WindowsRunVst3HostPcmSmoke import validate_voice_overlay_report
+from WindowsRunVst3HostPcmSmoke import validate_voice_overlay_report, validate_voice_profiles
 
 
 class VoiceOverlayReportTest(unittest.TestCase):
@@ -61,6 +61,19 @@ class VoiceOverlayReportTest(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     validate_voice_overlay_report("\n".join(bad)+"\n")
 
+
+class VoiceProfileTest(unittest.TestCase):
+    def test_exact_profiles(self):
+        def row(i,v,p):
+            return f"VOICE_PROFILE ID={i} VALUE={v} PROGRAM={p} RMS="+",".join(["0.01"]*30)+" DIFF="+",".join(["0.002"]*30)+" HARMONICS="+",".join(["0.003"]*240)
+        rows=[row(i,v,17 if 5<=i<=7 else 0) for i in range(10) for v in (.5,1.)]
+        rows += [row(-1,0.,p) for p in (0,17) for _ in range(3)]
+        validate_voice_profiles("\n".join(rows))
+        for bad in (rows[:-1],rows+[rows[0]], [rows[0].replace("0.01","nan",1)]+rows[1:],
+                    [rows[0].replace("PROGRAM=0","PROGRAM=17")]+rows[1:],
+                    [rows[0].rsplit(",",1)[0]]+rows[1:]):
+            with self.assertRaises(RuntimeError):
+                validate_voice_profiles("\n".join(bad))
 
 if __name__ == "__main__":
     unittest.main()

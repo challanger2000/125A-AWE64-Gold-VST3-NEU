@@ -922,6 +922,80 @@ int main(int argc,char** argv) {
             return fail("Active external SF2 state did not roundtrip");
         std::cout<<"REAL_VST3_ACTIVE_EXTERNAL_SF2_RESTART_PASS\n";
     }
+    if(const char* secondBank=std::getenv("AWE64_TEST_RESIDENT_SWITCH")) {
+        if(!originalMode||externalState.empty()||ramHz!=441.||hostRate!=44100.||timedNative||sweep||performance||overlayTest)
+            return fail("Resident switch needs two isolated synthetic SF2 banks at 44.1 kHz");
+        const std::string sourceB(secondBank);
+        if(sourceB.empty()||sourceB.size()>32768)return fail("Resident second bank path invalid");
+        const auto n=static_cast<std::uint32_t>(sourceB.size());
+        std::vector<std::uint8_t> second{'D','B','X','D',2,0,0,0x10,0x27,0x5a,0xa5,
+            std::uint8_t(n),std::uint8_t(n>>8),std::uint8_t(n>>16),std::uint8_t(n>>24)};
+        second.insert(second.end(),sourceB.begin(),sourceB.end());
+        using Clock=std::chrono::steady_clock;
+        auto next=Clock::now();
+        auto tick=[&](bool on=false,bool off=false){
+            midiEvents.setEnabled(on||off,off);l.fill(0);r.fill(0);
+            if(processor->process(data)!=S::kResultOk)return false;
+            for(unsigned k=0;k<512;++k)if(!std::isfinite(l[k])||!std::isfinite(r[k]))return false;
+            next=std::max(next,Clock::now()-std::chrono::milliseconds(2));
+            next+=std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(512./44100.));
+            std::this_thread::sleep_until(next);return true;
+        };
+        auto settle=[&](unsigned blocks){for(unsigned i=0;i<blocks;++i)if(!tick())return false;return true;};
+        auto tone=[&](double hz,bool leaveHeld){
+            if(!settle(64))return false;
+            double own=0,other=0,energy=0,idle=0;
+            constexpr double pi=3.14159265358979323846;
+            for(unsigned i=0;i<24;++i){if(!tick())return false;for(unsigned k=0;k<512;++k)idle+=double(l[k])*l[k]+double(r[k])*r[k];}
+            for(unsigned i=0;i<96;++i){
+                if(!tick(i==0,false))return false;
+                if(i<24)continue;
+                double re=0,im=0,ore=0,oim=0;
+                for(unsigned k=0;k<512;++k){
+                    const double x=(l[k]+r[k])*.5;
+                    const double a=2*pi*hz*k/44100.,b=2*pi*(hz==441.?735.:441.)*k/44100.;
+                    energy+=x*x;
+                    re+=x*std::cos(a);im+=x*std::sin(a);ore+=x*std::cos(b);oim+=x*std::sin(b);
+                }
+                own+=re*re+im*im;other+=ore*ore+oim*oim;
+            }
+            const double rms=std::sqrt(energy/(72.*512)),noise=std::sqrt(idle/(2.*24.*512));
+            const double ratio=own/std::max(other,1e-20);
+            std::cout<<"RESIDENT_TONE HZ="<<hz<<" RMS="<<rms<<" IDLE="<<noise<<" RATIO="<<ratio<<"\n";
+            if(!leaveHeld&&(!tick(false,true)||!settle(64)))return false;
+            return rms>.002&&rms>noise*5&&noise<.0005&&ratio>20;
+        };
+        auto change=[&](std::vector<std::uint8_t>& bytes,bool legacy,unsigned index){
+            S::MemoryStream input(bytes.data(),bytes.size());
+            const auto start=Clock::now();
+            if(component->setState(&input)!=S::kResultOk)return false;
+            const double ms=std::chrono::duration<double,std::milli>(Clock::now()-start).count();
+            S::MemoryStream saved;
+            if(component->getState(&saved)!=S::kResultOk)return false;
+            const bool match=legacy?matchesMigratedExternalState(saved.getData(),static_cast<std::size_t>(saved.getSize()),bytes):
+                saved.getSize()==static_cast<S::TSize>(bytes.size())&&std::memcmp(saved.getData(),bytes.data(),bytes.size())==0;
+            std::cout<<"RESIDENT_CHANGE INDEX="<<index<<" MS="<<ms<<" STATE="<<(match?"MATCH":"MISMATCH")<<"\n";
+            return match;
+        };
+        // Bank A and B have different sample PCM at the SAME program 0.
+        // Leave the previous note held at each switch to challenge stale PCM.
+        if(!tone(441.,true)||!change(second,true,1)||!tone(735.,true)||
+           !change(externalState,false,2)||!tone(441.,false))
+            return fail("Resident live bank PCM/state/held-note isolation failed");
+        auto invalid=second;invalid[11]=0;invalid[12]=0;invalid[13]=0;invalid[14]=0;
+        S::MemoryStream rejected(invalid.data(),invalid.size());
+        if(component->setState(&rejected)==S::kResultOk)return fail("Invalid bank state accepted");
+        S::MemoryStream finalState;
+        if(component->getState(&finalState)!=S::kResultOk||
+           finalState.getSize()!=static_cast<S::TSize>(externalState.size())||
+           std::memcmp(finalState.getData(),externalState.data(),externalState.size())!=0)
+            return fail("Rejected resident recall mutated state");
+        if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
+           component->terminate()!=S::kResultOk)return fail("Resident test shutdown failed");
+        processor->release();component->release();factory->release();
+        if(!exitDll())return fail("Resident module exit failed");FreeLibrary(module);
+        std::cout<<"REAL_VST3_RESIDENT_SWITCH_PCM_STATE_PASS\n";return 0;
+    }
     if(overlayTest) {
         if(!originalMode||externalState.empty()||hostRate!=44100.||ramHz!=441.||performance||sweep)
             return fail("Voice overlay test requires isolated original RAM fixture at 44.1kHz");
@@ -961,7 +1035,10 @@ int main(int argc,char** argv) {
             data.inputParameterChanges=nullptr;changes.clearQueue();
             return ok;
         };
-        struct Profile {std::array<double,bins> rms{},diff{};};
+        struct Profile {
+            std::array<double,bins> rms{},diff{};
+            std::array<std::array<double,8>,bins> harmonics{};
+        };
         bool filterPhase=false;
         auto quietBeforeNote=[&](){
             constexpr double limit=.00025;
@@ -995,19 +1072,38 @@ int main(int argc,char** argv) {
             std::cout<<"VOICE_PCM_CASE ID="<<id<<" VALUE="<<value<<"\n";
             const unsigned count=nblocks(.1);
             float prevL=0,prevR=0;
+            std::array<double,8> coeff{};
+            const double fundamental=filterPhase?367.5:441.;
+            constexpr double pi=3.14159265358979323846;
+            for(unsigned h=0;h<8;++h)coeff[h]=2.*std::cos(2.*pi*fundamental*(h+1)/hostRate);
             for(unsigned bin=0;bin<bins;++bin){
                 double energy=0,high=0;
+                std::array<double,8> z1{},z2{};
                 for(unsigned i=0;i<count;++i){
                     if(!tick(bin==0&&i==0,bin==heldBins&&i==0))return false;
                     for(unsigned k=0;k<buffer;++k){
                         const double x=l[k],y=r[k],dx=x-prevL,dy=y-prevR;
                         energy+=x*x+y*y;high+=dx*dx+dy*dy;
+                        for(unsigned h=0;h<8;++h){
+                            const double z=(x+y)*.5+coeff[h]*z1[h]-z2[h];
+                            z2[h]=z1[h];z1[h]=z;
+                        }
                         prevL=l[k];prevR=r[k];
                     }
                 }
                 p.rms[bin]=std::sqrt(energy/(2.*count*buffer));
                 p.diff[bin]=std::sqrt(high/(2.*count*buffer));
+                for(unsigned h=0;h<8;++h)p.harmonics[bin][h]=2.*std::sqrt(std::max(0.,z1[h]*z1[h]+z2[h]*z2[h]-coeff[h]*z1[h]*z2[h]))/(count*buffer);
             }
+            // Retain every measured envelope/spectral window for a
+            // direction-specific independent analysis, not just a PASS label.
+            std::cout<<"VOICE_PROFILE ID="<<id<<" VALUE="<<value<<" PROGRAM="<<(filterPhase?17:0)<<" RMS=";
+            for(unsigned n=0;n<bins;++n)std::cout<<(n?",":"")<<p.rms[n];
+            std::cout<<" DIFF=";
+            for(unsigned n=0;n<bins;++n)std::cout<<(n?",":"")<<p.diff[n];
+            std::cout<<" HARMONICS=";
+            for(unsigned n=0;n<bins;++n)for(unsigned h=0;h<8;++h)std::cout<<((n||h)?",":"")<<p.harmonics[n][h];
+            std::cout<<"\n";
             return true;
         };
         if(!settle(12.))return fail("Voice overlay guest warmup failed");

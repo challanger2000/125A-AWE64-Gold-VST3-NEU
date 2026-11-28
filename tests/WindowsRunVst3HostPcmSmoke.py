@@ -62,6 +62,14 @@ def run_private_creative_host(command: list[str], plugin: Path, seconds: int):
             print(tail(err), file=sys.stderr)
             raise TimeoutError("Real Creative-DOS VST3 host exceeded private test timeout")
         stdout, stderr = tail(out), tail(err)
+        if os.environ.get("AWE64_TEST_VOICE_OVERLAYS") == "1":
+            # 26 synthetic-fixture measurement rows exceed the diagnostic tail.
+            # Retain only test-owned numerical/summary lines from the spool.
+            out.seek(0)
+            prefixes = ("VOICE_PROFILE ", "VOICE_PCM_RESULT ", "VOICE_PCM_CASE ",
+                        "FILTER_", "REAL_VST3_", "PRIVATE_CREATIVE_VST3_", "VST3_HOST_")
+            stdout = "\n".join(line for raw in out
+                if (line := raw.decode("utf-8", errors="replace").strip()).startswith(prefixes))
         if not log.is_file():
             print(stdout, file=sys.stderr)
             print(stderr, file=sys.stderr)
@@ -130,6 +138,32 @@ def validate_voice_overlay_report(stdout: str):
             raise RuntimeError("Invalid measured silence before a filter trial")
 
 
+def validate_voice_profiles(stdout):
+    """Exact coverage/finite PCM profile evidence; not a direction verdict."""
+    rows = [line for line in stdout.splitlines() if line.startswith("VOICE_PROFILE ")]
+    expected = {(i, value, 17 if 5 <= i <= 7 else 0): 1
+                for i in range(10) for value in (.5, 1.)}
+    expected[(-1, 0., 0)] = expected[(-1, 0., 17)] = 3
+    for row in rows:
+        m = re.fullmatch(r"VOICE_PROFILE ID=(-?\d+) VALUE=(\S+) PROGRAM=(\d+) RMS=(\S+) DIFF=(\S+) HARMONICS=(\S+)", row)
+        if not m:
+            raise RuntimeError("Malformed native PCM profile")
+        try:
+            key = int(m[1]), float(m[2]), int(m[3])
+            vectors = [list(map(float, m[i].split(","))) for i in (4,5,6)]
+        except ValueError as exc:
+            raise RuntimeError("Invalid native PCM profile values") from exc
+        if key not in expected or not expected[key]:
+            raise RuntimeError("Unexpected/duplicate native PCM profile")
+        expected[key] -= 1
+        if [len(v) for v in vectors] != [30,30,240] or any(not math.isfinite(x) or x < 0 for v in vectors for x in v):
+            raise RuntimeError("Incomplete/non-finite native PCM profile")
+        if max(vectors[0]) < .00025:
+            raise RuntimeError("No measurable PCM in native profile")
+    if any(expected.values()):
+        raise RuntimeError("Missing native PCM profiles")
+
+
 def run_dual_creative_command(command: list[str]):
     # Capture native stderr independently: ordinary DOSBox logs are not
     # PowerShell errors. Only native exit and one exact PASS line count.
@@ -171,7 +205,7 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
                 print(f"SYNTHETIC_NATIVE_TIMEOUT {label}:\n{(stream or '')[-12000:]}",
                       file=sys.stderr, flush=True)
             raise
-    print(proc.stdout[-5000:], end="")
+    print(proc.stdout if os.environ.get("AWE64_TEST_VOICE_OVERLAYS") == "1" else proc.stdout[-5000:], end="\n")
     print(proc.stderr[-5000:], end="", file=sys.stderr)
     expected = ("PRIVATE_CREATIVE_VST3_HOST_NONZERO_PCM_OBSERVED" if original
                 else "SYNTHETIC_DOS_FIXTURE_REAL_VST3_HOST_PCM_PASS")
@@ -183,6 +217,7 @@ def run_native_host(exe: Path, vst3: Path, original: bool = False,
         raise RuntimeError("Active external SF2 guest restart missing")
     if original and os.environ.get("AWE64_TEST_VOICE_OVERLAYS") == "1":
         validate_voice_overlay_report(proc.stdout)
+        validate_voice_profiles(proc.stdout)
     if original and os.environ.get("AWE64_TEST_PERFORMANCE") == "1":
         def row(pattern):
             matches=[re.fullmatch(pattern,line) for line in proc.stdout.splitlines()]
