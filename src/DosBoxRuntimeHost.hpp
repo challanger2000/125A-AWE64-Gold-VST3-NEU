@@ -15,6 +15,7 @@
 #include <bcrypt.h>
 #include <process.h>
 #include "CreativeSysexRepair.hpp"
+#include "ResidentBankMailbox.hpp"
 #include "DosBoxHostAdapter.hpp"
 #include "ExternalSoundFont.hpp"
 #include "AWE64_DOSBOX_ABI.h"
@@ -41,6 +42,9 @@ class DosBoxRuntimeCore final {
     // share the in-bundle module's writable globals between components.
     HMODULE module_=nullptr;
     AWE64_RegisterMidiFn registerMidi_=nullptr;
+    AWE64_RegisterIOFn registerIO_=nullptr;
+    bool residentMode_=false;
+    guest::ResidentBankMailbox residentMailbox_;
     AWE64_RegisterPCMFn registerPCM_=nullptr;
     AWE64_StartGuestFn startGuest_=nullptr;
     AWE64_RequestStopFn requestStop_=nullptr;
@@ -104,6 +108,28 @@ class DosBoxRuntimeCore final {
     std::filesystem::path stagedDirectory_;
     HANDLE stagedRomLock_=INVALID_HANDLE_VALUE;
 
+    static bool sha256Matches(const std::filesystem::path& p,const char* expected) {
+        std::ifstream input(p,std::ios::binary);
+        if(!input)return false;
+        BCRYPT_ALG_HANDLE alg=nullptr;BCRYPT_HASH_HANDLE hash=nullptr;
+        if(BCryptOpenAlgorithmProvider(&alg,BCRYPT_SHA256_ALGORITHM,nullptr,0)<0)return false;
+        bool ok=BCryptCreateHash(alg,&hash,nullptr,0,nullptr,0,0)>=0;
+        std::array<unsigned char,16384> bytes{};
+        unsigned char digest[32]{};
+        while(ok&&input){
+            input.read(reinterpret_cast<char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));
+            const auto n=input.gcount();
+            if(n>0)ok=BCryptHashData(hash,bytes.data(),static_cast<ULONG>(n),0)>=0;
+        }
+        ok=ok&&input.eof()&&!input.bad();
+        if(ok)ok=BCryptFinishHash(hash,digest,sizeof(digest),0)>=0;
+        if(hash)BCryptDestroyHash(hash);
+        BCryptCloseAlgorithmProvider(alg,0);
+        constexpr char hex[]="0123456789abcdef";
+        for(unsigned i=0;ok&&i<32;++i)
+            ok=expected[2*i]==hex[digest[i]>>4]&&expected[2*i+1]==hex[digest[i]&15u];
+        return ok;
+    }
     static bool isUsableFile(const std::filesystem::path& p,
                              std::uintmax_t expectedSize=0) noexcept {
         try {
@@ -234,6 +260,9 @@ public:
         if(demandLead && (demandLead<=2*rt::GuestDemandClock::maxTickFrames ||
                          demandLead>=rt::GuestDemandClock::ringFrames/2))return false;
         demandLead_=demandLead;
+        const char* residentRequested=std::getenv("AWE64_TEST_RESIDENT_BANK");
+        residentMode_=residentRequested&&std::strcmp(residentRequested,"1")==0;
+        if(residentMode_&&demandLead_)return false; // legacy asynchronous path only
         // Real original owner material ONLY. Do not start a fake engine.
         const auto rom=privateDir/"awe32.raw";
         const auto guest=privateDir/"Driver.exe";
@@ -253,12 +282,19 @@ public:
                GetModuleHandleW(isolated.c_str())) {
                 stop();return false;
             }
+            if(residentMode_&&!sha256Matches(isolated,"4167cbb8ff8ee7cd344574316589466e76d3927f5f7dc1abcd6da6b3abd1c1c9")){
+                stop();return false;
+            }
             module_=LoadLibraryExW(isolated.c_str(),nullptr,
                        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
         } catch (...) {
             stop();return false;
         }
         if(!module_){stop();return false;}
+        if(residentMode_){
+            registerIO_=reinterpret_cast<AWE64_RegisterIOFn>(GetProcAddress(module_,"AWE64_HostRegisterIO"));
+            if(!registerIO_){stop();return false;}
+        }
         registerMidi_=reinterpret_cast<AWE64_RegisterMidiFn>(
                           GetProcAddress(module_,"AWE64_HostRegisterMidi"));
         registerPCM_=reinterpret_cast<AWE64_RegisterPCMFn>(
@@ -325,6 +361,25 @@ public:
                     stop();return false;
                 }
             }
+            if(residentMode_){
+                // Privately supplied, exact tested bytes only. Both fixed
+                // DOS slot names exist before mounting the staging drive.
+                const auto resident=stagedDirectory_/"RESIDENT.EXE";
+                const auto extender=stagedDirectory_/"DOS4GW.EXE";
+                std::vector<std::uint8_t> initial;
+                if(!authenticGuest_||
+                   !CopyFileW((privateDir/"Resident.exe").c_str(),resident.c_str(),TRUE)||
+                   !CopyFileW((privateDir/"DOS4GW.EXE").c_str(),extender.c_str(),TRUE)||
+                   !sha256Matches(resident,"fd0c30c0aa8c6651a5e08c715189bcd9966be713f60790159ef332a8060772f5")||
+                   !sha256Matches(extender,"b8265123ac8a189637448618409ef3ecd2e9f3e1a47062c685a02240f688dec1")||
+                   !guest::readDefaultBankSnapshot(stagedDirectory_/(externalBank.empty()?"SYNTHGM.SF2":"BANK.SF2"),initial)||
+                   !guest::writeExternalSf2(stagedDirectory_/"BANKA.SF2",initial)||
+                   !guest::writeExternalSf2(stagedDirectory_/"BANKB.SF2",initial)){
+                    stop();return false;
+                }
+                guestProgram="D:\\RESIDENT.EXE";guestBank="D:\\BANKA.SF2";
+                boostBankLoad_=false; // resident restores its own clock
+            }
             const char* perf=std::getenv("AWE64_TEST_PERFORMANCE");
             performanceStats_=perf&&std::strcmp(perf,"1")==0;
             measurementStarted_=false;measuredBlocks_=depthTotal_=0;
@@ -332,7 +387,8 @@ public:
             lostControllers_.fill({});haveLostControllers_=false;
             queues_=std::make_unique<rt::RealtimeQueues>();
             if(demandLead_&&!authenticGuest_){stop();return false;}
-            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_,demandLead_!=0,voiceControls_,sends_,captureGate_,deferCapture,true);
+            adapter_=std::make_unique<DosBoxHostAdapter>(*queues_,ready_,demandLead_!=0,voiceControls_,sends_,captureGate_,deferCapture,true,
+                                                          residentMode_?&residentMailbox_:nullptr);
             if(demandLead_ && !adapter_->publishDemand(demandLead_-2*rt::GuestDemandClock::maxTickFrames)) {
                 stop();return false;
             }
@@ -367,6 +423,7 @@ public:
                 argvStorage_.push_back("-c");
                 argvStorage_.push_back("mount d \""+utf8(stagedDirectory_)+"\"");
             }
+            if(residentMode_){argvStorage_.push_back("-c");argvStorage_.push_back("d:");}
             if(boostBankLoad_){
                 argvStorage_.push_back("-awe64-boot-boost");
                 argvStorage_.push_back("-c");
@@ -404,6 +461,7 @@ public:
             startupDeadline_={};startupTimedOut_.store(false,std::memory_order_release);
             firstPrimeCompleted_=false;startupSawUart_=false;startupMaxPcm_=0;
             guestClockPcm_(authenticGuest_?1u:0u);
+            if(registerIO_)registerIO_(adapter_.get(),&DosBoxHostAdapter::readPort,&DosBoxHostAdapter::writePort);
             registerMidi_(adapter_.get(),&DosBoxHostAdapter::pullMidi);
             registerPCM_(adapter_.get(),&DosBoxHostAdapter::receivePCM);
             if(demandLead_)registerClock_(adapter_.get(),&DosBoxHostAdapter::tickDecision);
@@ -474,6 +532,7 @@ public:
         if(guestClockPcm_)guestClockPcm_(0u);
         pcmPrimed_=false;
         authenticGuest_=false;lastSends_=0x10000u;
+        if(registerIO_)registerIO_(nullptr,nullptr,nullptr);
         if(registerMidi_)registerMidi_(nullptr,nullptr);
         if(registerPCM_)registerPCM_(nullptr,nullptr);
         if(registerClock_)registerClock_(nullptr,nullptr);
@@ -494,6 +553,7 @@ public:
             }
         }
         module_=nullptr;
+        registerIO_=nullptr;residentMode_=false;
         registerMidi_=nullptr;registerPCM_=nullptr;
         startGuest_=nullptr;requestStop_=nullptr;ready_=nullptr;sends_=nullptr;guestClockPcm_=nullptr;voiceControls_=nullptr;
         registerClock_=nullptr;clockFault_=nullptr;demandLead_=0;
@@ -519,7 +579,7 @@ public:
                 std::fprintf(stderr,"AWE64_CANDIDATE_BOOT_EXIT=%d\n",guestExitCode());
                 return false;
             }
-            if(ready_&&ready_()&&!finished())return true;
+            if(ready_&&ready_()&&!finished()&&(!residentMode_||residentMailbox_.transportOpen()))return true;
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
         std::fprintf(stderr,"AWE64_CANDIDATE_BOOT_TIMEOUT_MS=%u\n",bootTimeoutSeconds_*1000u);
@@ -527,8 +587,61 @@ public:
     }
     void startReplacementCapture() noexcept {if(adapter_)adapter_->startReplacementCapture();}
     void startLegacyMidi() noexcept {if(adapter_)adapter_->startLegacyMidi();}
+    using ResidentState=guest::ResidentBankMailbox::State;
+    bool residentBankChanging() const noexcept {
+        if(!residentMode_)return false;
+        const auto s=residentMailbox_.state();
+        return s!=ResidentState::Booting&&s!=ResidentState::Idle&&s!=ResidentState::Failed;
+    }
+    bool residentReloadAvailable() const noexcept {
+        return residentMode_&&residentMailbox_.transportOpen()&&!finished()&&ready_&&ready_();
+    }
+    // Serialized non-RT transition owner stages only the inactive slot.
+    // DOS never opens it before the later mailbox command.
+    std::uint8_t stageResidentBank(const std::vector<std::uint8_t>& bytes) {
+        if(!residentReloadAvailable()||bytes.empty()||bytes.size()>32ull*1024*1024)return 0;
+        const auto slot=residentMailbox_.current()==guest::ResidentBankMailbox::bankA?
+            guest::ResidentBankMailbox::bankB:guest::ResidentBankMailbox::bankA;
+        const auto path=stagedDirectory_/(slot==guest::ResidentBankMailbox::bankA?"BANKA.SF2":"BANKB.SF2");
+        if(!std::filesystem::is_regular_file(path))return 0;
+        std::ofstream out(path,std::ios::binary|std::ios::trunc);
+        if(!out)return 0;
+        out.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));
+        out.close();
+        std::vector<std::uint8_t> staged;
+        return out&&guest::readDefaultBankSnapshot(path,staged)&&staged==bytes?slot:0;
+    }
+    bool beginResidentBank(std::uint8_t slot) noexcept {
+        return residentReloadAvailable()&&residentMailbox_.begin(slot);
+    }
+    // Resolve a destructive transfer or fail closed, never pretend to cancel
+    // it. The transition owner holds lifetime, not the audio lock.
+    ResidentState waitResidentBank(bool largeTransfer) noexcept {
+        const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(largeTransfer?180u:30u);
+        while(std::chrono::steady_clock::now()<until&&!finished()){
+            const auto s=residentMailbox_.state();
+            if(s==ResidentState::Loaded||s==ResidentState::Rejected||s==ResidentState::Restored)return s;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        failResidentBank();return ResidentState::Failed;
+    }
+    void failResidentBank() noexcept {
+        residentMailbox_.fail();
+        if(requestStop_)requestStop_();
+    }
+    bool finishResidentBank() noexcept {
+        const auto s=residentMailbox_.state();
+        if(s!=ResidentState::Loaded&&s!=ResidentState::Rejected&&s!=ResidentState::Restored)return false;
+        // Sole host consumer under lifecycle lock; guest PCM remains gated.
+        discardLegacyAudio();
+        if(adapter_)adapter_->resetResidentTransport();
+        firstPrimeCompleted_=false;startupSawUart_=false;startupMaxPcm_=0;
+        lastVoiceHi_=0x10000u;lastSends_=0x10000u;
+        lostControllers_.fill({});haveLostControllers_=false;
+        return residentMailbox_.finish();
+    }
     [[nodiscard]] bool ready(std::size_t hostBlock=0) noexcept {
-        if(finished())return false;
+        if(finished()||(residentMode_&&!residentMailbox_.transportOpen()))return false;
         const bool uart=ready_&&ready_();
         if(finished())return false;
         if(pcmPrimed_)return uart;
@@ -565,7 +678,8 @@ public:
     unsigned bootTimeoutSeconds() const noexcept {return bootTimeoutSeconds_;}
     [[nodiscard]] bool startupTimedOut() const noexcept {return startupTimedOut_.load(std::memory_order_acquire);}
     [[nodiscard]] bool finished() const noexcept {
-        return startupTimedOut()||finished_.load(std::memory_order_acquire)||(clockFault_&&clockFault_());
+        return startupTimedOut()||finished_.load(std::memory_order_acquire)||(clockFault_&&clockFault_())||
+               (residentMode_&&residentMailbox_.state()==ResidentState::Failed);
     }
     [[nodiscard]] int guestExitCode() const noexcept {
         return guestExitCode_.load(std::memory_order_acquire);
@@ -616,7 +730,7 @@ public:
     [[nodiscard]] std::uint64_t midiRecoveryEpoch() const noexcept {return queues_?queues_->midiRecoveryEpoch():0;}
     [[nodiscard]] bool midiRecoveryPending() const noexcept {return queues_&&queues_->midiRecoveryPending();}
     bool sendMidi(const rt::MidiEvent& e) noexcept {
-        if(finished()||!queues_)return false;
+        if(finished()||!queues_||residentBankChanging())return false;
         if(performanceStats_&&!measurementStarted_&&(e.status&0xf0u)==0x90u&&e.data2) {
             // First actual NoteOn after warm-up establishes the baseline.
             measurementStart_=measurementEnd_=queues_->snapshot();
@@ -663,7 +777,7 @@ public:
     // frames from an in-flight callback are rejected by the epoch check.
     void discardLegacyAudio() noexcept {if(queues_)queues_->discardAudio();pcmPrimed_=false;startupDeadline_={};}
     std::size_t readAudio(float* left,float* right,std::size_t n) noexcept {
-        if(finished()){
+        if(finished()||residentBankChanging()){
             if(left)std::fill_n(left,n,0.f);
             if(right)std::fill_n(right,n,0.f);
             return 0;
@@ -734,6 +848,14 @@ public:
     bool waitForGuestMidiReady(const std::atomic<bool>* cancel=nullptr) noexcept {return core_&&core_->waitForGuestMidiReady(cancel);}
     void startReplacementCapture() noexcept {if(core_)core_->startReplacementCapture();}
     void startLegacyMidi() noexcept {if(core_)core_->startLegacyMidi();}
+    using ResidentState=DosBoxRuntimeCore::ResidentState;
+    bool residentBankChanging() const noexcept {return core_&&core_->residentBankChanging();}
+    bool residentReloadAvailable() const noexcept {return core_&&core_->residentReloadAvailable();}
+    std::uint8_t stageResidentBank(const std::vector<std::uint8_t>& bytes) {return core_?core_->stageResidentBank(bytes):0;}
+    bool beginResidentBank(std::uint8_t slot) noexcept {return core_&&core_->beginResidentBank(slot);}
+    ResidentState waitResidentBank(bool largeTransfer) noexcept {return core_?core_->waitResidentBank(largeTransfer):ResidentState::Failed;}
+    bool finishResidentBank() noexcept {return core_&&core_->finishResidentBank();}
+    void failResidentBank() noexcept {if(core_)core_->failResidentBank();}
     bool ready(std::size_t frames=0) noexcept {return core_&&core_->ready(frames);}
     bool running() const noexcept {return core_&&core_->running();}
     bool finished() const noexcept {return !core_||core_->finished();}

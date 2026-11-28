@@ -1,5 +1,12 @@
 # Änderungsverlauf
 
+## 28.11.2026 — Residenter Bankwechsel: opt-in Integrationskandidat
+
+- Privater Testmodus `AWE64_TEST_RESIDENT_BANK=1` verbindet den vorhandenen Host-I/O-Export mit der residenten Creative-SF2LIB-Mailbox. Exakte bekannte Engine-, Resident- und DOS4GW-Dateihashes erforderlich. Originale Standardlaufzeit bleibt ohne Opt-in unverändert; keine proprietären Dateien im Repo. Host-Demand-Modus nicht unterstützt.
+- Inaktive feste A/B-Slotdatei außerhalb des Audiothreads geschrieben und bytegeprüft, MIDI-Admission geschlossen, sole DOS-Consumer verwirft altes FIFO und sendet explizite Releases, PCM bis zur kohärenten Host-Übernahme gesperrt. Rollback behält Katalog/RAM/Bankidentität, Reprime und Plugin-Steuerwerte werden neu initialisiert. Destruktive Transfers bei später Abbruchanforderung auflösen oder fail closed. Offline während des Transfers liefert Fehler statt stummer Erfolgsmeldung.
+- Lokal mit g++ C++20, -O2 -Wall -Wextra -Werror -pthread: `ResidentBankDrainTest` 10.000 Transaktionen (inkl. Ablehnung/Restore), 1.000 Thread-Übergaben und vorzeitige/fatale ACKs PASS. Exakte Git-Blob-Prüfung. Neuer Adaptertest und kompletter Windows-VST3-Pfad **NOT RUN**; vorherige Wine-/DOS-Toolchain in dieser Sitzung nicht verfügbar. Kein weiterer kostenpflichtiger Build, kein Release, GUI und EMU8000 unverändert.
+
+
 ## 28.11.2026 — Bankwechsel, Phase 1: Editor entblocken
 
 - Verifizierter Ausgangspunkt 972e862: Windows Bankwechsel 1,5–66,2 s; UI callback wartet synchron auf die neue Gastinstanz. [Native Messung](https://github.com/challanger2000/125A-Engineering/actions/runs/46084299018).

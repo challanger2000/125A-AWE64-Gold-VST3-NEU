@@ -23,9 +23,13 @@ public:
     bool begin(std::uint8_t slot) noexcept {
         if(state()!=State::Idle||!isBank(slot)||slot==current())return false;
         target_.store(slot,std::memory_order_relaxed);
+        // Publish command before Queued: BUSY is valid only after the DOS
+        // thread has consumed a nonzero command. A premature ACK must fail.
+        command_.store(slot,std::memory_order_relaxed);
         State expected=State::Idle;
-        if(!state_.compare_exchange_strong(expected,State::Queued,std::memory_order_acq_rel))return false;
-        command_.store(slot,std::memory_order_release);
+        if(!state_.compare_exchange_strong(expected,State::Queued,std::memory_order_acq_rel)){
+            command_.store(0,std::memory_order_release);return false;
+        }
         return true;
     }
     std::uint8_t read(unsigned short port) noexcept {

@@ -112,7 +112,10 @@ std::string DosBoxVst3Shell::requestedSoundFont() {
 std::string DosBoxVst3Shell::soundFontStatus() {
     const auto status=editorBankLoad_.status();
     if(status==guest::AsyncBankLoad::Status::Loading)return "Loading sound bank...";
-    if(status==guest::AsyncBankLoad::Status::Failed)return "Error: Bank load failed; previous bank retained.";
+    if(status==guest::AsyncBankLoad::Status::Failed){
+        if(guestStatus_.load(std::memory_order_acquire)<0)return "Error: Bank reload failed; restart required.";
+        return "Error: Bank load failed; previous bank retained.";
+    }
     std::lock_guard<std::mutex> lock(selectionMutex_);
     if(requestedBank_!=startedBank_)
         return "SoundFont change pending.";
@@ -212,6 +215,42 @@ bool DosBoxVst3Shell::requestSoundFont(const std::string& path,int expectedProgr
                           (!haveBytes||requestedBankDigest_==digest);
         }
         if(sameSelection&&(!runtime_||!runtime_->finished()))return applyRecall();
+        if(runtime_&&haveBytes&&runtime_->residentReloadAvailable()){
+            using State=integration::DosBoxRuntimeHost::ResidentState;
+            auto* engine=runtime_.get(); // transitionMutex_ pins lifetime
+            std::string acceptedStarted=path;
+            const auto sampleRam=guest::sampleRamBytes(bytes);
+            const bool large=bytes.size()>1024u*1024u||requestedBankBytes_.size()>1024u*1024u;
+            lifecycle.unlock();
+            const auto slot=engine->stageResidentBank(bytes);
+            lifecycle.lock();
+            if(!slot||(cancel&&cancel->load(std::memory_order_acquire)))return false;
+            if(!engine->beginResidentBank(slot))return false;
+            guestStatus_.store(1,std::memory_order_release);
+            lifecycle.unlock();
+            const auto result=engine->waitResidentBank(large);
+            lifecycle.lock();
+            // After command submission cancellation cannot expose a stale
+            // catalog. Complete the acknowledged transaction coherently;
+            // the superseding lifecycle/recall runs after the worker joins.
+            if(result==State::Failed){
+                guestStatus_.store(-2,std::memory_order_release);return false;
+            }
+            try{
+                if(result==State::Loaded){
+                    publishCatalogLocked(std::move(candidate),&acceptedPath,&digest,&acceptedStarted,cancel!=nullptr);
+                    requestedBankBytes_.swap(bytes);
+                    startedSampleRamBytes_.store(sampleRam,std::memory_order_release);
+                    if(!applyRecall()){engine->failResidentBank();guestStatus_.store(-2,std::memory_order_release);return false;}
+                }
+                initialProgramSent_=false;absoluteSamplePosition_=0;
+                rateConverter_.reset();lastReverbType_=255;lastChorusType_=255;
+                if(!engine->finishResidentBank()){engine->failResidentBank();guestStatus_.store(-2,std::memory_order_release);return false;}
+                return result==State::Loaded;
+            }catch(...){
+                engine->failResidentBank();guestStatus_.store(-2,std::memory_order_release);return false;
+            }
+        }
         if(runtime_) {
             if(!startRuntimeLocked(lifecycle,path,&bytes,&candidate,&retired,cancel,&acceptedPath,haveBytes?&digest:nullptr))return false;
         } else publishCatalogLocked(std::move(candidate),&acceptedPath,haveBytes?&digest:nullptr,nullptr,cancel!=nullptr);
@@ -417,6 +456,12 @@ tresult PLUGIN_API DosBoxVst3Shell::process(ProcessData& data) {
             (data.inputParameterChanges&&data.inputParameterChanges->getParameterCount()>0)?kResultFalse:kResultOk;
     }
     auto& engine=*runtime_;
+    if(engine.residentBankChanging()){
+        silence();
+        return data.processMode==kOffline||
+            (data.inputEvents&&data.inputEvents->getEventCount()>0)||
+            (data.inputParameterChanges&&data.inputParameterChanges->getParameterCount()>0)?kResultFalse:kResultOk;
+    }
     if(engine.clocked())return processTimed(data,engine);
     if(engine.finished()) {
         guestStatus_.store(engine.startupTimedOut()?-3:-2,std::memory_order_release);

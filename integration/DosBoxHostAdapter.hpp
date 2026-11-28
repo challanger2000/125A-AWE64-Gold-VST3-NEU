@@ -2,6 +2,7 @@
 #include <utility>
 // Same-process DOSBox-X C ABI -> original Creative DOS mailbox / real mixer PCM.
 #include "CreativeDosMailbox.hpp"
+#include "ResidentBankDrain.hpp"
 #include "CreativeEffectMidi.hpp"
 #include "GuestDemandClock.hpp"
 #include "AWE64_DOSBOX_ABI.h"
@@ -24,6 +25,8 @@ class DosBoxHostAdapter final {
     const AWE64_SetVoiceControlsFn voiceControls_;
     const AWE64_SetAbsoluteSendsFn sends_;
     const std::shared_ptr<rt::LegacyCaptureGate> captureGate_;
+    guest::ResidentBankMailbox* const resident_;
+    guest::ResidentBankDrain residentDrain_; // DOS CPU thread only
     std::atomic<std::uint64_t> suspendedFrames_{0};
     // Independent of the host pause gate: a replacement guest may boot
     // while the old guest is playing. It must not accumulate pre-handover PCM.
@@ -99,12 +102,17 @@ public:
                                AWE64_SetVoiceControlsFn voiceControls=nullptr,
                                AWE64_SetAbsoluteSendsFn sends=nullptr,
                                std::shared_ptr<rt::LegacyCaptureGate> captureGate={},
-                               bool deferCapture=false,bool deferLegacyMidi=false) noexcept:
+                               bool deferCapture=false,bool deferLegacyMidi=false,
+                               guest::ResidentBankMailbox* resident=nullptr) noexcept:
         queues_(q),mailbox_(q),ready_(ready),clocked_(clocked),
         voiceControls_(voiceControls),sends_(sends),captureGate_(clocked?nullptr:std::move(captureGate)),
-        captureStarted_(clocked||!deferCapture),
+        resident_(resident),captureStarted_(clocked||!deferCapture),
         legacyMidiStarted_(clocked||!deferLegacyMidi){}
     void startLegacyMidi() noexcept {legacyMidiStarted_.store(true,std::memory_order_release);}
+    void resetResidentTransport() noexcept {
+        captureStarted_.store(false,std::memory_order_release);
+        legacyMidiStarted_.store(false,std::memory_order_release);
+    }
     std::uint64_t pulledNoteOns() const noexcept {return pulledNoteOns_.load(std::memory_order_relaxed);}
     void startReplacementCapture() noexcept {captureStarted_.store(true,std::memory_order_release);}
     std::uint64_t replacementSuppressedFrames() const noexcept {
@@ -127,11 +135,22 @@ public:
     DosBoxHostAdapter& operator=(const DosBoxHostAdapter&)=delete;
     guest::CreativeDosMailbox& mailbox() noexcept{return mailbox_;}
     static unsigned char AWE64_ABI_CALL readPort(void* ctx,unsigned short p) noexcept {
-        return ctx?static_cast<DosBoxHostAdapter*>(ctx)->mailbox_.ioRead(p):0xffu;
+        if(!ctx)return 0xffu;
+        auto* self=static_cast<DosBoxHostAdapter*>(ctx);
+        if(!self->resident_)return self->mailbox_.ioRead(p);
+        return self->residentDrain_.read(*self->resident_,p,
+            [self]() noexcept {self->queues_.requestMidiRecovery();},
+            [self]() noexcept {
+                rt::MidiEvent queued{};
+                return !self->queues_.midiRecoveryPending()&&!self->queues_.peekMidi(queued);
+            });
     }
     static void AWE64_ABI_CALL writePort(void* ctx,unsigned short p,
                                          unsigned char v) noexcept {
-        if(ctx)static_cast<DosBoxHostAdapter*>(ctx)->mailbox_.ioWrite(p,v);
+        if(!ctx)return;
+        auto* self=static_cast<DosBoxHostAdapter*>(ctx);
+        if(self->resident_)self->residentDrain_.write(*self->resident_,p,v);
+        else self->mailbox_.ioWrite(p,v);
     }
     // Preferred path: feed byte-complete MIDI into the ORIGINAL DOSBox-X
     // MPU-401 UART. Unmodified Creative DEMO.EXE reads 330h/331h and calls
@@ -143,6 +162,13 @@ public:
         rt::MidiEvent ev{};
         auto* self=static_cast<DosBoxHostAdapter*>(ctx);
         auto& queue=self->queues_;
+        if(self->resident_&&!self->resident_->transportOpen()){
+            // Discard pending old MIDI on the sole consumer; explicitly
+            // release notes before dispatch at a later UART-idle poll.
+            if(!self->residentDrain_.shouldDrain(*self->resident_))return 0u;
+            for(unsigned i=0;i<32;++i)if(!queue.popMidi(ev))return self->recoverMidi(out);
+            return 0u;
+        }
         if(!self->legacyMidiStarted_.load(std::memory_order_acquire))return 0u;
         // In clocked mode, abort undelivered packets on overflow instead
         // of playing an arbitrarily far-future backlog before recovery.
@@ -201,6 +227,7 @@ public:
                                            unsigned int frames) noexcept {
         if(!ctx||!s)return;
         auto* self=static_cast<DosBoxHostAdapter*>(ctx);
+        if(self->resident_&&!self->resident_->transportOpen())return;
         // Discard hardware startup PCM before it reaches the audio ring.
         if(self->ready_&&!self->ready_())return;
         if(!self->captureStarted_.load(std::memory_order_acquire)){
