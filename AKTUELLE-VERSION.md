@@ -1,5 +1,12 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 28.11.2026 — Hüllkurven-/Filter-Regelrichtung korrigiert (lokaler Kandidat)
+
+- 0 bleibt Originalwert, aktive Stellungen 1–255 absolut: Attack/Decay/Release werden länger, Sustain steigt, Cutoff öffnet, Resonance steigt. Bewusster Übergang zwischen Neutralstellung und erster aktiver Position; erlaubt kurze Hüllkurven auch auf ursprünglich langsamen Presets. Attack aktiv ohne zusätzliches Delay/Hold. Hardware-Rate 0 (Stillstand) ausgeschlossen. Gewählte Regelbereiche und PEFE-Kompensation siehe [P165-CONTROL-PORT](docs/P165-CONTROL-PORT.md). Alle Original-Registerflags, vorhandene signed Filter-/Pitch-Routen und neutralen Werte unverändert.
+- Lokales C++14-Gate (auch mit NDEBUG und UBSan): 65.536 Registerwörter, 16.711.680 Cutoff/PEFE/Position-Kombinationen PASS; acht absichtlich fehlerhafte Varianten tatsächlich abgelehnt. Exakte Git-Blob-Prüfung. Windows-Klangrichtung und tatsächliche Reglerwirkung im Produkt weiterhin NOT RUN, bisherige Live-Note-Overlay-Grenze unverändert.
+- Für späteren gebündelten privaten Test erlaubt der bereits explizite Resident-Testmodus optional den verifizierten neuen Engine-SHA-256 über `AWE64_TEST_RESIDENT_ENGINE_SHA256`; ohne Variable bleibt die alte bekannte DLL der einzige zulässige Referenzhash. Fehlformat oder abweichende Bytes werden abgelehnt. Windows-Test des Diagnosepfads noch offen. Kein neuer Build, keine Änderung an EMU8000-Upstream, Performance-Patches oder GUI, kein Release.
+
+
 ## 28.11.2026 — Residenter Bankwechsel: Transport-Nachprüfung und Controller-Recall
 
 - Lokale C++20-Prüfung mit exakt verifizierten Git-Blobs aus 645cabb: ResidentBankAdapterTest PASS (MIDI-FIFO, explizite NoteOffs, PCM-Sperre, Ablehnung/Rollback, Reprime); zusätzlich ASan/UBSan PASS. ResidentBankDrainTest erneut 10.000 Transaktionen/1.000 Thread-Übergaben und Abbruchfälle PASS. Neuer ResidentMidiStateTest PASS: 16 Kanäle/144 mögliche Einträge, letzte Controllerwerte und Reihenfolge relativ zu CC121, keine gehaltenen Noten/Sustain/Panic-Replays, Fehler und Instanzisolation. Fünf separat kompilierte Negativkontrollen wiesen absichtlich falsche PCM-Freigabe, fehlendes FIFO-Drain, Sustain-Replay, ausgelassenen Reset und ignorierten Abbruch jeweils tatsächlich zurück.

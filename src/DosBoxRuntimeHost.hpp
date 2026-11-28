@@ -111,6 +111,7 @@ class DosBoxRuntimeCore final {
     HANDLE stagedRomLock_=INVALID_HANDLE_VALUE;
 
     static bool sha256Matches(const std::filesystem::path& p,const char* expected) {
+        if(!expected||std::strlen(expected)!=64)return false;
         std::ifstream input(p,std::ios::binary);
         if(!input)return false;
         BCRYPT_ALG_HANDLE alg=nullptr;BCRYPT_HASH_HANDLE hash=nullptr;
@@ -284,8 +285,14 @@ public:
                GetModuleHandleW(isolated.c_str())) {
                 stop();return false;
             }
-            if(residentMode_&&!sha256Matches(isolated,"4167cbb8ff8ee7cd344574316589466e76d3927f5f7dc1abcd6da6b3abd1c1c9")){
-                stop();return false;
+            if(residentMode_){
+                // Old locally verified DLL remains the default reference.
+                // A private diagnostic may explicitly supply the verified
+                // digest from the consolidated build's artifact manifest.
+                // Never accept a missing/malformed/mismatched supplied hash.
+                const char* expected=std::getenv("AWE64_TEST_RESIDENT_ENGINE_SHA256");
+                if(!expected)expected="4167cbb8ff8ee7cd344574316589466e76d3927f5f7dc1abcd6da6b3abd1c1c9";
+                if(!sha256Matches(isolated,expected)){stop();return false;}
             }
             module_=LoadLibraryExW(isolated.c_str(),nullptr,
                        LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
