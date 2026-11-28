@@ -30,6 +30,9 @@ on:
       - 'tests/WindowsRunVst3HostPcmSmoke.py'
       - 'tests/test_voice_overlay_report.py'
       - 'tests/test_voice_trace_direction.py'
+      - 'tests/OwnerPreset*'
+      - 'tests/WindowsOwnerPresetSweep.py'
+      - 'tests/test_owner_preset_*.py'
       - 'tests/WindowsPrivateCreativeGuestSmoke.py'
       - 'tests/WindowsCheezoidsSweep.py'
       - 'tests/MakeRamSampleSf2.py'
@@ -72,6 +75,9 @@ jobs:
           PYTHONPATH=tests python -m unittest discover -s tests -p test_ram_sample_sf2.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_voice_overlay_report.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_voice_trace_direction.py -v
+          PYTHONPATH=tests python -m unittest discover -s tests -p 'test_owner_preset_*.py' -v
+          c++ -std=c++17 -Wall -Wextra -Werror -O2 -DNDEBUG tests/OwnerPresetMetricsTest.cpp -o /tmp/awe64-owner-metrics
+          /tmp/awe64-owner-metrics
           python tests/compare_emu8000.py third_party/dosbox-x-AWE32 --seconds 2 --repeats 3
           python tests/compare_emu8000.py third_party/dosbox-x-AWE32 --sanitize --seconds 2 --repeats 1
           python integration/patch_dosbox_runtime.py third_party/dosbox-x-AWE32
@@ -227,7 +233,7 @@ jobs:
           New-Item -ItemType Directory -Path (Join-Path $stage 'tools'),(Join-Path $stage 'tests') -ErrorAction Stop | Out-Null
           Copy-Item -LiteralPath 'build-vst3/Release/awe64_vst3_host_pcm_smoke.exe' -Destination $stage -ErrorAction Stop
           Copy-Item -LiteralPath 'tools/Run-Private-Creative-AWE-Test.ps1' -Destination (Join-Path $stage 'tools') -ErrorAction Stop
-          Copy-Item -LiteralPath 'tests/WindowsRunVst3HostPcmSmoke.py','tests/WindowsPrivateCreativeGuestSmoke.py','tests/MakeRamSampleSf2.py','tests/WindowsCheezoidsSweep.py','tests/WindowsTimedVst3Acceptance.py' -Destination (Join-Path $stage 'tests') -ErrorAction Stop
+          Copy-Item -LiteralPath 'tests/WindowsRunVst3HostPcmSmoke.py','tests/WindowsPrivateCreativeGuestSmoke.py','tests/MakeRamSampleSf2.py','tests/WindowsCheezoidsSweep.py','tests/WindowsTimedVst3Acceptance.py','tests/OwnerPresetPlan.py','tests/WindowsOwnerPresetSweep.py' -Destination (Join-Path $stage 'tests') -ErrorAction Stop
           Copy-Item -LiteralPath 'third_party/dosbox-x-AWE32/COPYING' -Destination (Join-Path $stage 'DOSBox-X-COPYING.txt') -ErrorAction Stop
           Copy-Item -LiteralPath 'docs/PROVENANCE.md' -Destination $stage -ErrorAction Stop
           Copy-Item -LiteralPath 'tools/Run-Prebuilt-Private-Test.cmd' -Destination $stage -ErrorAction Stop

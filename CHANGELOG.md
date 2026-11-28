@@ -1,5 +1,11 @@
 # Änderungsverlauf
 
+## 28.11.2026 — Owner-SF2-Massentest vorbereitet
+
+- 22 tatsächliche private Banken lokal inventarisiert: 955 Presets, 926 Bank 0, 29 außerhalb des derzeit adressierbaren Pfades. 14 Bank-0-Presets können mit der früheren einzigen Testnote nicht erreicht werden. 2.778 Screening-Proben, 11.722 erweiterte Bank-0-Proben; vollständiger unabhängiger Zonen-Rastervergleich für 955 Presets ausgeführt.
+- Portabler Plan-, PCM-Metrik- und Ergebnisparser-Test einschließlich Negativkontrollen lokal ausgeführt. Neuer nativer VST3-Sweep-Kandidat mit einstellbaren Programmen/Noten/Velocity und privatem Vorgängervergleich. Native Kompilierung und Ausführung NOT RUN; keine neue Produktkorrektur, keine Buildkosten. Details und Grenzen: [Preset playback repair](docs/2026-11-27-preset-playback-repair.md).
+
+
 ## 28.11.2026 — Nativer Register-Richtungstest: alter Prüfvertrag korrigiert
 
 - Befund: `summarize_filter_envelope_trace` erwartete noch steigende Decay-/Release-Raten und sinkenden Sustain relativ zum Originalpreset. Das ist die veraltete Regelrichtung; zudem waren nur drei Filterregler geprüft. 0 ist Preset-Bypass, nicht der untere aktive absolute Endpunkt.

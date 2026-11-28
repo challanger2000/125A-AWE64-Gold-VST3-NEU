@@ -1,4 +1,5 @@
 #include "../src/PerfCpuMeasurement.hpp"
+#include "OwnerPresetMetrics.hpp"
 // REAL VST3-host audio-callback gate with an explicitly NON-CREATIVE DOS fixture.
 //
 // Loads the exact compiled 125A AWE64 Gold.vst3 Windows binary, creates
@@ -286,12 +287,16 @@ int main(int argc,char** argv) {
     const char* ramHzEnv=std::getenv("AWE64_TEST_RAM_TONE_HZ");
     const double ramHz=ramHzEnv?std::atof(ramHzEnv):0.;
     if(ramHzEnv&&ramHz!=441.&&ramHz!=735.)return fail("Invalid RAM fixture frequency");
-    const unsigned fixtureProgram=ramHz==735.?17u:0u;
+    const bool ownerSweep=std::getenv("AWE64_TEST_OWNER_SWEEP")!=nullptr;
+    std::vector<awe64::qa::OwnerProbe> ownerProbes;
+    if(ownerSweep&&!awe64::qa::readOwnerProbes(std::cin,ownerProbes))
+        return fail("Invalid owner preset sweep plan");
+    const unsigned fixtureProgram=ownerSweep?ownerProbes.front()[0]:(ramHz==735.?17u:0u);
     const char* hostRateEnv=std::getenv("AWE64_TEST_HOST_RATE");
     const double hostRate=hostRateEnv?std::atof(hostRateEnv):44100.;
     if(hostRate!=44100.&&hostRate!=48000.&&hostRate!=96000.)return fail("Unsupported native test host rate");
     const bool timedNative=std::getenv("AWE64_TEST_TIMED_HOST")!=nullptr;
-    const bool sweep=std::getenv("AWE64_TEST_CHEEZOIDS_SWEEP")!=nullptr;
+    const bool sweep=ownerSweep||std::getenv("AWE64_TEST_CHEEZOIDS_SWEEP")!=nullptr;
     const bool performance=std::getenv("AWE64_TEST_PERFORMANCE")!=nullptr;
     const bool overlayTest=std::getenv("AWE64_TEST_VOICE_OVERLAYS")!=nullptr;
     const bool effectTest=std::getenv("AWE64_TEST_EFFECT_TYPES")!=nullptr;
@@ -1373,7 +1378,52 @@ int main(int argc,char** argv) {
             return true;
         };
         for(unsigned i=0;i<1292;++i)if(!tick(false,false))return fail("Sweep warmup failed");
-        for(unsigned program=0;program<128;++program) {
+        if(ownerSweep){
+            // Preserve the existing Cheezoids path below. The private
+            // generic path exercises explicit valid program/key/velocity rows.
+            V::ParameterChanges reset(1);
+            for(const auto& probe:ownerProbes){
+                const auto program=probe[0],key=probe[1],velocity=probe[2];
+                if(control->setParamNormalized(1000,program/127.)!=S::kResultOk||
+                   std::abs(control->getParamNormalized(1000)-program/127.)>1e-6)
+                    return fail("Owner sweep program selection failed: "+std::to_string(program));
+                midiEvents.setChord(1,key,velocity/127.f);
+                // Explicit All Sound Off and measured quiet baseline. Long
+                // tails are not allowed to masquerade as an audible new note.
+                S::int32 qi=0,pi=0;
+                auto* q=reset.addParameterData(allSoundOff,qi);
+                if(!q||q->addPoint(0,0.,pi)!=S::kResultOk)return fail("Owner reset failed");
+                data.inputParameterChanges=&reset;
+                if(!tick(false,false))return fail("Owner sweep reset callback failed");
+                data.inputParameterChanges=nullptr;reset.clearQueue();
+                unsigned quietBlocks=0;
+                double idle=0.;
+                for(unsigned n=0;n<432&&quietBlocks<12;++n){
+                    if(!tick(false,false))return fail("Owner sweep baseline failed");
+                    awe64::qa::OwnerMetrics b;
+                    if(!b.add(l.data(),r.data(),512))return fail("Invalid baseline PCM");
+                    if(b.rms()<=.00025){++quietBlocks;idle=std::max(idle,b.rms());}
+                    else {quietBlocks=0;idle=0.;}
+                }
+                if(quietBlocks<12){
+                    std::cout<<"OWNER_PROBE_CONTAMINATED "<<program<<" "<<key<<" "<<velocity<<"\n";
+                    continue;
+                }
+                awe64::qa::OwnerMetrics held,tail;
+                for(unsigned n=0;n<260;++n){
+                    if(!tick(n==0,false)||!held.add(l.data(),r.data(),512))
+                        return fail("Owner sweep held PCM failed");
+                }
+                for(unsigned n=0;n<86;++n){
+                    if(!tick(false,n==0)||!tail.add(l.data(),r.data(),512))
+                        return fail("Owner sweep release PCM failed");
+                }
+                std::cout<<"OWNER_PROBE "<<program<<" "<<key<<" "<<velocity<<" "
+                    <<idle<<" "<<held.rms()<<" "<<held.acMax<<" "<<held.peak<<" "
+                    <<held.stepMax<<" "<<held.jumps<<" "<<tail.rms()<<" "
+                    <<held.frames<<" "<<tail.frames<<"\n";
+            }
+        } else for(unsigned program=0;program<128;++program) {
             if(control->setParamNormalized(1000,program/127.)!=S::kResultOk||
                 std::abs(control->getParamNormalized(1000)-program/127.)>1e-6)
                 return fail("Sweep program selection failed: "+std::to_string(program));
@@ -1394,7 +1444,7 @@ int main(int argc,char** argv) {
         if(processor->setProcessing(false)!=S::kResultOk||component->setActive(false)!=S::kResultOk||
            component->terminate()!=S::kResultOk)return fail("Sweep shutdown failed");
         processor->release();component->release();factory->release();if(!exitDll())return fail("Steinberg Windows module deinitialization failed");FreeLibrary(module);
-        std::cout<<"CHEEZ_VST3_SWEEP_COMPLETE\n";
+        std::cout<<(ownerSweep?"OWNER_VST3_SWEEP_COMPLETE\n":"CHEEZ_VST3_SWEEP_COMPLETE\n");
         return 0;
     }
     V::IEditController* effectController=nullptr;
