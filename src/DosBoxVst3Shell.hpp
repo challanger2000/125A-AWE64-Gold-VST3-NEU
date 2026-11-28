@@ -10,6 +10,7 @@
 #include "HostRateConverter.hpp"
 #include "HostDemandSession.hpp"
 #include "MasterGainPlan.hpp"
+#include "AsyncBankLoad.hpp"
 #include <memory>
 #include <atomic>
 #include <array>
@@ -56,6 +57,7 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::mutex transitionMutex_;
     std::mutex runtimeMutex_;
     std::mutex selectionMutex_;
+    guest::AsyncBankLoad editorBankLoad_;
     AWE125::PresetCatalog startedCatalog_{};
     std::uint64_t displayedRevision_=0;
     using BankDigest=std::array<std::uint8_t,32>;
@@ -66,7 +68,9 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     };
     bool startRuntimeLocked(std::unique_lock<std::mutex>&, const std::string&, const std::vector<std::uint8_t>* = nullptr,
                             AWE125::PresetCatalog* = nullptr,
-                            std::unique_ptr<integration::DosBoxRuntimeHost>* retired=nullptr);
+                            std::unique_ptr<integration::DosBoxRuntimeHost>* retired=nullptr,
+                            const std::atomic<bool>* cancel=nullptr,
+                            std::string* acceptedPath=nullptr,const BankDigest* acceptedDigest=nullptr);
     std::vector<std::uint8_t> requestedBankBytes_; // protected by runtimeMutex_
     std::uint64_t refreshBrowserCatalog();
     void stopRuntimeLocked() noexcept;
@@ -77,13 +81,17 @@ class DosBoxVst3Shell final : public Steinberg::Vst::SingleComponentEffect,
     std::atomic<std::uint64_t> catalogRevision_{1};
     bool loadCatalog(const std::string&,AWE125::PresetCatalog&,
                      const std::vector<std::uint8_t>* = nullptr) const;
-    void publishCatalogLocked(AWE125::PresetCatalog&&);
+    void publishCatalogLocked(AWE125::PresetCatalog&&,std::string* acceptedPath=nullptr,
+                              const BankDigest* digest=nullptr,std::string* startedName=nullptr,
+                              bool editorWorker=false);
     bool requestSoundFont(const std::string&,int expectedProgram=-1,const BankDigest* expectedDigest=nullptr,
-                          const RecallControls* recall=nullptr);
+                          const RecallControls* recall=nullptr,const std::atomic<bool>* cancel=nullptr);
+    bool queueEditorBank(std::string path);
     std::string requestedSoundFont();
     std::string soundFontStatus();
 public:
-    ~DosBoxVst3Shell() override = default;
+    ~DosBoxVst3Shell() override {editorBankLoad_.cancelAndJoin();}
+    Steinberg::tresult PLUGIN_API terminate() override;
     static Steinberg::FUnknown* createInstance(void*) {
         return static_cast<Steinberg::Vst::IAudioProcessor*>(new DosBoxVst3Shell());
     }

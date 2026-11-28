@@ -8,6 +8,10 @@ include(CTest)
 if(BUILD_TESTING)
   find_package(Threads REQUIRED)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  add_executable(AuditAsyncBankLoadTest tests/AuditAsyncBankLoadTest.cpp)
+  target_include_directories(AuditAsyncBankLoadTest PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+  target_link_libraries(AuditAsyncBankLoadTest PRIVATE Threads::Threads)
+  add_test(NAME AuditAsyncBankLoadTest COMMAND AuditAsyncBankLoadTest)
   add_executable(AuditDisplayStatusTest tests/AuditDisplayStatusTest.cpp)
   target_include_directories(AuditDisplayStatusTest PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/gui")
   add_test(NAME AWE64_BankLoadBootPolicy COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_bank_load_boot_policy.py")
@@ -166,7 +170,7 @@ void PresetBrowserView::ChooseSf2() {
     if(!WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,filename,-1,path.data(),n,nullptr,nullptr))return;
     path.pop_back();
     if(!sf2LoadRequest_||!sf2LoadRequest_(path)) {
-        MessageBoxW(dialog.hwndOwner,L"Invalid or unsupported SoundFont.",
+        MessageBoxW(dialog.hwndOwner,L"A bank load is already running or could not be started.",
             L"125A AWE64 Gold",MB_OK|MB_ICONERROR);
         return;
     }
@@ -197,7 +201,7 @@ void PresetBrowserView::ChooseSf2() {
 void PresetBrowserView::ChooseRom() {
 #if defined(_WIN32)
     if(!romLoadRequest_||!romLoadRequest_(std::string{}))
-        MessageBoxW(GetForegroundWindow(),L"Could not load the original ROM bank.",
+        MessageBoxW(GetForegroundWindow(),L"A bank load is already running or could not be started.",
             L"125A AWE64 Gold",MB_OK|MB_ICONERROR);
     lastStatus_.clear();SyncSf2Status();
 #endif

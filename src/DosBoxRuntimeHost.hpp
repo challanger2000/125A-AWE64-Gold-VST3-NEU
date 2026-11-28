@@ -510,10 +510,11 @@ public:
     }
     // Non-RT candidate-bank preparation only: do not prime/dequeue PCM
     // or alter host timing while the former runtime is still processing.
-    bool waitForGuestMidiReady() noexcept {
+    bool waitForGuestMidiReady(const std::atomic<bool>* cancel=nullptr) noexcept {
         // Same bounded budget as initial activation and offline startup.
         const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(bootTimeoutSeconds_);
         while(std::chrono::steady_clock::now()<deadline){
+            if(cancel&&cancel->load(std::memory_order_acquire))return false;
             if(finished()){
                 std::fprintf(stderr,"AWE64_CANDIDATE_BOOT_EXIT=%d\n",guestExitCode());
                 return false;
@@ -730,7 +731,7 @@ public:
         // Reaper creation failure retains the entire core until process exit.
         std::fprintf(stderr,"AWE64_RUNTIME_QUARANTINED reaper=%s\n",thread?"started":"unavailable");
     }
-    bool waitForGuestMidiReady() noexcept {return core_&&core_->waitForGuestMidiReady();}
+    bool waitForGuestMidiReady(const std::atomic<bool>* cancel=nullptr) noexcept {return core_&&core_->waitForGuestMidiReady(cancel);}
     void startReplacementCapture() noexcept {if(core_)core_->startReplacementCapture();}
     void startLegacyMidi() noexcept {if(core_)core_->startLegacyMidi();}
     bool ready(std::size_t frames=0) noexcept {return core_&&core_->ready(frames);}

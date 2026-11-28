@@ -1,5 +1,12 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 28.11.2026 — Bankwechsel, Phase 1: Editor entblocken
+
+- Verifizierter Ausgangspunkt 972e862: Windows Bankwechsel 1,5–66,2 s; UI callback wartet synchron auf die neue Gastinstanz. [Native Messung](https://github.com/challanger2000/125A-Engineering/actions/runs/46084299018).
+- Editor-Dateiauswahl/ROM-Taste delegieren nun Validierung, Staging, Gaststart und Retirement an einen besitzenden, abbrechbaren Worker. Statusmeldung im vorhandenen Display; ein weiterer UI-Ladeauftrag wird während eines aktiven abgelehnt. Alte Bank bleibt bis Commit gültig. Host-Recall bleibt synchron, besitzt Vorrang und bricht ausstehende Editor-Aufträge ab. Katalog, Bankidentität und Fallback-Programm werden unter gemeinsamer Selection-Sperre veröffentlicht; kein SDK-Parameterobserver-Aufruf im Worker.
+- Kein EMU8000-, Creative-Treiber-, Performance- oder Artwork-Wechsel. **Noch vollständiger DOS-Neustart pro Bank, Transferoptimierung und residenter Gast sind Phase 2, nicht umgesetzt.** Portable Worker-Test ergänzt; native Editor-Ladezeit, Ausfall/Rollback, Recall und PCM-Nachweis noch NOT RUN. Kein Release.
+
+
 ## 27.11.2026 — Preset-Wiedergabe und Filtermodulation: Korrekturkandidat
 
 - Fehlerfälle: Bass Synth 000/015 (Knistern); Synth 512 Bank 008/012/021 (stumm). Private lokale Voruntersuchung und Korrekturkandidat siehe [Diagnosebericht](docs/2026-11-27-preset-playback-repair.md).
