@@ -29,6 +29,7 @@ on:
       - 'tests/CreativeMidiBankSelectTest.cpp'
       - 'tests/WindowsRunVst3HostPcmSmoke.py'
       - 'tests/test_voice_overlay_report.py'
+      - 'tests/test_voice_trace_direction.py'
       - 'tests/WindowsPrivateCreativeGuestSmoke.py'
       - 'tests/WindowsCheezoidsSweep.py'
       - 'tests/MakeRamSampleSf2.py'
@@ -70,6 +71,7 @@ jobs:
           PYTHONPATH=tests python -m unittest discover -s tests -p test_mpu_probe.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_ram_sample_sf2.py -v
           PYTHONPATH=tests python -m unittest discover -s tests -p test_voice_overlay_report.py -v
+          PYTHONPATH=tests python -m unittest discover -s tests -p test_voice_trace_direction.py -v
           python tests/compare_emu8000.py third_party/dosbox-x-AWE32 --seconds 2 --repeats 3
           python tests/compare_emu8000.py third_party/dosbox-x-AWE32 --sanitize --seconds 2 --repeats 1
           python integration/patch_dosbox_runtime.py third_party/dosbox-x-AWE32

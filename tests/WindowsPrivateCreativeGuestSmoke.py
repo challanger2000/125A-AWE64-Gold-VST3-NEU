@@ -125,15 +125,16 @@ def inspect_trace(trace: Path) -> tuple[int, int]:
 
 
 def summarize_filter_envelope_trace(trace: Path):
-    """Aggregate only musical-range DCYSUS writes from temporary local trace.
+    """Check real write evidence for the fixed 26-trial native host schedule.
 
-    The original trace is unlabelled by host trial. Counts are diagnostic,
-    not a per-control causality or PCM pass. Never emit raw trace or PCM.
+    DCYSUS anchors are the previously verified single-note boundaries.
+    Other registers must belong to the same voice, close to the anchor.
+    Use final relevant writes, not any matching word in the entire trace.
+    No raw private traces or PCM are printed.
     """
     pattern = re.compile(r"^(\d+) ([0-9A-Fa-f]{3,4}) ([0-9A-Fa-f]{4})$")
     selector = -1
-    held, release, routes = set(), set(), set()
-    counts = [0, 0, 0]
+    writes = []
     note_words, release_words = [], []
     with trace.open(encoding="utf-8", errors="replace") as fp:
         for line in fp:
@@ -146,52 +147,67 @@ def summarize_filter_envelope_trace(trace: Path):
                 continue
             if frame < 44100*8 or selector < 0 or (selector & 31) >= 30:
                 continue
-            reg = selector >> 5
+            reg, voice = selector >> 5, selector & 31
+            if port in (0xa20, 0xa22, 0xe20):
+                writes.append((frame, voice, port, reg, word))
             if port == 0xa20 and reg == 7:
-                if word & 0x8000:
-                    release.add(word & 127)
-                    counts[1] += 1
-                    release_words.append((frame,selector&31,word))
-                else:
-                    note_words.append((frame,selector&31,word))
-                    held.add((word >> 8 & 127, word & 127))
-                    counts[0] += 1
-            elif port == 0xe20 and reg == 2 and word & 255:
-                routes.add(word & 255)
-                counts[2] += 1
-    print(f"FILTER_TRACE_DIAGNOSTIC HELD_WRITES={counts[0]} RELEASE_WRITES={counts[1]} "
-          f"NONZERO_PEFE_WRITES={counts[2]} HELD_VARIANTS={len(held)} "
-          f"RELEASE_RATE_VARIANTS={len(release)} ROUTE_VARIANTS={len(routes)}")
-    # The controlled single-note schedule has 17 program-0 trials followed
-    # by 9 program-17 trials. Only attribute deltas if trace cardinality,
-    # same-voice pairing and note/release ordering agree.
+                (release_words if word & 0x8000 else note_words).append((frame, voice, word))
     if len(note_words) != 26 or len(release_words) != 26:
-        raise RuntimeError("FILTER_TRACE_CASE_ALIGNMENT=UNAVAILABLE")
-    for i,(on,off) in enumerate(zip(note_words,release_words)):
-        if on[1]!=off[1] or not 44100<=off[0]-on[0]<=88200 or (
-                i+1<len(note_words) and off[0]>=note_words[i+1][0]):
-            raise RuntimeError("FILTER_TRACE_CASE_ALIGNMENT=UNAVAILABLE")
-    base = note_words[17][2]
-    base_rel = release_words[17][2]
-    if any(note_words[i][2]!=base or release_words[i][2]!=base_rel
-           for i in (18,25)):
-        raise RuntimeError("FILTER_TRACE_CASE_ALIGNMENT=NEUTRAL_REGISTER_VARIATION")
-    print("FILTER_TRACE_CASE_ALIGNMENT=26_MATCHED_NOTE_RELEASE_PAIRS")
-    for index,field in ((1105,"decay"),(1106,"sustain"),(1107,"release")):
-        j=19+2*(index-1105)
-        if field=="decay":
-            delta=[(note_words[k][2]&127)-(base&127) for k in (j,j+1)]
-        elif field=="sustain":
-            delta=[((note_words[k][2]>>8)&127)-((base>>8)&127) for k in (j,j+1)]
-        else:
-            delta=[(release_words[k][2]&127)-(base_rel&127) for k in (j,j+1)]
-        print(f"FILTER_TRACE_FIELD_DELTA ID={index} MID={delta[0]} MAX={delta[1]}")
-        if field=="sustain":
-            if not delta[1]<delta[0]<0:
-                raise RuntimeError("Filter sustain register direction/midpoint failure")
-        elif not 0<delta[0]<delta[1]:
-            raise RuntimeError("Filter rate register direction/midpoint failure")
-    print("FILTER_TRACE_ALL_THREE_FIELD_GATES_PASS")
+        raise RuntimeError("VOICE_TRACE_CASE_ALIGNMENT=UNAVAILABLE")
+    for i, (on, off) in enumerate(zip(note_words, release_words)):
+        if on[1] != off[1] or not 44100 <= off[0]-on[0] <= 88200 or (
+                i+1 < len(note_words) and note_words[i+1][0]-off[0] < 4410):
+            raise RuntimeError("VOICE_TRACE_CASE_ALIGNMENT=UNAVAILABLE")
+
+    # (name, port, register, mask, shift, release phase, allowed raw writes)
+    # These are EMU8000 register definitions, not calls into VoiceOverlay.
+    fields = (
+        ("amp_attack", 0xa22, 4, 0x7f, 0, False, lambda w: True),
+        ("amp_decay", 0xa20, 5, 0x7f, 0, False, lambda w: not w & 0x8080),
+        ("amp_sustain", 0xa20, 5, 0x7f00, 8, False, lambda w: not w & 0x8080),
+        ("amp_release", 0xa20, 5, 0x7f, 0, True, lambda w: bool(w & 0x8000)),
+        ("filter_attack", 0xa22, 6, 0x7f, 0, False, lambda w: True),
+        ("filter_decay", 0xa20, 7, 0x7f, 0, False, lambda w: not w & 0x8000),
+        ("filter_sustain", 0xa20, 7, 0x7f00, 8, False, lambda w: not w & 0x8000),
+        ("filter_release", 0xa20, 7, 0x7f, 0, True, lambda w: bool(w & 0x8000)),
+        ("cutoff", 0xe20, 1, 0xff00, 8, False, lambda w: True),
+        ("resonance", 0xa22, 0, 0xf000, 12, False, lambda w: not w & 0x0400),
+    )
+    profiles = []
+    for trial, (on, off) in enumerate(zip(note_words, release_words)):
+        values = []
+        for name, port, reg, mask, shift, is_release, eligible in fields:
+            frame, voice, _ = off if is_release else on
+            # 50 ms either side; neighboring trials have disjoint windows.
+            candidates = [w for t,v,p,r,w in writes if v == voice and p == port
+                          and r == reg and abs(t-frame) <= 2205 and eligible(w)]
+            if not candidates:
+                raise RuntimeError(f"VOICE_TRACE_FIELD_MISSING TRIAL={trial} FIELD={name}")
+            values.append((candidates[-1] & mask) >> shift)
+        profiles.append(values)
+
+    # Fixed independent expected codes for .5 and 1.0, from the approved
+    # active control contract and the hardware fields. Zero is preset bypass,
+    # NOT the low endpoint of an absolute control. Do not compare max/neutral
+    # for direction: an original preset may already equal either endpoint.
+    expected = ((66,6),(69,12),(64,127),(69,12),(66,6),
+                (69,12),(64,127),(69,12),(128,255),(8,15))
+    trial_pairs = ((2,3),(4,5),(6,7),(8,9),(10,11),
+                   (19,20),(21,22),(23,24),(12,13),(14,15))
+    for neutral in ((0,1,16),(17,18,25)):
+        if not all(profiles[j] == profiles[neutral[0]] for j in neutral):
+            raise RuntimeError("VOICE_TRACE_NEUTRAL_REGISTER_VARIATION")
+    for i,(mid_trial,max_trial) in enumerate(trial_pairs):
+        baseline = profiles[17 if 5 <= i <= 7 else 0]
+        actual = (profiles[mid_trial][i], profiles[max_trial][i])
+        print(f"VOICE_TRACE_FIELD ID={1100+i} BASE={baseline[i]} MID={actual[0]} MAX={actual[1]} EXPECTED={expected[i][0]}/{expected[i][1]}")
+        if actual != expected[i]:
+            raise RuntimeError(f"VOICE_TRACE_DIRECTION_OR_VALUE ID={1100+i}")
+        for j in (mid_trial,max_trial):
+            if any(profiles[j][k] != baseline[k] for k in range(10) if k != i):
+                raise RuntimeError(f"VOICE_TRACE_CROSSTALK ID={1100+i} TRIAL={j}")
+    print("VOICE_TRACE_CASE_ALIGNMENT=26_MATCHED_NOTE_RELEASE_PAIRS")
+    print("VOICE_TRACE_ALL_TEN_FIELD_GATES_PASS")
 
 
 def summarize_ram_trace(trace: Path):

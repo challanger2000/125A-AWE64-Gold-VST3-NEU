@@ -1,5 +1,13 @@
 # AKTUELLE VERSION – verbindlicher Stand
 
+## 28.11.2026 — Nativer Register-Richtungstest: alter Prüfvertrag korrigiert
+
+- Befund: `summarize_filter_envelope_trace` erwartete noch steigende Decay-/Release-Raten und sinkenden Sustain relativ zum Originalpreset. Das ist die veraltete Regelrichtung; zudem waren nur drei Filterregler geprüft. 0 ist Preset-Bypass, nicht der untere aktive absolute Endpunkt.
+- Neuer Gate im selben privaten Windows-Testpfad: 26 aus der festen Host-Notenfolge abgeleitete DCYSUS-NoteOn-/Off-Paare, gleiche Stimme und zeitliche Zuordnung; finale relevante Registerwörter im Fenster ±50 ms, keine Übernahme beliebiger anderer Stimmen, deaktivierter Amp- oder DMA-Registerwörter. Alle zehn Regler einzeln mit unabhängigen exakten Sollcodes für 50/100 %: Attack 66/6, Decay/Release 69/12, Sustain 64/127, Cutoff 128/255, Resonance 8/15. Neutralreferenzen müssen jeweils übereinstimmen und andere neun Felder dürfen bei Einzelregler-Trials nicht mitwandern. Das ist ein strenger Trace-Kandidat; echte Gastregisterfolge kann zusätzliche Writes/abweichende Grenzen haben, dann ist der Nachweis nicht verfügbar statt PASS.
+- Tatsächlich lokal ausgeführter Python-Test: gültiger **synthetischer** 26-Paar-Trace, 10 vertauschte Mid/Max-Werte einzeln erkannt, 10 Cross-Talk-Gegenproben einzeln erkannt, veränderte Neutralreferenz, fehlendes Paar und fehlendes Register erkannt (5 Unittest-Methoden OK). Testblob dd84fdd41becb0702ad4a28c049fc8ac374585f4; lokal ausgeführtes Parserfragment 4794 ASCII-Zeichen, FNV-1a32 3a6050bc, SHA256 099adedcdbf559ab7a2468c56dda49c27738389f6ee80ac8721125fa8f152ad1. Beobachtete Soll-/Ist-Codes im synthetischen Trace stimmen exakt überein; kein echter nativer Trace erzeugt. Neuer Test in vorhandenen Workflow aufgenommen, keine neue private Paketabhängigkeit.
+- Keine Änderung am Plugin oder an der Engine. Nativer Windows-Trace, akustische Richtung (PCM-Hüllkurven-/Spektralprofile), gehaltene Noten, reale Presetprüfung und komplette Produktabnahme bleiben NOT RUN. Kein Windows-Build ausgelöst.
+
+
 ## 28.11.2026 — PCM-Bericht darf Messfehler nicht als PASS akzeptieren
 
 - Native Regler-Differenzprüfung: bisheriger Ergebnisparser akzeptierte sämtliche 14 widersprüchlichen Testberichte trotz PASS-Text (Nullwirkung, Delta gleich Schwelle, Rauschen oberhalb Schwelle, Schwelle null, unendliche/NaN/negative/fehlende Zahlen, falsche Probeprogramme, nicht stille oder ungültig gezählte Ruhefenster). Originalparser gegen exakt dieselben Gegenbeispiele ausgeführt: 14/14 falsch akzeptiert. Korrigierter Parser weist alle 14 zurück; beide gültigen Zeilenendformate und 10 bisherige Struktur-Gegenproben ebenfalls geprüft.
